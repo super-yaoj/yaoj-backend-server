@@ -53,7 +53,7 @@ func CTList(bound, pagesize, user_id int, isleft, isadmin bool) ([]Contest, bool
 		isfull := len(ids) == pagesize
 		if isfull { ids = ids[: pagesize - 1] }
 		id_str := libs.JoinArray(ids)
-		if len(ids) == 0 {
+		if len(ids) > 0 {
 			err = libs.DBSelectAll(&cts, "select * from contests where contest_id in (" + id_str + ")")
 			if err != nil { return nil, false, err }
 		}
