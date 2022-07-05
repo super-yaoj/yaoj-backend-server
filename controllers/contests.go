@@ -53,12 +53,14 @@ func CTList(bound, pagesize, user_id int, isleft, isadmin bool) ([]Contest, bool
 		isfull := len(ids) == pagesize
 		if isfull { ids = ids[: pagesize - 1] }
 		id_str := libs.JoinArray(ids)
-		err = libs.DBSelectAll(&cts, "select * from contests where contest_id in (" + id_str + ")")
-		if err != nil { return nil, false, err }
+		if len(ids) == 0 {
+			err = libs.DBSelectAll(&cts, "select * from contests where contest_id in (" + id_str + ")")
+			if err != nil { return nil, false, err }
+		}
 		sort.Slice(cts, func(i, j int) bool { return cts[i].Id > cts[j].Id })
 		
 		CTGetLikes(cts, user_id)
-		if user_id > 0 {
+		if user_id > 0 && len(ids) > 0 {
 			for i := range cts {
 				cts[i].RegisterStatus = 1
 			}

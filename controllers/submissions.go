@@ -54,8 +54,12 @@ func SMGetExtraInfo(subs []Submission) {
 		Name string `db:"name"`
 	}
 	var pname, uname []Name
-	libs.DBSelectAll(&pname, "select problem_id as id, title as name from problems where problem_id in (" + libs.JoinArray(probs) + ")")
-	libs.DBSelectAll(&uname, "select user_id as id, user_name as name from user_info where user_id in (" + libs.JoinArray(users) + ")")
+	if len(probs) > 0 {
+		libs.DBSelectAll(&pname, "select problem_id as id, title as name from problems where problem_id in (" + libs.JoinArray(probs) + ")")
+	}
+	if len(users) > 0 {
+		libs.DBSelectAll(&uname, "select user_id as id, user_name as name from user_info where user_id in (" + libs.JoinArray(users) + ")")
+	}
 	sort.Slice(pname, func(i, j int) bool { return pname[i].Id < pname[j].Id })
 	sort.Slice(uname, func(i, j int) bool { return uname[i].Id < uname[j].Id })
 	for key, val := range subs {

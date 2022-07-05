@@ -49,12 +49,12 @@ func SMList(ctx *gin.Context) {
 		
 		must = "("
 		if problem_id == 0 {
-			must += "(problem_id in (" + libs.JoinArray(probs) + "))"
+			must += libs.If(len(probs) == 0, "0", "(problem_id in (" + libs.JoinArray(probs) + "))")
 		} else {
 			must += libs.If(libs.HasIntN(probs, problem_id), "1", "0")
 		}
 		if contest_id == 0 {
-			must += " or (contest_id in (" + libs.JoinArray(conts) + "))"
+			must += libs.If(len(conts) == 0, "0", " or (contest_id in (" + libs.JoinArray(conts) + "))")
 		} else {
 			must += " or " + libs.If(libs.HasIntN(conts, contest_id), "1", "0")
 		}

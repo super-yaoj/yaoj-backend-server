@@ -66,8 +66,10 @@ func PRList(bound, pagesize, user_id int, isleft, isadmin bool) ([]Problem, bool
 		
 		isfull := len(ids) == pagesize
 		if isfull { ids = ids[: pagesize - 1] }
-		err = libs.DBSelectAll(&problems, "select problem_id, title, `like` from problems where problem_id in (" + libs.JoinArray(ids) + ")")
-		if err != nil { return nil, false, err }
+		if len(ids) != 0 {
+			err = libs.DBSelectAll(&problems, "select problem_id, title, `like` from problems where problem_id in (" + libs.JoinArray(ids) + ")")
+			if err != nil { return nil, false, err }
+		}
 		sort.Slice(problems, func(i, j int) bool { return problems[i].Id < problems[j].Id })
 		PRGetLikes(problems, user_id)
 		return problems, isfull, nil
