@@ -26,7 +26,7 @@ func NewJudger(url string) *Judger {
 }
 
 var judgers = []*Judger {
-	NewJudger("http://localhost:2375"),
+	NewJudger("http://localhost:3000"),
 	// "http://localhost:8083",
 	// "http://localhost:8084",
 }

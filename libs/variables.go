@@ -3,8 +3,8 @@ package libs
 import "time"
 
 var (
-	FrontDomain  string        = "http://localhost:8080"
-	BackDomain   string        = "http://192.168.0.106:8081"
+	FrontDomain  string        = "http://www.wzyhome.work"
+	BackDomain   string        = "http://localhost:8081"
 	Sault        string        = "3.1y4a1o5j9"
 	DefaultGroup int           = 1
 	Day          int           = 86400
