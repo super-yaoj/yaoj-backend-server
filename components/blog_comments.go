@@ -14,7 +14,9 @@ func BLCreateComment(ctx *gin.Context) {
 		return
 	}
 	blog_id, ok := libs.PostInt(ctx, "blog_id")
-	if !ok { return }
+	if !ok {
+		return
+	}
 	if !BLCanSee(ctx, blog_id) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
@@ -24,13 +26,15 @@ func BLCreateComment(ctx *gin.Context) {
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	} else {
-		libs.APIWriteBack(ctx, 200, "", map[string]any{ "id": id })
+		libs.APIWriteBack(ctx, 200, "", map[string]any{"id": id})
 	}
 }
 
 func BLGetComments(ctx *gin.Context) {
 	blog_id, ok := libs.GetInt(ctx, "blog_id")
-	if !ok { return }
+	if !ok {
+		return
+	}
 	if !controllers.BLExists(blog_id) {
 		libs.APIWriteBack(ctx, 404, "", nil)
 		return
@@ -43,13 +47,15 @@ func BLGetComments(ctx *gin.Context) {
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	} else {
-		libs.APIWriteBack(ctx, 200, "", map[string]any{ "data": comments })
+		libs.APIWriteBack(ctx, 200, "", map[string]any{"data": comments})
 	}
 }
 
 func BLDeleteComment(ctx *gin.Context) {
 	id, ok := libs.GetInt(ctx, "comment_id")
-	if !ok { return }
+	if !ok {
+		return
+	}
 	user_id := GetUserId(ctx)
 	var comment controllers.Comment
 	err := libs.DBSelectSingle(&comment, "select author, blog_id from blog_comments where comment_id=?", id)

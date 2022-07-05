@@ -7,16 +7,16 @@ import (
 )
 
 type Blog struct {
-	Id 			int 		`db:"blog_id" json:"blog_id"`
-	Author 		int 		`db:"author" json:"author"`
-	AuthorName 	string 		`db:"user_name" json:"author_name"`
-	Title 		string 		`db:"title" json:"title"`
-	Content 	string 		`db:"content" json:"content"`
-	Private 	bool 		`db:"private" json:"private"`
-	CreateTime 	time.Time 	`db:"create_time" json:"create_time"`
-	Comments 	int 		`db:"comments" json:"comments"`
-	Like 		int 		`db:"like" json:"like"`
-	Liked 		bool 		`json:"liked"`
+	Id         int       `db:"blog_id" json:"blog_id"`
+	Author     int       `db:"author" json:"author"`
+	AuthorName string    `db:"user_name" json:"author_name"`
+	Title      string    `db:"title" json:"title"`
+	Content    string    `db:"content" json:"content"`
+	Private    bool      `db:"private" json:"private"`
+	CreateTime time.Time `db:"create_time" json:"create_time"`
+	Comments   int       `db:"comments" json:"comments"`
+	Like       int       `db:"like" json:"like"`
+	Liked      bool      `json:"liked"`
 }
 
 func BLValidTitle(title string) bool {
@@ -57,7 +57,7 @@ func BLQuery(id, user_id int) (Blog, error) {
 }
 
 func BLListUser(id, user_id int) ([]Blog, error) {
-	var blogs[] Blog
+	var blogs []Blog
 	err := libs.DBSelectAll(&blogs, "select blog_id, title, private, create_time, comments, `like` from blogs where author=?", id)
 	BLGetLikes(blogs, user_id)
 	return blogs, err
@@ -80,16 +80,24 @@ func BLListAll(bound, pagesize, user_id int, isleft, isadmin bool) ([]Blog, bool
 			err = libs.DBSelectAll(&blogs, "select blog_id, title, author, create_time, private, user_name, comments, `like` from (user_info join blogs on user_info.user_id=blogs.author) where blog_id>? and (author=? or private=0) order by blog_id desc limit ?", bound, user_id, pagesize)
 		}
 	}
-	if err != nil { return nil, false, err }
+	if err != nil {
+		return nil, false, err
+	}
 	var isfull = len(blogs) == pagesize
-	if isfull { blogs = blogs[: pagesize - 1] }
-	if !isleft { libs.Reverse(blogs) }
+	if isfull {
+		blogs = blogs[:pagesize-1]
+	}
+	if !isleft {
+		libs.Reverse(blogs)
+	}
 	BLGetLikes(blogs, user_id)
 	return blogs, isfull, nil
 }
 
 func BLGetLikes(blogs []Blog, user_id int) {
-	if user_id < 0 { return }
+	if user_id < 0 {
+		return
+	}
 	ids := []int{}
 	for _, i := range blogs {
 		ids = append(ids, i.Id)

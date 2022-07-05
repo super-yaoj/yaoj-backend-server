@@ -6,14 +6,14 @@ import (
 )
 
 type Announcement struct {
-	Id 			int 		`db:"id" json:"id"`
-	BlogId 		int 		`db:"blog_id" json:"blog_id"`
-	Title 		string 		`db:"title" json:"title"`
-	Priority 	int 		`db:"priority" json:"priority"`
-	ReleaseTime	time.Time 	`db:"release_time" json:"release_time"`
-	Comments 	int 		`db:"comments" json:"comments"`
-	Like 		int 		`db:"like" json:"like"`
-	Liked 		bool 		`json:"liked"`
+	Id          int       `db:"id" json:"id"`
+	BlogId      int       `db:"blog_id" json:"blog_id"`
+	Title       string    `db:"title" json:"title"`
+	Priority    int       `db:"priority" json:"priority"`
+	ReleaseTime time.Time `db:"release_time" json:"release_time"`
+	Comments    int       `db:"comments" json:"comments"`
+	Like        int       `db:"like" json:"like"`
+	Liked       bool      `json:"liked"`
 }
 
 func ANCreate(blog_id, priority int) error {
@@ -29,7 +29,9 @@ func ANQuery(user_id int) []Announcement {
 }
 
 func ANGetLikes(blogs []Announcement, user_id int) {
-	if user_id < 0 { return }
+	if user_id < 0 {
+		return
+	}
 	ids := []int{}
 	for _, i := range blogs {
 		ids = append(ids, i.BlogId)

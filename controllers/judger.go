@@ -15,17 +15,17 @@ import (
 )
 
 type Judger struct {
-	url 		string
+	url string
 	//The submission which this judger is running on, 0 means free
-	submission 	int
-	callback 	chan []byte
+	submission int
+	callback   chan []byte
 }
 
 func NewJudger(url string) *Judger {
-	return &Judger{ url, 0, make(chan []byte) }
+	return &Judger{url, 0, make(chan []byte)}
 }
 
-var judgers = []*Judger {
+var judgers = []*Judger{
 	NewJudger("http://localhost:3000"),
 	// "http://localhost:8083",
 	// "http://localhost:8084",
@@ -55,16 +55,16 @@ func JudgersInit() {
 }
 
 type judgerResponse struct {
-	Err 		string 	`json:"error"`
-	Err_code 	int 	`json:"error_code"`
-	Msg 		string 	`json:"message"`
+	Err      string `json:"error"`
+	Err_code int    `json:"error_code"`
+	Msg      string `json:"message"`
 }
 
 func JudgerStart(judger *Judger) {
 	for {
 		sid := waitingList.Pop().(int)
 		go libs.DBUpdate("update submissions set status=? where submission_id=?", Judging, sid)
-		
+
 		var content []byte
 		err := libs.DBSelectSingleColumn(&content, "select content from submission_content where submission_id=?", sid)
 		prob, err1 := libs.DBSelectSingleInt("select problem_id from submissions where submission_id=?", sid)
@@ -75,13 +75,13 @@ func JudgerStart(judger *Judger) {
 			libs.DBUpdate("update submissions set status=? where submission_id=?", SystemError, sid)
 			continue
 		}
-		
+
 		failed := true
-		for {//Repeating for data sync
-			res, err := http.Post(judger.url + "/judge?" + libs.GetQuerys(map[string]string{
+		for { //Repeating for data sync
+			res, err := http.Post(judger.url+"/judge?"+libs.GetQuerys(map[string]string{
 				"sum": check_sum,
 				//Give a check_sum of submission_id for security
-				"cb": fmt.Sprintf(libs.BackDomain + "/FinishJudging?submission_id=%d&check_sum=%s", sid, SaltPassword(fmt.Sprint(sid))),
+				"cb": fmt.Sprintf(libs.BackDomain+"/FinishJudging?submission_id=%d&check_sum=%s", sid, SaltPassword(fmt.Sprint(sid))),
 			}), "binary", bytes.NewBuffer(content))
 			if err != nil {
 				fmt.Printf("%v\n", err)
@@ -90,14 +90,14 @@ func JudgerStart(judger *Judger) {
 			body, _ := ioutil.ReadAll(res.Body)
 			var jr judgerResponse
 			json.Unmarshal(body, &jr)
-			
+
 			if jr.Msg == "ok" {
 				failed = false
 				break
 			} else if jr.Err_code == 1 {
 				ProblemRLock(prob)
 				file, err := os.Open(PRGetDataZip(prob))
-				res, err1 = http.Post(judger.url + "/sync?" + libs.GetQuerys(map[string]string{ "sum": check_sum }), "binary", file)
+				res, err1 = http.Post(judger.url+"/sync?"+libs.GetQuerys(map[string]string{"sum": check_sum}), "binary", file)
 				ProblemRUnlock(prob)
 				if err != nil || err1 != nil {
 					fmt.Printf("%v %v\n", err, err1)

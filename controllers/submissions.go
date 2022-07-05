@@ -9,23 +9,23 @@ import (
 	"time"
 	"yao/libs"
 
-	"github.com/sshwy/yaoj-core/pkg/problem"
+	"github.com/super-yaoj/yaoj-core/pkg/problem"
 )
 
 type Submission struct {
-	Id          	int 		`db:"submission_id" json:"submission_id"`
-	Submitter   	int     	`db:"submitter" json:"submitter"`
-	ProblemId 		int 		`db:"problem_id" json:"problem_id"`
-	ProblemName		string 		`json:"problem_name"`
-	ContestId 		int 		`db:"contest_id" json:"contest_id"`
-	SubmitterName	string 		`json:"submitter_name"`
-	Status      	int     	`db:"status" json:"status"`
-	Score       	float64 	`db:"score" json:"score"`
-	SubmitTime  	time.Time 	`db:"submit_time" json:"submit_time"`
-	Result      	string 		`db:"result" json:"result"`
-	Language 		int 		`db:"language" json:"language"`
-	Time 			int 		`db:"time" json:"time"`
-	Memory  		int 		`db:"memory" json:"memory"`
+	Id            int       `db:"submission_id" json:"submission_id"`
+	Submitter     int       `db:"submitter" json:"submitter"`
+	ProblemId     int       `db:"problem_id" json:"problem_id"`
+	ProblemName   string    `json:"problem_name"`
+	ContestId     int       `db:"contest_id" json:"contest_id"`
+	SubmitterName string    `json:"submitter_name"`
+	Status        int       `db:"status" json:"status"`
+	Score         float64   `db:"score" json:"score"`
+	SubmitTime    time.Time `db:"submit_time" json:"submit_time"`
+	Result        string    `db:"result" json:"result"`
+	Language      int       `db:"language" json:"language"`
+	Time          int       `db:"time" json:"time"`
+	Memory        int       `db:"memory" json:"memory"`
 }
 
 func SMGetZipName(submission_id int) string {
@@ -34,11 +34,17 @@ func SMGetZipName(submission_id int) string {
 
 func SMCreate(user_id, problem_id, contest_id, language int, tmp_file string) error {
 	id, err := libs.DBInsertGetId("insert into submissions values (null, ?, ?, ?, ?, 0, -1, -1, ?, ?, \"\")", user_id, problem_id, contest_id, Waiting, language, time.Now())
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	byt, err := os.ReadFile(tmp_file)
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	_, err = libs.DBUpdate("insert into submission_content values (?, ?)", id, byt)
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	InsertSubmission(int(id), libs.If(contest_id > 0, 4, 2))
 	return nil
 }
@@ -50,7 +56,7 @@ func SMGetExtraInfo(subs []Submission) {
 		users = append(users, val.Submitter)
 	}
 	type Name struct {
-		Id 	 int 	`db:"id"`
+		Id   int    `db:"id"`
 		Name string `db:"name"`
 	}
 	var pname, uname []Name
@@ -78,9 +84,11 @@ func SMQuery(sid int) (Submission, error) {
 func SMUpdate(sid, pid int, result []byte) error {
 	res_map := make(map[string]any)
 	err := json.Unmarshal(result, &res_map)
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	prob := PRLoad(pid)
-	
+
 	var score, time_used, memory_used float64 = 0, 0, 0
 	is_subtask := res_map["IsSubtask"].(bool)
 	for _, subtask := range res_map["Subtask"].([]any) {
@@ -97,9 +105,12 @@ func SMUpdate(sid, pid int, result []byte) error {
 			}
 			if is_subtask {
 				switch prob.DataInfo.CalcMethod {
-					case problem.Mmin: sub_score = math.Min(sub_score, test_score)
-					case problem.Mmax: sub_score = math.Max(sub_score, test_score)
-					case problem.Msum: sub_score += test_score
+				case problem.Mmin:
+					sub_score = math.Min(sub_score, test_score)
+				case problem.Mmax:
+					sub_score = math.Max(sub_score, test_score)
+				case problem.Msum:
+					sub_score += test_score
 				}
 			} else {
 				sub_score += test_score
@@ -108,6 +119,6 @@ func SMUpdate(sid, pid int, result []byte) error {
 		score += sub_score
 	}
 	_, err = libs.DBUpdate("update submissions set status=0, score=?, time=?, memory=?, result=? where submission_id=?",
-		score, int(time_used / float64(time.Millisecond)), int(memory_used / 1024), result, sid)
+		score, int(time_used/float64(time.Millisecond)), int(memory_used/1024), result, sid)
 	return err
 }

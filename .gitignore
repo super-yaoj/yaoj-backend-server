@@ -1,2 +1,2 @@
-test/*
-libs/variables.go
+test
+local*

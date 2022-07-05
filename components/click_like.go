@@ -15,7 +15,9 @@ func ClickLike(ctx *gin.Context) {
 		return
 	}
 	id, ok := libs.PostInt(ctx, "id")
-	if !ok { return }
+	if !ok {
+		return
+	}
 	var err error
 	switch target {
 	case "blog":

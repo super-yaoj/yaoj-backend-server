@@ -14,7 +14,9 @@ import (
 func checkPU(ctx *gin.Context, name, password string) bool {
 	if !controllers.ValidPassword(password) || !controllers.ValidUsername(name) {
 		message := "invalid username"
-		if !controllers.ValidPassword(password) { message = "invalid password" }
+		if !controllers.ValidPassword(password) {
+			message = "invalid password"
+		}
 		libs.RPCWriteBack(ctx, 400, -32600, message, nil)
 		return false
 	}
@@ -65,7 +67,7 @@ func USLogin(ctx *gin.Context) {
 		return
 	}
 	password = controllers.SaltPassword(password)
-	user := controllers.UserSmall{ Name: name }
+	user := controllers.UserSmall{Name: name}
 	err := libs.DBSelectSingle(&user, "select user_id, user_group from user_info where user_name=? and password=?", name, password)
 	if err != nil {
 		libs.RPCWriteBack(ctx, 400, -32600, "username or password is wrong", nil)
@@ -87,7 +89,6 @@ func USLogin(ctx *gin.Context) {
 		libs.DBUpdate("update user_info set remember_token=? where user_id=?", remember_token, user.Id)
 	}
 	libs.RPCWriteBack(ctx, 200, 0, "", nil)
-	return
 }
 
 func USLogout(ctx *gin.Context) {
@@ -111,9 +112,9 @@ func USInit(ctx *gin.Context) {
 		}
 		libs.RPCWriteBack(ctx, 200, 0, "", map[string]any{"user_id": user.Id, "user_name": user.Name, "user_group": user.Usergroup, "server_time": time.Now()})
 	}
-	
+
 	tmp, err := ctx.Cookie("user_id")
-	user := controllers.UserSmall{ Id: -1, Name: "", Usergroup: 2 }
+	user := controllers.UserSmall{Id: -1, Name: "", Usergroup: 2}
 	if err == nil {
 		id, err := strconv.Atoi(tmp)
 		remember_token, err1 := ctx.Cookie("remember_token")
@@ -136,7 +137,6 @@ func USInit(ctx *gin.Context) {
 		user.Usergroup = sess.Get("user_group").(int)
 	}
 	ret(user)
-	return
 }
 
 func ISAdmin(ctx *gin.Context) bool {
@@ -148,13 +148,17 @@ func ISAdmin(ctx *gin.Context) bool {
 func GetUserId(ctx *gin.Context) int {
 	sess := sessions.Default(ctx)
 	user_id, err := sess.Get("user_id").(int)
-	if !err { return -1 }
+	if !err {
+		return -1
+	}
 	return user_id
 }
 
 func USQuery(ctx *gin.Context) {
 	id, ok := libs.GetInt(ctx, "user_id")
-	if !ok { return }
+	if !ok {
+		return
+	}
 	user, err := controllers.USQuery(id)
 	if err != nil {
 		libs.APIWriteBack(ctx, 400, "no such user id", nil)
@@ -173,7 +177,9 @@ func USModify(ctx *gin.Context) {
 	sess := sessions.Default(ctx)
 	cur, ok := sess.Get("user_id").(int)
 	user_id, ok1 := libs.PostInt(ctx, "user_id")
-	if !ok1 { return }
+	if !ok1 {
+		return
+	}
 	if !ok || user_id != cur {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
@@ -194,7 +200,9 @@ func USModify(ctx *gin.Context) {
 	}
 	password = controllers.SaltPassword(password)
 	gender, ok := libs.PostIntRange(ctx, "gender", 0, 2)
-	if !ok { return }
+	if !ok {
+		return
+	}
 	motto, email, organization := ctx.PostForm("motto"), ctx.PostForm("email"), ctx.PostForm("organization")
 	if len(motto) > 350 || len(organization) > 150 {
 		libs.APIWriteBack(ctx, 400, "length of motto or organization is too long", nil)
@@ -213,9 +221,13 @@ func USModify(ctx *gin.Context) {
 
 func USGroupEdit(ctx *gin.Context) {
 	user_id, ok := libs.PostInt(ctx, "user_id")
-	if !ok { return }
+	if !ok {
+		return
+	}
 	user_group, ok := libs.PostIntRange(ctx, "user_group", 1, 3)
-	if !ok { return }
+	if !ok {
+		return
+	}
 	cur_group, ok := sessions.Default(ctx).Get("user_group").(int)
 	if !ok || cur_group > 1 || cur_group >= user_group {
 		libs.APIWriteBack(ctx, 403, "", nil)
@@ -239,29 +251,37 @@ func USGroupEdit(ctx *gin.Context) {
 
 func USList(ctx *gin.Context) {
 	pagesize, ok := libs.GetIntRange(ctx, "pagesize", 1, 100)
-	if !ok { return }
+	if !ok {
+		return
+	}
 	user_name, searchname := ctx.GetQuery("user_name")
 	if searchname {
 		_, isleft := ctx.GetQuery("left")
 		bound, ok := libs.GetInt(ctx, libs.If(isleft, "left", "right"))
-		if !ok { return }
-		users, isfull, err := controllers.USListByName(user_name + "%", bound, pagesize, isleft)
+		if !ok {
+			return
+		}
+		users, isfull, err := controllers.USListByName(user_name+"%", bound, pagesize, isleft)
 		if err != nil {
 			libs.APIInternalError(ctx, err)
 		} else {
-			libs.APIWriteBack(ctx, 200, "", map[string]any{ "data": users, "isfull": isfull })
+			libs.APIWriteBack(ctx, 200, "", map[string]any{"data": users, "isfull": isfull})
 		}
 	} else {
 		_, isleft := ctx.GetQuery("left_user_id")
 		bound_user_id, ok := libs.GetInt(ctx, libs.If(isleft, "left_user_id", "right_user_id"))
-		if !ok { return }
+		if !ok {
+			return
+		}
 		bound_rating, ok := libs.GetInt(ctx, libs.If(isleft, "left_rating", "right_user_id"))
-		if !ok { return }
+		if !ok {
+			return
+		}
 		users, isfull, err := controllers.USList(bound_user_id, bound_rating, pagesize, isleft)
 		if err != nil {
 			libs.APIInternalError(ctx, err)
 		} else {
-			libs.APIWriteBack(ctx, 200, "", map[string]any{ "data": users, "isfull": isfull })
+			libs.APIWriteBack(ctx, 200, "", map[string]any{"data": users, "isfull": isfull})
 		}
 	}
 }

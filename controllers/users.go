@@ -7,23 +7,23 @@ import (
 )
 
 type UserSmall struct {
-	Id            int           `db:"user_id" json:"user_id"`
-	Name          string        `db:"user_name" json:"user_name"`
-	Usergroup     int           `db:"user_group" json:"user_group"`
+	Id        int    `db:"user_id" json:"user_id"`
+	Name      string `db:"user_name" json:"user_name"`
+	Usergroup int    `db:"user_group" json:"user_group"`
 }
 
 type User struct {
-	Id            int           `db:"user_id" json:"user_id"`
-	Name          string        `db:"user_name" json:"user_name"`
-	Password      string        `db:"password" json:"password"`
-	Motto         string        `db:"motto" json:"motto"`
-	Rating        int           `db:"rating" json:"rating"`
-	RegisterTime  time.Time     `db:"register_time" json:"register_time"`
-	RememberToken string        `db:"remember_token" json:"remember_token"`
-	Usergroup     int           `db:"user_group" json:"user_group"`
-	Gender        int           `db:"gender" json:"gender"`
-	Email         string        `db:"email" json:"email"`
-	Organization  string        `db:"organization" json:"organization"`
+	Id            int       `db:"user_id" json:"user_id"`
+	Name          string    `db:"user_name" json:"user_name"`
+	Password      string    `db:"password" json:"password"`
+	Motto         string    `db:"motto" json:"motto"`
+	Rating        int       `db:"rating" json:"rating"`
+	RegisterTime  time.Time `db:"register_time" json:"register_time"`
+	RememberToken string    `db:"remember_token" json:"remember_token"`
+	Usergroup     int       `db:"user_group" json:"user_group"`
+	Gender        int       `db:"gender" json:"gender"`
+	Email         string    `db:"email" json:"email"`
+	Organization  string    `db:"organization" json:"organization"`
 }
 
 func SaltPassword(password string) string {
@@ -61,7 +61,9 @@ func ValidEmail(email string) bool {
 }
 
 func CheckPassword(user_id int, password string) (bool, error) {
-	if !ValidPassword(password) { return false, nil }
+	if !ValidPassword(password) {
+		return false, nil
+	}
 	count, err := libs.DBSelectSingleInt("select count(*) from user_info where user_id=? and password=?", user_id, SaltPassword(password))
 	return count == 1, err
 }
@@ -73,7 +75,7 @@ func USQuery(user_id int) (User, error) {
 }
 
 func USQuerySmall(user_id int) (UserSmall, error) {
-	user := UserSmall{ Id: user_id }
+	user := UserSmall{Id: user_id}
 	err := libs.DBSelectSingle(&user, "select user_name, user_group from user_info where user_id=?", user_id)
 	return user, err
 }
@@ -97,10 +99,16 @@ func USList(bound_user_id, bound_rating, pagesize int, isleft bool) ([]User, boo
 	} else {
 		err = libs.DBSelectAll(&users, "select user_id, user_name, motto, rating from user_info where rating>? or (rating=? and user_id<=?) order by rating, user_id desc limit ?", bound_rating, bound_rating, bound_user_id, pagesize)
 	}
-	if err != nil { return nil, false, err }
+	if err != nil {
+		return nil, false, err
+	}
 	isfull := pagesize == len(users)
-	if isfull { users = users[: pagesize - 1] }
-	if !isleft { libs.Reverse(users) }
+	if isfull {
+		users = users[:pagesize-1]
+	}
+	if !isleft {
+		libs.Reverse(users)
+	}
 	return users, isfull, nil
 }
 
@@ -111,9 +119,13 @@ func USQueryPermission(user_id int) ([]Permission, error) {
 }
 
 func USPermissions(user_id int) ([]int, error) {
-	if user_id < 0 { return []int{ libs.DefaultGroup }, nil }
+	if user_id < 0 {
+		return []int{libs.DefaultGroup}, nil
+	}
 	p, err := libs.DBSelectInts("select permission_id from user_permissions where user_id=?", user_id)
-	if err != nil { return nil, nil }
+	if err != nil {
+		return nil, nil
+	}
 	return append(p, -user_id), err
 }
 
@@ -132,7 +144,11 @@ func USListByName(user_name string, bound, pagesize int, isleft bool) ([]UserSma
 		err = libs.DBSelectAll(&users, "select user_id, user_name from user_info where user_id<=? and user_name like ? order by user_id desc limit ?", bound, user_name, pagesize)
 	}
 	isfull := len(users) == pagesize
-	if isfull { users = users[: pagesize - 1] }
-	if !isleft { libs.Reverse(users) }
+	if isfull {
+		users = users[:pagesize-1]
+	}
+	if !isleft {
+		libs.Reverse(users)
+	}
 	return users, isfull, err
 }
