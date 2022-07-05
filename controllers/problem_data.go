@@ -4,12 +4,15 @@ import (
 	"archive/zip"
 	"fmt"
 	"io"
+	"log"
 	"os"
+	"path"
 	"sync"
 	"yao/libs"
 
-	"github.com/sshwy/yaoj-core/pkg/problem"
-	"github.com/sshwy/yaoj-core/pkg/utils"
+	"github.com/k0kubun/pp"
+	"github.com/super-yaoj/yaoj-core/pkg/problem"
+	"github.com/super-yaoj/yaoj-core/pkg/utils"
 )
 
 func PRGetDir(problem_id int) string {
@@ -34,8 +37,8 @@ Put problem data in tmp dir first. You should put data zip in tmpdir/1.zip
 If the data format is correct, then copy it to the data dir.
 */
 func PRPutData(problem_id int, tmpdir string) error {
-	os.Mkdir(tmpdir+"/1", os.ModePerm)
-	_, err := problem.LoadDump(tmpdir+"/1.zip", tmpdir+"/1")
+	os.Mkdir(path.Join(tmpdir, "1"), os.ModePerm)
+	_, err := problem.LoadDump(path.Join(tmpdir, "1.zip"), path.Join(tmpdir, "1"))
 	if err != nil {
 		return err
 	}
@@ -50,8 +53,8 @@ func PRPutData(problem_id int, tmpdir string) error {
 	os.RemoveAll(data_dir)
 	os.RemoveAll(sample_zip)
 
-	os.Rename(tmpdir+"/1.zip", data_zip)
-	os.Rename(tmpdir+"/1", data_dir)
+	os.Rename(path.Join(tmpdir, "1.zip"), data_zip)
+	os.Rename(path.Join(tmpdir, "1"), data_dir)
 
 	libs.CacheMap.Delete(PRGetKey(problem_id))
 	libs.DBUpdate("update problems set check_sum=?, allow_down=\"\" where problem_id=?", utils.FileChecksum(data_zip).String(), problem_id)
@@ -66,8 +69,10 @@ func PRLoad(problem_id int) *Problem {
 		defer ProblemRUnlock(problem_id)
 		pro, err := problem.LoadDir(PRGetDir(problem_id))
 		if err != nil {
+			log.Print("prload", err)
 			return &Problem{}
 		}
+		pp.Print(pro)
 		PRSetCache(problem_id, pro)
 		ret, _ := libs.CacheMap.Get(PRGetKey(problem_id))
 		return ret.(*Problem)

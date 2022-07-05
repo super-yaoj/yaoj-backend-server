@@ -8,8 +8,8 @@ import (
 	"yao/libs"
 
 	"github.com/gin-gonic/gin"
-	"github.com/sshwy/yaoj-core/pkg/problem"
-	"github.com/sshwy/yaoj-core/pkg/utils"
+	"github.com/super-yaoj/yaoj-core/pkg/problem"
+	"github.com/super-yaoj/yaoj-core/pkg/utils"
 )
 
 func SMList(ctx *gin.Context) {
@@ -168,7 +168,9 @@ func SMSubmit(ctx *gin.Context) {
 			}
 			sub.Set(key, path)
 		}
-		sub.DumpFile(zip)
+		if err := sub.DumpFile(zip); err != nil {
+			libs.APIInternalError(ctx, err)
+		}
 	}
 	err = controllers.SMCreate(user_id, problem_id, contest_id, language, zip)
 	if err != nil {

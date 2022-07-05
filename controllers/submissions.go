@@ -9,7 +9,7 @@ import (
 	"time"
 	"yao/libs"
 
-	"github.com/sshwy/yaoj-core/pkg/problem"
+	"github.com/super-yaoj/yaoj-core/pkg/problem"
 )
 
 type Submission struct {

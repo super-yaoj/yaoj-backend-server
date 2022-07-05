@@ -87,7 +87,7 @@ func GetTempDir() string {
 		tmp := TmpDir + RandomString(16)
 		_, err := os.Stat(tmp)
 		if err != nil {
-			os.Mkdir(tmp, os.ModePerm)
+			os.MkdirAll(tmp, os.ModePerm)
 			return tmp
 		}
 	}

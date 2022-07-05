@@ -2,10 +2,12 @@ package controllers
 
 import (
 	"fmt"
+	"log"
 	"sort"
+	"strings"
 	"yao/libs"
 
-	"github.com/sshwy/yaoj-core/pkg/problem"
+	"github.com/super-yaoj/yaoj-core/pkg/problem"
 )
 
 type Statement struct {
@@ -78,9 +80,13 @@ func PRList(bound, pagesize, user_id int, isleft, isadmin bool) ([]Problem, bool
 		if isfull {
 			ids = ids[:pagesize-1]
 		}
-		err = libs.DBSelectAll(&problems, "select problem_id, title, `like` from problems where problem_id in ("+libs.JoinArray(ids)+")")
-		if err != nil {
-			return nil, false, err
+		idsstr := libs.JoinArray(ids)
+		if strings.TrimSpace(idsstr) != "" {
+			err = libs.DBSelectAll(&problems, "select problem_id, title, `like` from problems where problem_id in ("+idsstr+")")
+			if err != nil {
+				log.Print(err, "idsstr: ", idsstr)
+				return nil, false, err
+			}
 		}
 		sort.Slice(problems, func(i, j int) bool { return problems[i].Id < problems[j].Id })
 		PRGetLikes(problems, user_id)

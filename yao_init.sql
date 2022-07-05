@@ -3,25 +3,13 @@
 -- Host: localhost    Database: yaoj
 -- ------------------------------------------------------
 -- Server version	8.0.13
-
-/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
-/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
-/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
  SET NAMES utf8mb4 ;
-/*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;
-/*!40103 SET TIME_ZONE='+00:00' */;
-/*!40014 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0 */;
-/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
-/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
-/*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
 
 --
 -- Table structure for table `announcements`
 --
 
 DROP TABLE IF EXISTS `announcements`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
- SET character_set_client = utf8mb4 ;
 CREATE TABLE `announcements` (
   `blog_id` int(11) DEFAULT NULL,
   `release_time` datetime DEFAULT NULL,
@@ -29,8 +17,7 @@ CREATE TABLE `announcements` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   PRIMARY KEY (`id`),
   KEY `blog_id` (`blog_id`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
+);
 
 --
 -- Dumping data for table `announcements`
@@ -46,8 +33,6 @@ UNLOCK TABLES;
 --
 
 DROP TABLE IF EXISTS `blog_comments`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
- SET character_set_client = utf8mb4 ;
 CREATE TABLE `blog_comments` (
   `blog_id` int(11) DEFAULT NULL,
   `create_time` datetime DEFAULT NULL,
@@ -58,8 +43,7 @@ CREATE TABLE `blog_comments` (
   PRIMARY KEY (`comment_id`),
   KEY `blog_id` (`blog_id`),
   KEY `author` (`author`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
+);
 
 --
 -- Dumping data for table `blog_comments`
@@ -75,8 +59,6 @@ UNLOCK TABLES;
 --
 
 DROP TABLE IF EXISTS `blogs`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
- SET character_set_client = utf8mb4 ;
 CREATE TABLE `blogs` (
   `blog_id` int(11) NOT NULL AUTO_INCREMENT,
   `author` int(11) DEFAULT NULL,
@@ -88,8 +70,7 @@ CREATE TABLE `blogs` (
   `like` int(11) DEFAULT NULL,
   PRIMARY KEY (`blog_id`),
   KEY `author` (`author`)
-) ENGINE=MyISAM AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
+);
 
 --
 -- Dumping data for table `blogs`
@@ -106,15 +87,12 @@ UNLOCK TABLES;
 --
 
 DROP TABLE IF EXISTS `click_like`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
- SET character_set_client = utf8mb4 ;
 CREATE TABLE `click_like` (
   `target` int(11) DEFAULT NULL,
   `id` int(11) DEFAULT NULL,
   `user_id` int(11) DEFAULT NULL,
   UNIQUE KEY `target` (`target`,`id`,`user_id`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
+);
 
 --
 -- Dumping data for table `click_like`
@@ -130,15 +108,12 @@ UNLOCK TABLES;
 --
 
 DROP TABLE IF EXISTS `contest_participants`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
- SET character_set_client = utf8mb4 ;
 CREATE TABLE `contest_participants` (
   `contest_id` int(11) DEFAULT NULL,
   `user_id` int(11) DEFAULT NULL,
   UNIQUE KEY `contest_id` (`contest_id`,`user_id`),
   KEY `user_id` (`user_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
+);
 
 --
 -- Dumping data for table `contest_participants`
@@ -154,15 +129,12 @@ UNLOCK TABLES;
 --
 
 DROP TABLE IF EXISTS `contest_permissions`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
- SET character_set_client = utf8mb4 ;
 CREATE TABLE `contest_permissions` (
   `contest_id` int(11) DEFAULT NULL,
   `permission_id` int(11) DEFAULT NULL,
   UNIQUE KEY `contest_id` (`contest_id`,`permission_id`),
   KEY `permission_id` (`permission_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
+);
 
 --
 -- Dumping data for table `contest_permissions`
@@ -178,14 +150,11 @@ UNLOCK TABLES;
 --
 
 DROP TABLE IF EXISTS `contest_problems`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
- SET character_set_client = utf8mb4 ;
 CREATE TABLE `contest_problems` (
   `contest_id` int(11) DEFAULT NULL,
   `problem_id` int(11) DEFAULT NULL,
   UNIQUE KEY `contest_id` (`contest_id`,`problem_id`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
+);
 
 --
 -- Dumping data for table `contest_problems`
@@ -201,8 +170,6 @@ UNLOCK TABLES;
 --
 
 DROP TABLE IF EXISTS `contests`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
- SET character_set_client = utf8mb4 ;
 CREATE TABLE `contests` (
   `contest_id` int(11) NOT NULL AUTO_INCREMENT,
   `title` varchar(200) DEFAULT NULL,
@@ -215,8 +182,7 @@ CREATE TABLE `contests` (
   `registrants` int(11) DEFAULT NULL,
   PRIMARY KEY (`contest_id`),
   KEY `end_time` (`end_time`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
+);
 
 --
 -- Dumping data for table `contests`
@@ -232,15 +198,12 @@ UNLOCK TABLES;
 --
 
 DROP TABLE IF EXISTS `permissions`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
- SET character_set_client = utf8mb4 ;
 CREATE TABLE `permissions` (
   `permission_id` int(11) NOT NULL AUTO_INCREMENT,
   `permission_name` varchar(200) DEFAULT NULL,
   `count` int(11) DEFAULT '0',
   PRIMARY KEY (`permission_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
+);
 
 --
 -- Dumping data for table `permissions`
@@ -257,15 +220,12 @@ UNLOCK TABLES;
 --
 
 DROP TABLE IF EXISTS `problem_permissions`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
- SET character_set_client = utf8mb4 ;
 CREATE TABLE `problem_permissions` (
   `problem_id` int(11) DEFAULT NULL,
   `permission_id` int(11) DEFAULT NULL,
   UNIQUE KEY `problem_id` (`problem_id`,`permission_id`),
   KEY `permission_id` (`permission_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
+);
 
 --
 -- Dumping data for table `problem_permissions`
@@ -281,8 +241,6 @@ UNLOCK TABLES;
 --
 
 DROP TABLE IF EXISTS `problems`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
- SET character_set_client = utf8mb4 ;
 CREATE TABLE `problems` (
   `problem_id` int(11) NOT NULL AUTO_INCREMENT,
   `title` varchar(200) DEFAULT NULL,
@@ -290,8 +248,7 @@ CREATE TABLE `problems` (
   `check_sum` char(64) DEFAULT NULL,
   `allow_down` varchar(256) DEFAULT NULL,
   PRIMARY KEY (`problem_id`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
+);
 
 --
 -- Dumping data for table `problems`
@@ -307,14 +264,11 @@ UNLOCK TABLES;
 --
 
 DROP TABLE IF EXISTS `submission_content`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
- SET character_set_client = utf8mb4 ;
 CREATE TABLE `submission_content` (
   `submission_id` int(11) NOT NULL,
   `content` longblob,
   PRIMARY KEY (`submission_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
+);
 
 --
 -- Dumping data for table `submission_content`
@@ -330,8 +284,6 @@ UNLOCK TABLES;
 --
 
 DROP TABLE IF EXISTS `submissions`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
- SET character_set_client = utf8mb4 ;
 CREATE TABLE `submissions` (
   `submission_id` int(11) NOT NULL AUTO_INCREMENT,
   `submitter` int(11) DEFAULT NULL,
@@ -349,8 +301,7 @@ CREATE TABLE `submissions` (
   KEY `problem_id` (`problem_id`),
   KEY `contest_id` (`contest_id`),
   KEY `status` (`status`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
+);
 
 --
 -- Dumping data for table `submissions`
@@ -366,8 +317,6 @@ UNLOCK TABLES;
 --
 
 DROP TABLE IF EXISTS `user_info`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
- SET character_set_client = utf8mb4 ;
 CREATE TABLE `user_info` (
   `user_id` int(11) NOT NULL AUTO_INCREMENT,
   `user_name` varchar(30) DEFAULT NULL,
@@ -383,8 +332,7 @@ CREATE TABLE `user_info` (
   PRIMARY KEY (`user_id`),
   UNIQUE KEY `user_name` (`user_name`),
   UNIQUE KEY `rating` (`rating` DESC,`user_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
+);
 
 --
 -- Dumping data for table `user_info`
@@ -401,15 +349,12 @@ UNLOCK TABLES;
 --
 
 DROP TABLE IF EXISTS `user_permissions`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
- SET character_set_client = utf8mb4 ;
 CREATE TABLE `user_permissions` (
   `user_id` int(11) DEFAULT NULL,
   `permission_id` int(11) DEFAULT NULL,
   UNIQUE KEY `user_id` (`user_id`,`permission_id`),
   KEY `permission_id` (`permission_id`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
+);
 
 --
 -- Dumping data for table `user_permissions`
@@ -419,14 +364,3 @@ LOCK TABLES `user_permissions` WRITE;
 /*!40000 ALTER TABLE `user_permissions` DISABLE KEYS */;
 /*!40000 ALTER TABLE `user_permissions` ENABLE KEYS */;
 UNLOCK TABLES;
-/*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
-
-/*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
-/*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;
-/*!40014 SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS */;
-/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
-/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
-/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
-/*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
-
--- Dump completed on 2022-07-05  9:18:57

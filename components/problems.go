@@ -2,14 +2,17 @@ package components
 
 import (
 	"fmt"
+	"log"
 	"os"
+	"path"
 	"strings"
 	"time"
 	"yao/controllers"
 	"yao/libs"
 
 	"github.com/gin-gonic/gin"
-	"github.com/sshwy/yaoj-core/pkg/problem"
+	"github.com/k0kubun/pp/v3"
+	"github.com/super-yaoj/yaoj-core/pkg/problem"
 )
 
 func PRCanEdit(ctx *gin.Context, problem_id int) bool {
@@ -111,6 +114,7 @@ func PRQuery(ctx *gin.Context) {
 	}
 
 	prob, err := controllers.PRQuery(problem_id, GetUserId(ctx))
+	pp.Print(prob)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 		return
@@ -286,11 +290,12 @@ func PRPutData(ctx *gin.Context) {
 
 	tmpdir := libs.GetTempDir()
 	defer os.RemoveAll(tmpdir)
-	err = ctx.SaveUploadedFile(file, tmpdir+"/1.zip")
+	err = ctx.SaveUploadedFile(file, path.Join(tmpdir, "1.zip"))
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 		return
 	}
+	log.Printf("file uploaded saves at %s", path.Join(tmpdir, "1.zip"))
 	err = controllers.PRPutData(problem_id, tmpdir)
 	if err != nil {
 		libs.APIWriteBack(ctx, 400, err.Error(), nil)
