@@ -11,8 +11,12 @@ import (
 
 func CTCanEdit(ctx *gin.Context, contest_id int) bool {
 	user_id := GetUserId(ctx)
-	if user_id < 0 { return false }
-	if ISAdmin(ctx) { return true }
+	if user_id < 0 {
+		return false
+	}
+	if ISAdmin(ctx) {
+		return true
+	}
 	count, _ := libs.DBSelectSingleInt("select count(*) from contest_permissions where contest_id=? and permission_id=?", contest_id, -user_id)
 	return count > 0
 }
@@ -23,14 +27,18 @@ func CTCanSee(ctx *gin.Context, contest_id int, can_edit bool) bool {
 		count, _ := libs.DBSelectSingleInt("select count(*) from contest_permissions where contest_id=? and permission_id=?", contest_id, libs.DefaultGroup)
 		return count > 0
 	}
-	if can_edit { return true }
+	if can_edit {
+		return true
+	}
 	count, _ := libs.DBSelectSingleInt("select count(*) from ((select permission_id from contest_permissions where contest_id=?) as a join (select permission_id from user_permissions where user_id=?) as b on a.permission_id=b.permission_id)", contest_id, user_id)
 	return count > 0
 }
 
 func CTCanTake(ctx *gin.Context, contest controllers.Contest, can_edit bool) bool {
 	user_id := GetUserId(ctx)
-	if user_id < 0 { return false }
+	if user_id < 0 {
+		return false
+	}
 	if contest.EndTime.After(time.Now()) {
 		return !can_edit && CTCanSee(ctx, contest.Id, can_edit)
 	}
@@ -38,10 +46,12 @@ func CTCanTake(ctx *gin.Context, contest controllers.Contest, can_edit bool) boo
 }
 
 func CTCanEnter(ctx *gin.Context, contest controllers.Contest, can_edit bool) bool {
-	user_id := GetUserId(ctx);
-	if can_edit { return true }
+	user_id := GetUserId(ctx)
+	if can_edit {
+		return true
+	}
 	if contest.StartTime.After(time.Now()) {
-		return false;
+		return false
 	} else if contest.EndTime.After(time.Now()) {
 		return controllers.CTRegistered(contest.Id, user_id)
 	} else {
@@ -51,22 +61,28 @@ func CTCanEnter(ctx *gin.Context, contest controllers.Contest, can_edit bool) bo
 
 func CTList(ctx *gin.Context) {
 	pagesize, ok := libs.GetIntRange(ctx, "pagesize", 1, 100)
-	if !ok { return }
+	if !ok {
+		return
+	}
 	user_id := GetUserId(ctx)
 	_, isleft := ctx.GetQuery("left")
 	bound, ok := libs.GetInt(ctx, libs.If(isleft, "left", "right"))
-	if !ok { return }
+	if !ok {
+		return
+	}
 	contests, isfull, err := controllers.CTList(bound, pagesize, user_id, isleft, ISAdmin(ctx))
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	} else {
-		libs.APIWriteBack(ctx, 200, "", map[string]any{ "isfull": isfull, "data": contests })
+		libs.APIWriteBack(ctx, 200, "", map[string]any{"isfull": isfull, "data": contests})
 	}
 }
 
 func CTQuery(ctx *gin.Context) {
 	contest_id, ok := libs.GetInt(ctx, "contest_id")
-	if !ok { return }
+	if !ok {
+		return
+	}
 	contest, err := controllers.CTQuery(contest_id, GetUserId(ctx))
 	if err != nil {
 		libs.APIWriteBack(ctx, 404, "", nil)
@@ -77,12 +93,14 @@ func CTQuery(ctx *gin.Context) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
-	libs.APIWriteBack(ctx, 200, "", map[string]any{ "contest": contest, "can_edit": can_edit })
+	libs.APIWriteBack(ctx, 200, "", map[string]any{"contest": contest, "can_edit": can_edit})
 }
 
 func CTGetProblems(ctx *gin.Context) {
 	contest_id, ok := libs.GetInt(ctx, "contest_id")
-	if !ok { return }
+	if !ok {
+		return
+	}
 	contest, err := controllers.CTQuery(contest_id, GetUserId(ctx))
 	if err != nil {
 		libs.APIWriteBack(ctx, 404, "", nil)
@@ -96,15 +114,19 @@ func CTGetProblems(ctx *gin.Context) {
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	} else {
-		libs.APIWriteBack(ctx, 200, "", map[string]any{ "data": problems })
+		libs.APIWriteBack(ctx, 200, "", map[string]any{"data": problems})
 	}
 }
 
 func CTAddProblem(ctx *gin.Context) {
 	contest_id, ok := libs.PostInt(ctx, "contest_id")
-	if !ok { return }
+	if !ok {
+		return
+	}
 	problem_id, ok := libs.PostInt(ctx, "problem_id")
-	if !ok { return }
+	if !ok {
+		return
+	}
 	if !controllers.CTExists(contest_id) {
 		libs.APIWriteBack(ctx, 404, "", nil)
 		return
@@ -125,9 +147,13 @@ func CTAddProblem(ctx *gin.Context) {
 
 func CTDeleteProblem(ctx *gin.Context) {
 	contest_id, ok := libs.GetInt(ctx, "contest_id")
-	if !ok { return }
+	if !ok {
+		return
+	}
 	problem_id, ok := libs.GetInt(ctx, "problem_id")
-	if !ok { return }
+	if !ok {
+		return
+	}
 	if !CTCanEdit(ctx, contest_id) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
@@ -147,13 +173,15 @@ func CTCreate(ctx *gin.Context) {
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	} else {
-		libs.APIWriteBack(ctx, 200, "", map[string]any{ "id": id })
+		libs.APIWriteBack(ctx, 200, "", map[string]any{"id": id})
 	}
 }
 
 func CTModify(ctx *gin.Context) {
 	contest_id, ok := libs.PostInt(ctx, "contest_id")
-	if !ok { return }
+	if !ok {
+		return
+	}
 	if !controllers.CTExists(contest_id) {
 		libs.APIWriteBack(ctx, 404, "", nil)
 		return
@@ -173,11 +201,17 @@ func CTModify(ctx *gin.Context) {
 		return
 	}
 	last, ok := libs.PostIntRange(ctx, "last", 1, 1000000)
-	if !ok { return }
+	if !ok {
+		return
+	}
 	pretest, ok := libs.PostIntRange(ctx, "pretest", 0, 1)
-	if !ok { return }
+	if !ok {
+		return
+	}
 	score_private, ok := libs.PostIntRange(ctx, "score_private", 0, 1)
-	if !ok { return }
+	if !ok {
+		return
+	}
 	err = controllers.CTModify(contest_id, title, start, last, pretest, score_private)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
@@ -186,7 +220,9 @@ func CTModify(ctx *gin.Context) {
 
 func CTGetPermissions(ctx *gin.Context) {
 	contest_id, ok := libs.GetInt(ctx, "contest_id")
-	if !ok { return }
+	if !ok {
+		return
+	}
 	if !controllers.CTExists(contest_id) {
 		libs.APIWriteBack(ctx, 404, "", nil)
 		return
@@ -199,13 +235,15 @@ func CTGetPermissions(ctx *gin.Context) {
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	} else {
-		libs.APIWriteBack(ctx, 200, "", map[string]any{ "data": perms })
+		libs.APIWriteBack(ctx, 200, "", map[string]any{"data": perms})
 	}
 }
 
 func CTGetManagers(ctx *gin.Context) {
 	contest_id, ok := libs.GetInt(ctx, "contest_id")
-	if !ok { return }
+	if !ok {
+		return
+	}
 	if !controllers.CTExists(contest_id) {
 		libs.APIWriteBack(ctx, 404, "", nil)
 		return
@@ -218,15 +256,19 @@ func CTGetManagers(ctx *gin.Context) {
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	} else {
-		libs.APIWriteBack(ctx, 200, "", map[string]any{ "data": users })
+		libs.APIWriteBack(ctx, 200, "", map[string]any{"data": users})
 	}
 }
 
 func CTAddPermission(ctx *gin.Context) {
 	contest_id, ok := libs.PostInt(ctx, "contest_id")
-	if !ok { return }
+	if !ok {
+		return
+	}
 	permission_id, ok := libs.PostInt(ctx, "permission_id")
-	if !ok { return }
+	if !ok {
+		return
+	}
 	if !controllers.CTExists(contest_id) {
 		libs.APIWriteBack(ctx, 404, "", nil)
 		return
@@ -247,9 +289,13 @@ func CTAddPermission(ctx *gin.Context) {
 
 func CTAddManager(ctx *gin.Context) {
 	contest_id, ok := libs.PostInt(ctx, "contest_id")
-	if !ok { return }
+	if !ok {
+		return
+	}
 	user_id, ok := libs.PostInt(ctx, "user_id")
-	if !ok { return }
+	if !ok {
+		return
+	}
 	if !controllers.CTExists(contest_id) {
 		libs.APIWriteBack(ctx, 404, "", nil)
 		return
@@ -274,9 +320,13 @@ func CTAddManager(ctx *gin.Context) {
 
 func CTDeletePermission(ctx *gin.Context) {
 	contest_id, ok := libs.GetInt(ctx, "contest_id")
-	if !ok { return }
+	if !ok {
+		return
+	}
 	permission_id, ok := libs.GetInt(ctx, "permission_id")
-	if !ok { return }
+	if !ok {
+		return
+	}
 	if !CTCanEdit(ctx, contest_id) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
@@ -289,9 +339,13 @@ func CTDeletePermission(ctx *gin.Context) {
 
 func CTDeleteManager(ctx *gin.Context) {
 	contest_id, ok := libs.GetInt(ctx, "contest_id")
-	if !ok { return }
+	if !ok {
+		return
+	}
 	user_id, ok := libs.GetInt(ctx, "user_id")
-	if !ok { return }
+	if !ok {
+		return
+	}
 	if !CTCanEdit(ctx, contest_id) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
@@ -304,7 +358,9 @@ func CTDeleteManager(ctx *gin.Context) {
 
 func CTGetParticipants(ctx *gin.Context) {
 	contest_id, ok := libs.GetInt(ctx, "contest_id")
-	if !ok { return }
+	if !ok {
+		return
+	}
 	if !controllers.CTExists(contest_id) {
 		libs.APIWriteBack(ctx, 404, "", nil)
 		return
@@ -317,13 +373,15 @@ func CTGetParticipants(ctx *gin.Context) {
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	} else {
-		libs.APIWriteBack(ctx, 200, "", map[string]any{ "data": parts })
+		libs.APIWriteBack(ctx, 200, "", map[string]any{"data": parts})
 	}
 }
 
 func CTSignup(ctx *gin.Context) {
 	contest_id, ok := libs.PostInt(ctx, "contest_id")
-	if !ok { return }
+	if !ok {
+		return
+	}
 	user_id := GetUserId(ctx)
 	contest, err := controllers.CTQuery(contest_id, user_id)
 	if err != nil {
@@ -342,9 +400,13 @@ func CTSignup(ctx *gin.Context) {
 
 func CTSignout(ctx *gin.Context) {
 	contest_id, ok := libs.GetInt(ctx, "contest_id")
-	if !ok { return }
+	if !ok {
+		return
+	}
 	user_id := GetUserId(ctx)
-	if !ok { return }
+	if !ok {
+		return
+	}
 	err := controllers.CTDeleteParticipant(contest_id, user_id)
 	if err != nil {
 		libs.APIInternalError(ctx, err)

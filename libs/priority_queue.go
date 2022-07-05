@@ -45,14 +45,16 @@ func (bh *binaryHeap) Pop() any {
 	top := (*bh)[0]
 	n := len(*bh) - 1
 	(*bh)[0], (*bh)[n] = (*bh)[n], (*bh)[0]
-	(*bh) = (*bh)[: n]
+	(*bh) = (*bh)[:n]
 	if n > 0 {
 		temp := (*bh)[0]
 		i := 0
 		for {
-			l := i * 2 + 1
+			l := i*2 + 1
 			r := l + 1
-			if l >= n { break }
+			if l >= n {
+				break
+			}
 			if r >= n {
 				if (*bh)[l].priority > temp.priority {
 					(*bh)[i] = (*bh)[l]
@@ -91,7 +93,7 @@ type blockPriorityQueue struct {
 }
 
 func NewBlockPriorityQueue() *blockPriorityQueue {
-	ret := &blockPriorityQueue{ &binaryHeap{}, sync.NewCond(&sync.Mutex{}) }
+	ret := &blockPriorityQueue{&binaryHeap{}, sync.NewCond(&sync.Mutex{})}
 	return ret
 }
 

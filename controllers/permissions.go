@@ -7,9 +7,9 @@ import (
 )
 
 type Permission struct {
-	Id int `db:"permission_id" json:"permission_id"`
-	Name string `db:"permission_name" json:"permission_name"`
-	Count int `db:"count" json:"count"`
+	Id    int    `db:"permission_id" json:"permission_id"`
+	Name  string `db:"permission_name" json:"permission_name"`
+	Count int    `db:"count" json:"count"`
 }
 
 func PMCreate(name string) (int64, error) {
@@ -23,12 +23,20 @@ func PMChangeName(id int, name string) error {
 
 func PMDelete(id int) (int64, error) {
 	res, err := libs.DBUpdateGetAffected("delete from permissions where permission_id=?", id)
-	if err != nil { return res, err }
-	if res == 0 { return res, nil }
+	if err != nil {
+		return res, err
+	}
+	if res == 0 {
+		return res, nil
+	}
 	_, err = libs.DBUpdate("delete from user_permissions where permission_id=?", id)
-	if err != nil { return 0, err }
+	if err != nil {
+		return 0, err
+	}
 	_, err = libs.DBUpdate("delete from problem_permissions where permission_id=?", id)
-	if err != nil { return 0, err }
+	if err != nil {
+		return 0, err
+	}
 	return res, err
 }
 
@@ -45,8 +53,12 @@ func PMQuery(bound, pagesize int, isleft bool) ([]Permission, bool, error) {
 		return nil, false, err
 	} else {
 		isfull := len(p) == pagesize
-		if isfull { p = p[: pagesize - 1] }
-		if !isleft { libs.Reverse(p) }
+		if isfull {
+			p = p[:pagesize-1]
+		}
+		if !isleft {
+			libs.Reverse(p)
+		}
 		return p, isfull, nil
 	}
 }
@@ -61,7 +73,7 @@ func PMAddUser(ids []int, id int) (int64, error) {
 	query := strings.Builder{}
 	for i, j := range ids {
 		query.WriteString(fmt.Sprintf("(%d,%d)", j, id))
-		if i + 1 < len(ids) {
+		if i+1 < len(ids) {
 			query.WriteString(",")
 		}
 	}
@@ -76,7 +88,9 @@ func PMAddUser(ids []int, id int) (int64, error) {
 
 func PMDeleteUser(pid, uid int) (int64, error) {
 	res, err := libs.DBUpdateGetAffected("delete from user_permissions where user_id=? and permission_id=?", uid, pid)
-	if err != nil { return 0, err }
+	if err != nil {
+		return 0, err
+	}
 	if res == 1 {
 		libs.DBUpdate("update permissions set count = count - 1 where permission_id=?", pid)
 	}

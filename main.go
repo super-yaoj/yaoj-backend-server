@@ -34,21 +34,26 @@ func main() {
 		log.Fatal(err)
 	}
 	app := gin.Default()
-	
+
 	go controllers.JudgersInit()
 	app.POST("/FinishJudging", controllers.FinishJudging)
-	
+
 	app.Use(sessions.Sessions("sessionId", cookie.NewStore([]byte("3.1y4a1o5j9"))))
-	captcha.SetCustomStore(captcha.NewMemoryStore(1024, 10 * time.Minute))
+	captcha.SetCustomStore(captcha.NewMemoryStore(1024, 10*time.Minute))
 	for url, value := range components.Router {
 		app.OPTIONS(url, process(func(ctx *gin.Context) {}))
 		for _, req := range value {
 			switch req.Method {
-			case "GET": 	app.GET(url, process(req.Function))
-			case "POST": 	app.POST(url, process(req.Function))
-			case "PATCH": 	app.PATCH(url, process(req.Function))
-			case "PUT": 	app.PUT(url, process(req.Function))
-			case "DELETE": 	app.DELETE(url, process(req.Function))
+			case "GET":
+				app.GET(url, process(req.Function))
+			case "POST":
+				app.POST(url, process(req.Function))
+			case "PATCH":
+				app.PATCH(url, process(req.Function))
+			case "PUT":
+				app.PUT(url, process(req.Function))
+			case "DELETE":
+				app.DELETE(url, process(req.Function))
 			}
 		}
 	}

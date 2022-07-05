@@ -16,7 +16,7 @@ func CaptchaId(ctx *gin.Context) {
 		return
 	}
 	id := captcha.NewLen(len)
-	libs.APIWriteBack(ctx, 200, "", map[string]any{ "id": id })
+	libs.APIWriteBack(ctx, 200, "", map[string]any{"id": id})
 }
 
 func CaptchaImage(ctx *gin.Context) {

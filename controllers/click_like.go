@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	BLOG = 1
+	BLOG    = 1
 	CONTEST = 2
 	PROBLEM = 3
 	COMMENT = 4
@@ -15,7 +15,10 @@ const (
 
 func ClickLike(target, id, user_id int) error {
 	has := GetLike(target, user_id, id)
-	val := 1; if has { val = -1 }
+	val := 1
+	if has {
+		val = -1
+	}
 	var err error
 	switch target {
 	case BLOG:
@@ -27,7 +30,9 @@ func ClickLike(target, id, user_id int) error {
 	case CONTEST:
 		_, err = libs.DBUpdate("update contests set `like` = `like` + ? where contest_id=?", val, id)
 	}
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	if has {
 		_, err = libs.DBUpdate("delete from click_like where target=? and id=? and user_id=?", target, id, user_id)
 	} else {
@@ -37,7 +42,9 @@ func ClickLike(target, id, user_id int) error {
 }
 
 func GetLikes(target, user_id int, ids []int) []int {
-	if len(ids) == 0 { return []int{} }
+	if len(ids) == 0 {
+		return []int{}
+	}
 	ret, _ := libs.DBSelectInts(fmt.Sprintf("select id from click_like where target=%d and user_id=%d and id in (%s)", target, user_id, libs.JoinArray(ids)))
 	sort.Ints(ret)
 	return ret

@@ -11,10 +11,10 @@ type mapEntry struct {
 }
 
 type cacheMap struct {
-	mutex 			sync.RWMutex
-	mp 				map[string]mapEntry
+	mutex           sync.RWMutex
+	mp              map[string]mapEntry
 	cacheExpireTime time.Duration
-	maxCheckLength 	int
+	maxCheckLength  int
 }
 
 type MemoryCache interface {
@@ -24,12 +24,12 @@ type MemoryCache interface {
 }
 
 func NewMemoryCache(expire time.Duration, check_length int) *cacheMap {
-	return &cacheMap{ sync.RWMutex{}, make(map[string]mapEntry), expire, check_length }
+	return &cacheMap{sync.RWMutex{}, make(map[string]mapEntry), expire, check_length}
 }
 
 func (cm *cacheMap) Set(key string, val any) {
 	cm.mutex.Lock()
-	cm.mp[key] = mapEntry{ time.Now(), val }
+	cm.mp[key] = mapEntry{time.Now(), val}
 	if len(cm.mp) >= cm.maxCheckLength {
 		current := time.Now().Add(-cm.cacheExpireTime)
 		for i := range cm.mp {
@@ -45,7 +45,9 @@ func (cm *cacheMap) Get(key string) (any, bool) {
 	cm.mutex.RLock()
 	defer cm.mutex.RUnlock()
 	a := cm.mp[key]
-	if a.data == nil { return nil, false }
+	if a.data == nil {
+		return nil, false
+	}
 	return a.data, true
 }
 

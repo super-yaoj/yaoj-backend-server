@@ -34,23 +34,25 @@ Put problem data in tmp dir first. You should put data zip in tmpdir/1.zip
 If the data format is correct, then copy it to the data dir.
 */
 func PRPutData(problem_id int, tmpdir string) error {
-	os.Mkdir(tmpdir + "/1", os.ModePerm)
-	_, err := problem.LoadDump(tmpdir + "/1.zip", tmpdir + "/1")
-	if err != nil { return err }
+	os.Mkdir(tmpdir+"/1", os.ModePerm)
+	_, err := problem.LoadDump(tmpdir+"/1.zip", tmpdir+"/1")
+	if err != nil {
+		return err
+	}
 	//Success now
 	ProblemWLock(problem_id)
 	defer ProblemWUnlock(problem_id)
 	data_zip := PRGetDataZip(problem_id)
 	data_dir := PRGetDir(problem_id)
 	sample_zip := PRGetSampleZip(problem_id)
-	
+
 	os.RemoveAll(data_zip)
 	os.RemoveAll(data_dir)
 	os.RemoveAll(sample_zip)
-	
-	os.Rename(tmpdir + "/1.zip", data_zip)
-	os.Rename(tmpdir + "/1", data_dir)
-	
+
+	os.Rename(tmpdir+"/1.zip", data_zip)
+	os.Rename(tmpdir+"/1", data_dir)
+
 	libs.CacheMap.Delete(PRGetKey(problem_id))
 	libs.DBUpdate("update problems set check_sum=?, allow_down=\"\" where problem_id=?", utils.FileChecksum(data_zip).String(), problem_id)
 	return err
@@ -63,7 +65,9 @@ func PRLoad(problem_id int) *Problem {
 		ProblemRLock(problem_id)
 		defer ProblemRUnlock(problem_id)
 		pro, err := problem.LoadDir(PRGetDir(problem_id))
-		if err != nil { return &Problem{} }
+		if err != nil {
+			return &Problem{}
+		}
 		PRSetCache(problem_id, pro)
 		ret, _ := libs.CacheMap.Get(PRGetKey(problem_id))
 		return ret.(*Problem)
@@ -80,17 +84,17 @@ func PRSetCache(problem_id int, pro problem.Problem) {
 			stmts = append(stmts, Statement{key, val})
 		}
 	}
-	libs.CacheMap.Set(PRGetKey(problem_id), &Problem {
-		Id: problem_id,
+	libs.CacheMap.Set(PRGetKey(problem_id), &Problem{
+		Id:           problem_id,
 		Statement_zh: string(pro.Stmt("zh")),
 		Statement_en: string(pro.Stmt("en")),
-		Tutorial_zh: string(pro.Tutr("zh")),
-		Tutorial_en: string(pro.Tutr("en")),
-		DataInfo: pro.DataInfo(),
-		Statements: stmts,
-		SubmConfig: pro.Data().Submission,
-		HasSample: libs.FileExists(PRGetSampleZip(problem_id)),
-		TimeLimit: libs.AtoiDefault(pro.Data().Statement["_tl"], -1),
+		Tutorial_zh:  string(pro.Tutr("zh")),
+		Tutorial_en:  string(pro.Tutr("en")),
+		DataInfo:     pro.DataInfo(),
+		Statements:   stmts,
+		SubmConfig:   pro.Data().Submission,
+		HasSample:    libs.FileExists(PRGetSampleZip(problem_id)),
+		TimeLimit:    libs.AtoiDefault(pro.Data().Statement["_tl"], -1),
 		MemoryLimit:  libs.AtoiDefault(pro.Data().Statement["_ml"], -1),
 	})
 }
@@ -105,15 +109,19 @@ func PRModifySample(problem_id int, allow_down string) error {
 	pro := PRLoad(problem_id)
 	zipfile, _ := os.Create(sample_dir)
 	writer := zip.NewWriter(zipfile)
-	
+
 	success := false
 	for key, val := range pro.Statements {
 		if key < len(allow_down) && allow_down[key] == '1' {
 			file, err := os.Open(data_dir + "/" + val.Path)
+			if err != nil {
+				continue
+			}
 			defer file.Close()
-			if err != nil { continue }
 			f, err := writer.Create(val.Name)
-			if err != nil { continue }
+			if err != nil {
+				continue
+			}
 			_, err = io.Copy(f, file)
 			if err != nil {
 				writer.Close()

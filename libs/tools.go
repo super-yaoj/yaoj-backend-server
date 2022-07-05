@@ -45,8 +45,8 @@ func RandomString(length int) string {
 
 func Reverse[T any](arr []T) {
 	l := len(arr)
-	for i := 0; i * 2 < l; i++ {
-		arr[i], arr[l - i - 1] = arr[l - i - 1], arr[i]
+	for i := 0; i*2 < l; i++ {
+		arr[i], arr[l-i-1] = arr[l-i-1], arr[i]
 	}
 }
 
@@ -57,7 +57,9 @@ func HasInt(srt []int, val int) bool {
 
 func HasIntN(arr []int, val int) bool {
 	for _, v := range arr {
-		if v == val { return true }
+		if v == val {
+			return true
+		}
 	}
 	return false
 }
@@ -66,7 +68,7 @@ func JoinArray[T any](val []T) string {
 	s := strings.Builder{}
 	for i, j := range val {
 		s.WriteString(fmt.Sprint(j))
-		if i + 1 < len(val) {
+		if i+1 < len(val) {
 			s.WriteString(",")
 		}
 	}
@@ -74,7 +76,9 @@ func JoinArray[T any](val []T) string {
 }
 
 func If[T any](a bool, b T, c T) T {
-	if a { return b }
+	if a {
+		return b
+	}
 	return c
 }
 
@@ -95,27 +99,27 @@ func ZipDir(src_dir string, zip_file_name string) error {
 		return err
 	}
 	if len(dir) == 0 {
-		return  nil
+		return nil
 	}
 	os.RemoveAll(zip_file_name)
 	zipfile, _ := os.Create(zip_file_name)
 	defer zipfile.Close()
 	archive := zip.NewWriter(zipfile)
 	defer archive.Close()
- 
+
 	filepath.Walk(src_dir, func(path string, info os.FileInfo, _ error) error {
 		if path == src_dir {
 			return nil
 		}
 		header, _ := zip.FileInfoHeader(info)
- 
-		header.Name = path[len(src_dir) + 1 :]
+
+		header.Name = path[len(src_dir)+1:]
 		if info.IsDir() {
 			header.Name += `/`
 		} else {
 			header.Method = zip.Deflate
 		}
- 
+
 		writer, _ := archive.CreateHeader(header)
 		if !info.IsDir() {
 			file, _ := os.Open(path)
@@ -124,7 +128,7 @@ func ZipDir(src_dir string, zip_file_name string) error {
 		}
 		return nil
 	})
-	return  nil
+	return nil
 }
 
 func FileExists(filename string) bool {
@@ -134,6 +138,8 @@ func FileExists(filename string) bool {
 
 func AtoiDefault(str string, def int) int {
 	val, err := strconv.Atoi(str)
-	if err != nil { return def }
+	if err != nil {
+		return def
+	}
 	return val
 }
