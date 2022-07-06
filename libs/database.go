@@ -12,7 +12,7 @@ import (
 var db *sqlx.DB
 
 func DBInit() error {
-	dsn := "root:root@tcp(127.0.0.1:3306)/yaoj?charset=utf8mb4&parseTime=True"
+	dsn := "yaoj@tcp(127.0.0.1:3306)/yaoj?charset=utf8mb4&parseTime=True"
 	var err error
 	db, err = sqlx.Connect("mysql", dsn)
 	if err != nil {
