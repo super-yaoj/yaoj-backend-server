@@ -1,24 +1,24 @@
-package controllers
+package internal
 
 import (
 	"encoding/json"
 	"fmt"
 	"math"
-	"os"
 	"sort"
 	"time"
 	"yao/libs"
 
 	"github.com/super-yaoj/yaoj-core/pkg/problem"
+	"github.com/super-yaoj/yaoj-core/pkg/utils"
 )
 
 type Submission struct {
 	Id            int       `db:"submission_id" json:"submission_id"`
 	Submitter     int       `db:"submitter" json:"submitter"`
 	ProblemId     int       `db:"problem_id" json:"problem_id"`
-	ProblemName   string    `json:"problem_name"`
+	ProblemName   string    `db:"problem_name" json:"problem_name"`
 	ContestId     int       `db:"contest_id" json:"contest_id"`
-	SubmitterName string    `json:"submitter_name"`
+	SubmitterName string    `db:"submitter_name" json:"submitter_name"`
 	Status        int       `db:"status" json:"status"`
 	Score         float64   `db:"score" json:"score"`
 	SubmitTime    time.Time `db:"submit_time" json:"submit_time"`
@@ -26,22 +26,25 @@ type Submission struct {
 	Language      int       `db:"language" json:"language"`
 	Time          int       `db:"time" json:"time"`
 	Memory        int       `db:"memory" json:"memory"`
+	Preview 	  string	`db:"content_preview" json:"preview"`
+	SampleScore   float64 	`db:"sample_score" json:"sample_score"`
+	Hacked 		  bool 		`db:"hacked" json:"hacked"`
 }
 
 func SMGetZipName(submission_id int) string {
 	return libs.TmpDir + fmt.Sprintf("submission_%d.zip", submission_id)
 }
 
-func SMCreate(user_id, problem_id, contest_id, language int, tmp_file string) error {
-	id, err := libs.DBInsertGetId("insert into submissions values (null, ?, ?, ?, ?, 0, -1, -1, ?, ?, \"\")", user_id, problem_id, contest_id, Waiting, language, time.Now())
+func SMCreate(user_id, problem_id, contest_id int, language utils.LangTag, zipfile []byte, preview map[string]string) error {
+	id, err := libs.DBInsertGetId("insert into submissions values (null, ?, ?, ?, ?, 0, -1, -1, ?, ?, 0, 0)", user_id, problem_id, contest_id, Waiting, language, time.Now())
 	if err != nil {
 		return err
 	}
-	byt, err := os.ReadFile(tmp_file)
+	js, err := json.Marshal(preview)
 	if err != nil {
 		return err
 	}
-	_, err = libs.DBUpdate("insert into submission_content values (?, ?)", id, byt)
+	_, err = libs.DBUpdate("insert into submission_content values (?, ?, \"\", ?)", id, zipfile, js)
 	if err != nil {
 		return err
 	}
@@ -78,6 +81,18 @@ func SMGetExtraInfo(subs []Submission) {
 func SMQuery(sid int) (Submission, error) {
 	var ret Submission
 	err := libs.DBSelectSingle(&ret, "select * from submissions where submission_id=?", sid)
+	if err != nil {
+		return ret, err
+	}
+	err = libs.DBSelectSingle(&ret, "select result, content_preview from submission_content where submission_id=?", sid)
+	if err != nil {
+		return ret, err
+	}
+	err = libs.DBSelectSingle(&ret, "select title as problem_name from problems where problem_id=?", ret.ProblemId)
+	if err != nil {
+		return ret, err
+	}
+	err = libs.DBSelectSingle(&ret, "select user_name as submitter_name from user_info where user_id=?", ret.Submitter)
 	return ret, err
 }
 
@@ -118,7 +133,11 @@ func SMUpdate(sid, pid int, result []byte) error {
 		}
 		score += sub_score
 	}
-	_, err = libs.DBUpdate("update submissions set status=0, score=?, time=?, memory=?, result=? where submission_id=?",
-		score, int(time_used/float64(time.Millisecond)), int(memory_used/1024), result, sid)
+	_, err = libs.DBUpdate("update submissions set status=0, score=?, time=?, memory=? where submission_id=?",
+		score, int(time_used/float64(time.Millisecond)), int(memory_used/1024), sid)
+	if err != nil {
+		return err
+	}
+	_, err = libs.DBUpdate("update submission_content set result=? where submission_id=?", result, sid)
 	return err
 }

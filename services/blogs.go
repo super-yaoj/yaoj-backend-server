@@ -1,14 +1,14 @@
-package components
+package services
 
 import (
-	"yao/controllers"
+	"yao/internal"
 	"yao/libs"
 
 	"github.com/gin-gonic/gin"
 )
 
 func BLCanSee(ctx *gin.Context, blog_id int) bool {
-	var blog controllers.Blog
+	var blog internal.Blog
 	err := libs.DBSelectSingle(&blog, "select blog_id, author, private from blogs where blog_id=?", blog_id)
 	if err != nil {
 		return false
@@ -18,7 +18,7 @@ func BLCanSee(ctx *gin.Context, blog_id int) bool {
 }
 
 func BLCanEdit(ctx *gin.Context, blog_id int) bool {
-	var blog controllers.Blog
+	var blog internal.Blog
 	err := libs.DBSelectSingle(&blog, "select blog_id, author from blogs where blog_id=?", blog_id)
 	if err != nil {
 		return false
@@ -34,12 +34,12 @@ func BLCreate(ctx *gin.Context) {
 		return
 	}
 	title := ctx.PostForm("title")
-	if !controllers.BLValidTitle(title) {
+	if !internal.BLValidTitle(title) {
 		libs.APIWriteBack(ctx, 400, "invalid title", nil)
 		return
 	}
 	content := ctx.PostForm("content")
-	id, err := controllers.BLCreate(user_id, private, title, content)
+	id, err := internal.BLCreate(user_id, private, title, content)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	} else {
@@ -52,7 +52,7 @@ func BLEdit(ctx *gin.Context) {
 	if !ok {
 		return
 	}
-	if !controllers.BLExists(id) {
+	if !internal.BLExists(id) {
 		libs.APIWriteBack(ctx, 404, "", nil)
 		return
 	}
@@ -65,12 +65,12 @@ func BLEdit(ctx *gin.Context) {
 		return
 	}
 	title := ctx.PostForm("title")
-	if !controllers.BLValidTitle(title) {
+	if !internal.BLValidTitle(title) {
 		libs.APIWriteBack(ctx, 400, "invalid title", nil)
 		return
 	}
 	content := ctx.PostForm("content")
-	err := controllers.BLEdit(id, private, title, content)
+	err := internal.BLEdit(id, private, title, content)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	}
@@ -85,7 +85,7 @@ func BLDelete(ctx *gin.Context) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
-	err := controllers.BLDelete(id)
+	err := internal.BLDelete(id)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	}
@@ -96,7 +96,7 @@ func BLQuery(ctx *gin.Context) {
 	if !ok {
 		return
 	}
-	if !controllers.BLExists(id) {
+	if !internal.BLExists(id) {
 		libs.APIWriteBack(ctx, 404, "", nil)
 		return
 	}
@@ -104,7 +104,7 @@ func BLQuery(ctx *gin.Context) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
-	blog, err := controllers.BLQuery(id, GetUserId(ctx))
+	blog, err := internal.BLQuery(id, GetUserId(ctx))
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	} else {
@@ -120,7 +120,7 @@ func BLList(ctx *gin.Context) {
 		if !ok {
 			return
 		}
-		blogs, err := controllers.BLListUser(user_id, GetUserId(ctx))
+		blogs, err := internal.BLListUser(user_id, GetUserId(ctx))
 		if err != nil {
 			libs.APIInternalError(ctx, err)
 		} else {
@@ -136,7 +136,7 @@ func BLList(ctx *gin.Context) {
 		if !ok {
 			return
 		}
-		blogs, isfull, err := controllers.BLListAll(bound, pagesize, GetUserId(ctx), isleft, ISAdmin(ctx))
+		blogs, isfull, err := internal.BLListAll(bound, pagesize, GetUserId(ctx), isleft, ISAdmin(ctx))
 		if err != nil {
 			libs.APIInternalError(ctx, err)
 			return

@@ -1,7 +1,7 @@
-package components
+package services
 
 import (
-	"yao/controllers"
+	"yao/internal"
 	"yao/libs"
 
 	"github.com/gin-gonic/gin"
@@ -23,7 +23,7 @@ func ANCreate(ctx *gin.Context) {
 		libs.APIWriteBack(ctx, 400, "invalid request", nil)
 		return
 	}
-	err = controllers.ANCreate(blog_id, priority)
+	err = internal.ANCreate(blog_id, priority)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 		return
@@ -31,7 +31,7 @@ func ANCreate(ctx *gin.Context) {
 }
 
 func ANQuery(ctx *gin.Context) {
-	libs.APIWriteBack(ctx, 200, "", map[string]any{"data": controllers.ANQuery(GetUserId(ctx))})
+	libs.APIWriteBack(ctx, 200, "", map[string]any{"data": internal.ANQuery(GetUserId(ctx))})
 }
 
 func ANDelete(ctx *gin.Context) {
@@ -43,5 +43,5 @@ func ANDelete(ctx *gin.Context) {
 	if !ok {
 		return
 	}
-	controllers.ANDelete(id)
+	internal.ANDelete(id)
 }

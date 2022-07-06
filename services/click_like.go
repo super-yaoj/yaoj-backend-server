@@ -1,7 +1,7 @@
-package components
+package services
 
 import (
-	"yao/controllers"
+	"yao/internal"
 	"yao/libs"
 
 	"github.com/gin-gonic/gin"
@@ -21,29 +21,29 @@ func ClickLike(ctx *gin.Context) {
 	var err error
 	switch target {
 	case "blog":
-		if !controllers.BLExists(id) {
+		if !internal.BLExists(id) {
 			libs.APIWriteBack(ctx, 404, "", nil)
 			return
 		}
-		err = controllers.ClickLike(controllers.BLOG, id, user_id)
+		err = internal.ClickLike(internal.BLOG, id, user_id)
 	case "comment":
-		if !controllers.BLCommentExists(id) {
+		if !internal.BLCommentExists(id) {
 			libs.APIWriteBack(ctx, 404, "", nil)
 			return
 		}
-		err = controllers.ClickLike(controllers.COMMENT, id, user_id)
+		err = internal.ClickLike(internal.COMMENT, id, user_id)
 	case "problem":
-		if !controllers.PRExists(id) {
+		if !internal.PRExists(id) {
 			libs.APIWriteBack(ctx, 404, "", nil)
 			return
 		}
-		err = controllers.ClickLike(controllers.PROBLEM, id, user_id)
+		err = internal.ClickLike(internal.PROBLEM, id, user_id)
 	case "contest":
-		if !controllers.CTExists(id) {
+		if !internal.CTExists(id) {
 			libs.APIWriteBack(ctx, 404, "", nil)
 			return
 		}
-		err = controllers.ClickLike(controllers.CONTEST, id, user_id)
+		err = internal.ClickLike(internal.CONTEST, id, user_id)
 	default:
 		libs.APIWriteBack(ctx, 400, "invalid request", nil)
 		return

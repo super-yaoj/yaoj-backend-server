@@ -1,9 +1,9 @@
-package components
+package services
 
 import (
 	"strings"
 	"time"
-	"yao/controllers"
+	"yao/internal"
 	"yao/libs"
 
 	"github.com/gin-gonic/gin"
@@ -34,7 +34,7 @@ func CTCanSee(ctx *gin.Context, contest_id int, can_edit bool) bool {
 	return count > 0
 }
 
-func CTCanTake(ctx *gin.Context, contest controllers.Contest, can_edit bool) bool {
+func CTCanTake(ctx *gin.Context, contest internal.Contest, can_edit bool) bool {
 	user_id := GetUserId(ctx)
 	if user_id < 0 {
 		return false
@@ -45,7 +45,7 @@ func CTCanTake(ctx *gin.Context, contest controllers.Contest, can_edit bool) boo
 	return false
 }
 
-func CTCanEnter(ctx *gin.Context, contest controllers.Contest, can_edit bool) bool {
+func CTCanEnter(ctx *gin.Context, contest internal.Contest, can_edit bool) bool {
 	user_id := GetUserId(ctx)
 	if can_edit {
 		return true
@@ -53,7 +53,7 @@ func CTCanEnter(ctx *gin.Context, contest controllers.Contest, can_edit bool) bo
 	if contest.StartTime.After(time.Now()) {
 		return false
 	} else if contest.EndTime.After(time.Now()) {
-		return controllers.CTRegistered(contest.Id, user_id)
+		return internal.CTRegistered(contest.Id, user_id)
 	} else {
 		return CTCanSee(ctx, contest.Id, can_edit)
 	}
@@ -70,7 +70,7 @@ func CTList(ctx *gin.Context) {
 	if !ok {
 		return
 	}
-	contests, isfull, err := controllers.CTList(bound, pagesize, user_id, isleft, ISAdmin(ctx))
+	contests, isfull, err := internal.CTList(bound, pagesize, user_id, isleft, ISAdmin(ctx))
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	} else {
@@ -83,7 +83,7 @@ func CTQuery(ctx *gin.Context) {
 	if !ok {
 		return
 	}
-	contest, err := controllers.CTQuery(contest_id, GetUserId(ctx))
+	contest, err := internal.CTQuery(contest_id, GetUserId(ctx))
 	if err != nil {
 		libs.APIWriteBack(ctx, 404, "", nil)
 		return
@@ -101,7 +101,7 @@ func CTGetProblems(ctx *gin.Context) {
 	if !ok {
 		return
 	}
-	contest, err := controllers.CTQuery(contest_id, GetUserId(ctx))
+	contest, err := internal.CTQuery(contest_id, GetUserId(ctx))
 	if err != nil {
 		libs.APIWriteBack(ctx, 404, "", nil)
 		return
@@ -110,7 +110,7 @@ func CTGetProblems(ctx *gin.Context) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
-	problems, err := controllers.CTGetProblems(contest_id)
+	problems, err := internal.CTGetProblems(contest_id)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	} else {
@@ -127,7 +127,7 @@ func CTAddProblem(ctx *gin.Context) {
 	if !ok {
 		return
 	}
-	if !controllers.CTExists(contest_id) {
+	if !internal.CTExists(contest_id) {
 		libs.APIWriteBack(ctx, 404, "", nil)
 		return
 	}
@@ -135,11 +135,11 @@ func CTAddProblem(ctx *gin.Context) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
-	if !controllers.PRExists(problem_id) {
+	if !internal.PRExists(problem_id) {
 		libs.APIWriteBack(ctx, 400, "no such problem id", nil)
 		return
 	}
-	err := controllers.CTAddProblem(contest_id, problem_id)
+	err := internal.CTAddProblem(contest_id, problem_id)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	}
@@ -158,7 +158,7 @@ func CTDeleteProblem(ctx *gin.Context) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
-	err := controllers.CTDeleteProblem(contest_id, problem_id)
+	err := internal.CTDeleteProblem(contest_id, problem_id)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	}
@@ -169,7 +169,7 @@ func CTCreate(ctx *gin.Context) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
-	id, err := controllers.CTCreate()
+	id, err := internal.CTCreate()
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	} else {
@@ -182,7 +182,7 @@ func CTModify(ctx *gin.Context) {
 	if !ok {
 		return
 	}
-	if !controllers.CTExists(contest_id) {
+	if !internal.CTExists(contest_id) {
 		libs.APIWriteBack(ctx, 404, "", nil)
 		return
 	}
@@ -212,7 +212,7 @@ func CTModify(ctx *gin.Context) {
 	if !ok {
 		return
 	}
-	err = controllers.CTModify(contest_id, title, start, last, pretest, score_private)
+	err = internal.CTModify(contest_id, title, start, last, pretest, score_private)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	}
@@ -223,7 +223,7 @@ func CTGetPermissions(ctx *gin.Context) {
 	if !ok {
 		return
 	}
-	if !controllers.CTExists(contest_id) {
+	if !internal.CTExists(contest_id) {
 		libs.APIWriteBack(ctx, 404, "", nil)
 		return
 	}
@@ -231,7 +231,7 @@ func CTGetPermissions(ctx *gin.Context) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
-	perms, err := controllers.CTGetPermissions(contest_id)
+	perms, err := internal.CTGetPermissions(contest_id)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	} else {
@@ -244,7 +244,7 @@ func CTGetManagers(ctx *gin.Context) {
 	if !ok {
 		return
 	}
-	if !controllers.CTExists(contest_id) {
+	if !internal.CTExists(contest_id) {
 		libs.APIWriteBack(ctx, 404, "", nil)
 		return
 	}
@@ -252,7 +252,7 @@ func CTGetManagers(ctx *gin.Context) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
-	users, err := controllers.CTGetManagers(contest_id)
+	users, err := internal.CTGetManagers(contest_id)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	} else {
@@ -269,7 +269,7 @@ func CTAddPermission(ctx *gin.Context) {
 	if !ok {
 		return
 	}
-	if !controllers.CTExists(contest_id) {
+	if !internal.CTExists(contest_id) {
 		libs.APIWriteBack(ctx, 404, "", nil)
 		return
 	}
@@ -277,11 +277,11 @@ func CTAddPermission(ctx *gin.Context) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
-	if !controllers.PMExists(permission_id) {
+	if !internal.PMExists(permission_id) {
 		libs.APIWriteBack(ctx, 400, "no such permission id", nil)
 		return
 	}
-	err := controllers.CTAddPermission(contest_id, permission_id)
+	err := internal.CTAddPermission(contest_id, permission_id)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	}
@@ -296,7 +296,7 @@ func CTAddManager(ctx *gin.Context) {
 	if !ok {
 		return
 	}
-	if !controllers.CTExists(contest_id) {
+	if !internal.CTExists(contest_id) {
 		libs.APIWriteBack(ctx, 404, "", nil)
 		return
 	}
@@ -304,15 +304,15 @@ func CTAddManager(ctx *gin.Context) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
-	if !controllers.USExists(user_id) {
+	if !internal.USExists(user_id) {
 		libs.APIWriteBack(ctx, 400, "no such user id", nil)
 		return
 	}
-	if controllers.CTRegistered(contest_id, user_id) {
+	if internal.CTRegistered(contest_id, user_id) {
 		libs.APIWriteBack(ctx, 400, "user has registered this contest", nil)
 		return
 	}
-	err := controllers.CTAddPermission(contest_id, -user_id)
+	err := internal.CTAddPermission(contest_id, -user_id)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	}
@@ -331,7 +331,7 @@ func CTDeletePermission(ctx *gin.Context) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
-	err := controllers.CTDeletePermission(contest_id, permission_id)
+	err := internal.CTDeletePermission(contest_id, permission_id)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	}
@@ -350,7 +350,7 @@ func CTDeleteManager(ctx *gin.Context) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
-	err := controllers.CTDeletePermission(contest_id, -user_id)
+	err := internal.CTDeletePermission(contest_id, -user_id)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	}
@@ -361,7 +361,7 @@ func CTGetParticipants(ctx *gin.Context) {
 	if !ok {
 		return
 	}
-	if !controllers.CTExists(contest_id) {
+	if !internal.CTExists(contest_id) {
 		libs.APIWriteBack(ctx, 404, "", nil)
 		return
 	}
@@ -369,7 +369,7 @@ func CTGetParticipants(ctx *gin.Context) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
-	parts, err := controllers.CTGetParticipants(contest_id)
+	parts, err := internal.CTGetParticipants(contest_id)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	} else {
@@ -383,7 +383,7 @@ func CTSignup(ctx *gin.Context) {
 		return
 	}
 	user_id := GetUserId(ctx)
-	contest, err := controllers.CTQuery(contest_id, user_id)
+	contest, err := internal.CTQuery(contest_id, user_id)
 	if err != nil {
 		libs.APIWriteBack(ctx, 404, "", nil)
 		return
@@ -392,7 +392,7 @@ func CTSignup(ctx *gin.Context) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
-	err = controllers.CTAddParticipant(contest_id, user_id)
+	err = internal.CTAddParticipant(contest_id, user_id)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	}
@@ -407,7 +407,7 @@ func CTSignout(ctx *gin.Context) {
 	if !ok {
 		return
 	}
-	err := controllers.CTDeleteParticipant(contest_id, user_id)
+	err := internal.CTDeleteParticipant(contest_id, user_id)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	}

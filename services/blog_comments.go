@@ -1,7 +1,7 @@
-package components
+package services
 
 import (
-	"yao/controllers"
+	"yao/internal"
 	"yao/libs"
 
 	"github.com/gin-gonic/gin"
@@ -22,7 +22,7 @@ func BLCreateComment(ctx *gin.Context) {
 		return
 	}
 	content := ctx.PostForm("content")
-	id, err := controllers.BLCreateComment(blog_id, user_id, content)
+	id, err := internal.BLCreateComment(blog_id, user_id, content)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	} else {
@@ -35,7 +35,7 @@ func BLGetComments(ctx *gin.Context) {
 	if !ok {
 		return
 	}
-	if !controllers.BLExists(blog_id) {
+	if !internal.BLExists(blog_id) {
 		libs.APIWriteBack(ctx, 404, "", nil)
 		return
 	}
@@ -43,7 +43,7 @@ func BLGetComments(ctx *gin.Context) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
-	comments, err := controllers.BLGetComments(blog_id, GetUserId(ctx))
+	comments, err := internal.BLGetComments(blog_id, GetUserId(ctx))
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	} else {
@@ -57,14 +57,14 @@ func BLDeleteComment(ctx *gin.Context) {
 		return
 	}
 	user_id := GetUserId(ctx)
-	var comment controllers.Comment
+	var comment internal.Comment
 	err := libs.DBSelectSingle(&comment, "select author, blog_id from blog_comments where comment_id=?", id)
 	if err != nil {
 		libs.APIWriteBack(ctx, 404, "", nil)
 	} else if !ISAdmin(ctx) && comment.Author != user_id {
 		libs.APIWriteBack(ctx, 403, "", nil)
 	} else {
-		err = controllers.BLDeleteComment(id, comment.BlogId)
+		err = internal.BLDeleteComment(id, comment.BlogId)
 		if err != nil {
 			libs.APIInternalError(ctx, err)
 		}

@@ -2,14 +2,13 @@ package libs
 
 import (
 	"archive/zip"
+	"bytes"
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math/rand"
 	"os"
-	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -93,42 +92,28 @@ func GetTempDir() string {
 	}
 }
 
-func ZipDir(src_dir string, zip_file_name string) error {
-	dir, err := ioutil.ReadDir(src_dir)
+func UnzipMemory(mem []byte) (map[string][]byte, error) {
+	//OpenReader will open the Zip file specified by name and return a ReadCloser.
+	reader, err := zip.NewReader(bytes.NewReader(mem), int64(len(mem)))
 	if err != nil {
-		return err
+		return nil, err
 	}
-	if len(dir) == 0 {
-		return nil
+	ret := make(map[string][]byte)
+	for _, file := range reader.File {
+		rc, err := file.Open()
+		if err != nil {
+			return nil, err
+		}
+		defer rc.Close()
+		w := bytes.NewBuffer(nil)
+		_, err = io.Copy(w, rc)
+		if err != nil {
+			return nil, err
+		}
+		ret[file.Name] = w.Bytes()
+		rc.Close()
 	}
-	os.RemoveAll(zip_file_name)
-	zipfile, _ := os.Create(zip_file_name)
-	defer zipfile.Close()
-	archive := zip.NewWriter(zipfile)
-	defer archive.Close()
-
-	filepath.Walk(src_dir, func(path string, info os.FileInfo, _ error) error {
-		if path == src_dir {
-			return nil
-		}
-		header, _ := zip.FileInfoHeader(info)
-
-		header.Name = path[len(src_dir)+1:]
-		if info.IsDir() {
-			header.Name += `/`
-		} else {
-			header.Method = zip.Deflate
-		}
-
-		writer, _ := archive.CreateHeader(header)
-		if !info.IsDir() {
-			file, _ := os.Open(path)
-			defer file.Close()
-			io.Copy(writer, file)
-		}
-		return nil
-	})
-	return nil
+	return ret, nil
 }
 
 func FileExists(filename string) bool {
@@ -142,4 +127,14 @@ func AtoiDefault(str string, def int) int {
 		return def
 	}
 	return val
+}
+
+/*
+Whether a is start with b
+*/
+func StartsWith(a, b string) bool {
+	if len(a) < len(b) {
+		return false
+	}
+	return a[: len(b)] == b
 }

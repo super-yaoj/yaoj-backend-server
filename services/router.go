@@ -1,4 +1,4 @@
-package components
+package services
 
 import (
 	"time"
@@ -43,7 +43,7 @@ var Router map[string][]Request = map[string][]Request{
 	"/contest_participants": {{"GET", CTGetParticipants}, {"POST", CTSignup}, {"DELETE", CTSignout}},
 	"/contest_problems":     {{"GET", CTGetProblems}, {"POST", CTAddProblem}, {"DELETE", CTDeleteProblem}},
 
-	"/submission":  {{"POST", SMSubmit}},
+	"/submission":  {{"GET", SMQuery}, {"POST", SMSubmit}},
 	"/submissions": {{"GET", SMList}},
 }
 

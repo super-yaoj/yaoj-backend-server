@@ -1,11 +1,11 @@
-package components
+package services
 
 import (
 	"fmt"
 	"sort"
 	"strconv"
 	"strings"
-	"yao/controllers"
+	"yao/internal"
 	"yao/libs"
 
 	"github.com/gin-gonic/gin"
@@ -21,7 +21,7 @@ func PMCreate(ctx *gin.Context) {
 		libs.APIWriteBack(ctx, 400, "permission name is too long", nil)
 		return
 	}
-	id, err := controllers.PMCreate(name)
+	id, err := internal.PMCreate(name)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	} else {
@@ -43,11 +43,11 @@ func PMChangeName(ctx *gin.Context) {
 		libs.APIWriteBack(ctx, 400, "permission name is too long", nil)
 		return
 	}
-	if !controllers.PMExists(id) {
+	if !internal.PMExists(id) {
 		libs.APIWriteBack(ctx, 400, "no such permission id", nil)
 		return
 	}
-	err := controllers.PMChangeName(id, name)
+	err := internal.PMChangeName(id, name)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	}
@@ -66,7 +66,7 @@ func PMDelete(ctx *gin.Context) {
 		libs.APIWriteBack(ctx, 400, "you cannot modify the default group", nil)
 		return
 	}
-	num, err := controllers.PMDelete(id)
+	num, err := internal.PMDelete(id)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	} else if num != 1 {
@@ -90,7 +90,7 @@ func PMQuery(ctx *gin.Context) {
 	if !ok {
 		return
 	}
-	p, isfull, err := controllers.PMQuery(bound, pagesize, isleft)
+	p, isfull, err := internal.PMQuery(bound, pagesize, isleft)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	} else {
@@ -109,7 +109,7 @@ func PMQueryUser(ctx *gin.Context) {
 		if !ok {
 			return
 		}
-		users, err := controllers.PMQueryUser(id)
+		users, err := internal.PMQueryUser(id)
 		if err != nil {
 			libs.APIInternalError(ctx, err)
 		} else {
@@ -124,7 +124,7 @@ func PMQueryUser(ctx *gin.Context) {
 			libs.APIWriteBack(ctx, 403, "", nil)
 			return
 		}
-		permissions, err := controllers.USQueryPermission(id)
+		permissions, err := internal.USQueryPermission(id)
 		if err != nil {
 			libs.APIInternalError(ctx, err)
 		} else {
@@ -152,7 +152,7 @@ func PMAddUser(ctx *gin.Context) {
 		libs.APIWriteBack(ctx, 400, "you cannot modify the default group", nil)
 		return
 	}
-	if !controllers.PMExists(id) {
+	if !internal.PMExists(id) {
 		libs.APIWriteBack(ctx, 400, "invalid request: permission id is wrong", nil)
 		return
 	}
@@ -182,7 +182,7 @@ func PMAddUser(ctx *gin.Context) {
 		libs.APIWriteBack(ctx, 400, "invalid ids exist", map[string]any{"invalid_ids": invalid_ids})
 		return
 	}
-	res, err := controllers.PMAddUser(real_ids, id)
+	res, err := internal.PMAddUser(real_ids, id)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	} else {
@@ -204,7 +204,7 @@ func PMDeleteUser(ctx *gin.Context) {
 		libs.APIWriteBack(ctx, 400, "you cannot modify the default group", nil)
 		return
 	}
-	res, err := controllers.PMDeleteUser(pid, uid)
+	res, err := internal.PMDeleteUser(pid, uid)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	} else if res != 1 {

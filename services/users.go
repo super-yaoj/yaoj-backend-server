@@ -1,10 +1,10 @@
-package components
+package services
 
 import (
 	"fmt"
 	"strconv"
 	"time"
-	"yao/controllers"
+	"yao/internal"
 	"yao/libs"
 
 	"github.com/gin-contrib/sessions"
@@ -12,9 +12,9 @@ import (
 )
 
 func checkPU(ctx *gin.Context, name, password string) bool {
-	if !controllers.ValidPassword(password) || !controllers.ValidUsername(name) {
+	if !internal.ValidPassword(password) || !internal.ValidUsername(name) {
 		message := "invalid username"
-		if !controllers.ValidPassword(password) {
+		if !internal.ValidPassword(password) {
 			message = "invalid password"
 		}
 		libs.RPCWriteBack(ctx, 400, -32600, message, nil)
@@ -35,7 +35,7 @@ func USSignup(ctx *gin.Context) {
 		libs.APIWriteBack(ctx, 400, "verify code is wrong", nil)
 		return
 	}
-	password = controllers.SaltPassword(password)
+	password = internal.SaltPassword(password)
 	remember_token := ""
 	if remember == "true" {
 		remember_token = libs.RandomString(32)
@@ -66,8 +66,8 @@ func USLogin(ctx *gin.Context) {
 	if !checkPU(ctx, name, password) {
 		return
 	}
-	password = controllers.SaltPassword(password)
-	user := controllers.UserSmall{Name: name}
+	password = internal.SaltPassword(password)
+	user := internal.UserSmall{Name: name}
 	err := libs.DBSelectSingle(&user, "select user_id, user_group from user_info where user_name=? and password=?", name, password)
 	if err != nil {
 		libs.RPCWriteBack(ctx, 400, -32600, "username or password is wrong", nil)
@@ -104,7 +104,7 @@ func USLogout(ctx *gin.Context) {
 
 func USInit(ctx *gin.Context) {
 	sess := sessions.Default(ctx)
-	var ret func(controllers.UserSmall) = func(user controllers.UserSmall) {
+	var ret func(internal.UserSmall) = func(user internal.UserSmall) {
 		if user.Usergroup == 3 {
 			USLogout(ctx)
 			libs.RPCWriteBack(ctx, 400, -32600, "user is banned", nil)
@@ -114,7 +114,7 @@ func USInit(ctx *gin.Context) {
 	}
 
 	tmp, err := ctx.Cookie("user_id")
-	user := controllers.UserSmall{Id: -1, Name: "", Usergroup: 2}
+	user := internal.UserSmall{Id: -1, Name: "", Usergroup: 2}
 	if err == nil {
 		id, err := strconv.Atoi(tmp)
 		remember_token, err1 := ctx.Cookie("remember_token")
@@ -159,7 +159,7 @@ func USQuery(ctx *gin.Context) {
 	if !ok {
 		return
 	}
-	user, err := controllers.USQuery(id)
+	user, err := internal.USQuery(id)
 	if err != nil {
 		libs.APIWriteBack(ctx, 400, "no such user id", nil)
 		return
@@ -185,7 +185,7 @@ func USModify(ctx *gin.Context) {
 		return
 	}
 	password := ctx.PostForm("password")
-	ok, err := controllers.CheckPassword(user_id, password)
+	ok, err := internal.CheckPassword(user_id, password)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 		return
@@ -195,10 +195,10 @@ func USModify(ctx *gin.Context) {
 		return
 	}
 	new_password := ctx.PostForm("new_password")
-	if new_password != "" && controllers.ValidPassword(new_password) {
+	if new_password != "" && internal.ValidPassword(new_password) {
 		password = new_password
 	}
-	password = controllers.SaltPassword(password)
+	password = internal.SaltPassword(password)
 	gender, ok := libs.PostIntRange(ctx, "gender", 0, 2)
 	if !ok {
 		return
@@ -208,11 +208,11 @@ func USModify(ctx *gin.Context) {
 		libs.APIWriteBack(ctx, 400, "length of motto or organization is too long", nil)
 		return
 	}
-	if !controllers.ValidEmail(email) {
+	if !internal.ValidEmail(email) {
 		libs.APIWriteBack(ctx, 400, "invalid email", nil)
 		return
 	}
-	err = controllers.USModify(password, gender, motto, email, organization, user_id)
+	err = internal.USModify(password, gender, motto, email, organization, user_id)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 		return
@@ -233,7 +233,7 @@ func USGroupEdit(ctx *gin.Context) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
-	target, err := controllers.USQuerySmall(user_id)
+	target, err := internal.USQuerySmall(user_id)
 	if err != nil {
 		libs.APIWriteBack(ctx, 400, "no such user id", nil)
 		return
@@ -241,7 +241,7 @@ func USGroupEdit(ctx *gin.Context) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
-	err = controllers.USGroupEdit(user_id, user_group)
+	err = internal.USGroupEdit(user_id, user_group)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	} else {
@@ -261,7 +261,7 @@ func USList(ctx *gin.Context) {
 		if !ok {
 			return
 		}
-		users, isfull, err := controllers.USListByName(user_name+"%", bound, pagesize, isleft)
+		users, isfull, err := internal.USListByName(user_name+"%", bound, pagesize, isleft)
 		if err != nil {
 			libs.APIInternalError(ctx, err)
 		} else {
@@ -277,7 +277,7 @@ func USList(ctx *gin.Context) {
 		if !ok {
 			return
 		}
-		users, isfull, err := controllers.USList(bound_user_id, bound_rating, pagesize, isleft)
+		users, isfull, err := internal.USList(bound_user_id, bound_rating, pagesize, isleft)
 		if err != nil {
 			libs.APIInternalError(ctx, err)
 		} else {

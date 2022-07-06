@@ -1,4 +1,4 @@
-package components
+package services
 
 import (
 	"fmt"
@@ -7,7 +7,7 @@ import (
 	"path"
 	"strings"
 	"time"
-	"yao/controllers"
+	"yao/internal"
 	"yao/libs"
 
 	"github.com/gin-gonic/gin"
@@ -42,10 +42,10 @@ func PRCanSeeWithoutContent(ctx *gin.Context, problem_id int) bool {
 /*
  */
 func PRCanSeeFromContest(ctx *gin.Context, problem_id, contest_id int) bool {
-	contest, _ := controllers.CTQuery(contest_id, GetUserId(ctx))
+	contest, _ := internal.CTQuery(contest_id, GetUserId(ctx))
 	if CTCanEnter(ctx, contest, CTCanEdit(ctx, contest_id)) &&
 		contest.StartTime.Before(time.Now()) && contest.EndTime.After(time.Now()) {
-		return controllers.CTHasProblem(contest_id, problem_id)
+		return internal.CTHasProblem(contest_id, problem_id)
 	}
 	return false
 }
@@ -77,7 +77,7 @@ func PRList(ctx *gin.Context) {
 	if !ok {
 		return
 	}
-	problems, isfull, err := controllers.PRList(bound, pagesize, user_id, isleft, ISAdmin(ctx))
+	problems, isfull, err := internal.PRList(bound, pagesize, user_id, isleft, ISAdmin(ctx))
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	} else {
@@ -103,7 +103,7 @@ func PRQuery(ctx *gin.Context) {
 	if !ok {
 		return
 	}
-	if !controllers.PRExists(problem_id) {
+	if !internal.PRExists(problem_id) {
 		libs.APIWriteBack(ctx, 404, "", nil)
 		return
 	}
@@ -112,7 +112,7 @@ func PRQuery(ctx *gin.Context) {
 		return
 	}
 
-	prob, err := controllers.PRQuery(problem_id, GetUserId(ctx))
+	prob, err := internal.PRQuery(problem_id, GetUserId(ctx))
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 		return
@@ -133,7 +133,7 @@ func PRGetPermissions(ctx *gin.Context) {
 	if !ok {
 		return
 	}
-	if !controllers.PRExists(problem_id) {
+	if !internal.PRExists(problem_id) {
 		libs.APIWriteBack(ctx, 404, "", nil)
 		return
 	}
@@ -141,7 +141,7 @@ func PRGetPermissions(ctx *gin.Context) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
-	pers, err := controllers.PRGetPermissions(problem_id)
+	pers, err := internal.PRGetPermissions(problem_id)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	} else {
@@ -158,7 +158,7 @@ func PRAddPermission(ctx *gin.Context) {
 	if !ok {
 		return
 	}
-	if !controllers.PRExists(problem_id) {
+	if !internal.PRExists(problem_id) {
 		libs.APIWriteBack(ctx, 404, "", nil)
 		return
 	}
@@ -166,11 +166,11 @@ func PRAddPermission(ctx *gin.Context) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
-	if !controllers.PMExists(permission_id) {
+	if !internal.PMExists(permission_id) {
 		libs.APIWriteBack(ctx, 400, "no such permission id", nil)
 		return
 	}
-	err := controllers.PRAddPermission(problem_id, permission_id)
+	err := internal.PRAddPermission(problem_id, permission_id)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	}
@@ -189,7 +189,7 @@ func PRDeletePermission(ctx *gin.Context) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
-	err := controllers.PRDeletePermission(problem_id, permission_id)
+	err := internal.PRDeletePermission(problem_id, permission_id)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	}
@@ -200,7 +200,7 @@ func PRGetManagers(ctx *gin.Context) {
 	if !ok {
 		return
 	}
-	if !controllers.PRExists(problem_id) {
+	if !internal.PRExists(problem_id) {
 		libs.APIWriteBack(ctx, 404, "", nil)
 		return
 	}
@@ -208,7 +208,7 @@ func PRGetManagers(ctx *gin.Context) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
-	users, err := controllers.PRGetManagers(problem_id)
+	users, err := internal.PRGetManagers(problem_id)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	} else {
@@ -225,7 +225,7 @@ func PRAddManager(ctx *gin.Context) {
 	if !ok {
 		return
 	}
-	if !controllers.PRExists(problem_id) {
+	if !internal.PRExists(problem_id) {
 		libs.APIWriteBack(ctx, 404, "", nil)
 		return
 	}
@@ -233,11 +233,11 @@ func PRAddManager(ctx *gin.Context) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
-	if !controllers.USExists(user_id) {
+	if !internal.USExists(user_id) {
 		libs.APIWriteBack(ctx, 400, "no such user id", nil)
 		return
 	}
-	err := controllers.PRAddPermission(problem_id, -user_id)
+	err := internal.PRAddPermission(problem_id, -user_id)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	}
@@ -256,7 +256,7 @@ func PRDeleteManager(ctx *gin.Context) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
-	err := controllers.PRDeletePermission(problem_id, -user_id)
+	err := internal.PRDeletePermission(problem_id, -user_id)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	}
@@ -267,7 +267,7 @@ func PRPutData(ctx *gin.Context) {
 	if !ok {
 		return
 	}
-	if !controllers.PRExists(problem_id) {
+	if !internal.PRExists(problem_id) {
 		libs.APIWriteBack(ctx, 404, "", nil)
 		return
 	}
@@ -294,7 +294,7 @@ func PRPutData(ctx *gin.Context) {
 		return
 	}
 	log.Printf("file uploaded saves at %s", path.Join(tmpdir, "1.zip"))
-	err = controllers.PRPutData(problem_id, tmpdir)
+	err = internal.PRPutData(problem_id, tmpdir)
 	if err != nil {
 		libs.APIWriteBack(ctx, 400, err.Error(), nil)
 	}
@@ -305,19 +305,19 @@ func PRDownloadData(ctx *gin.Context) {
 	if !ok {
 		return
 	}
-	if !controllers.PRExists(problem_id) {
+	if !internal.PRExists(problem_id) {
 		libs.APIWriteBack(ctx, 404, "", nil)
 		return
 	}
 	t := ctx.Query("type")
-	controllers.ProblemRLock(problem_id)
-	defer controllers.ProblemRUnlock(problem_id)
+	internal.ProblemRLock(problem_id)
+	defer internal.ProblemRUnlock(problem_id)
 	if t == "data" {
 		if !PRCanEdit(ctx, problem_id) {
 			libs.APIWriteBack(ctx, 403, "", nil)
 			return
 		}
-		path := controllers.PRGetDataZip(problem_id)
+		path := internal.PRGetDataZip(problem_id)
 		_, err := os.Stat(path)
 		if err != nil {
 			libs.APIWriteBack(ctx, 400, "no data", nil)
@@ -331,7 +331,7 @@ func PRDownloadData(ctx *gin.Context) {
 			libs.APIWriteBack(ctx, 403, "", nil)
 			return
 		}
-		path := controllers.PRGetSampleZip(problem_id)
+		path := internal.PRGetSampleZip(problem_id)
 		_, err := os.Stat(path)
 		if err != nil {
 			libs.APIWriteBack(ctx, 400, "no data", nil)
@@ -346,7 +346,7 @@ func PRModify(ctx *gin.Context) {
 	if !ok {
 		return
 	}
-	if !controllers.PRExists(problem_id) {
+	if !internal.PRExists(problem_id) {
 		libs.APIWriteBack(ctx, 404, "", nil)
 		return
 	}
@@ -360,7 +360,7 @@ func PRModify(ctx *gin.Context) {
 		return
 	}
 
-	pro := controllers.PRLoad(problem_id)
+	pro := internal.PRLoad(problem_id)
 	length := len(pro.Statements)
 	fix := func(str string) string {
 		if len(str) > length {
@@ -383,7 +383,7 @@ func PRModify(ctx *gin.Context) {
 	new_allow = fix(new_allow)
 	if allow_down != new_allow {
 		libs.DBUpdate("update problems set title=?, allow_down=? where problem_id=?", title, new_allow, problem_id)
-		err := controllers.PRModifySample(problem_id, new_allow)
+		err := internal.PRModifySample(problem_id, new_allow)
 		if err != nil {
 			libs.APIInternalError(ctx, err)
 		}

@@ -1,4 +1,4 @@
-package controllers
+package internal
 
 import (
 	"bytes"
@@ -35,10 +35,9 @@ var waitingList = libs.NewBlockPriorityQueue()
 
 const (
 	Ok int = iota
-	CompileError
+	InternalServerError
 	Waiting
 	Judging
-	SystemError
 )
 
 func JudgersInit() {
@@ -72,7 +71,7 @@ func JudgerStart(judger *Judger) {
 		err2 := libs.DBSelectSingleColumn(&check_sum, "select check_sum from problems where problem_id=?", prob)
 		if err != nil || err1 != nil || err2 != nil {
 			fmt.Printf("%v %v %v", err, err1, err2)
-			libs.DBUpdate("update submissions set status=? where submission_id=?", SystemError, sid)
+			libs.DBUpdate("update submissions set status=? where submission_id=?", InternalServerError, sid)
 			continue
 		}
 
@@ -115,7 +114,7 @@ func JudgerStart(judger *Judger) {
 			}
 		}
 		if failed {
-			libs.DBUpdate("update submissions set status=? where submission_id=?", SystemError, sid)
+			libs.DBUpdate("update submissions set status=? where submission_id=?", InternalServerError, sid)
 			continue
 		}
 		//Waiting judger finishes

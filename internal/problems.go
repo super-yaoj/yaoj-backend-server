@@ -1,4 +1,4 @@
-package controllers
+package internal
 
 import (
 	"fmt"
@@ -12,6 +12,8 @@ type Statement struct {
 	Name string `json:"name"`
 	Path string `json:"path"`
 }
+
+type SubmConfig map[string]problem.SubmLimit
 
 type Problem struct {
 	Id    int    `db:"problem_id" json:"problem_id"`
@@ -30,7 +32,7 @@ type Problem struct {
 	Statements []Statement `json:"statements"`
 	//01-string denotes which files can be downloaded
 	AllowDown  string                       `db:"allow_down" json:"allow_down"`
-	SubmConfig map[string]problem.SubmLimit `json:"subm_config"`
+	SubmConfig SubmConfig `json:"subm_config"`
 	//Could only be seen by admins
 	DataInfo problem.DataInfo `json:"data"`
 }
