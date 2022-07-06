@@ -9,8 +9,8 @@ require (
 	github.com/go-sql-driver/mysql v1.6.0
 	github.com/jmoiron/sqlx v1.3.5
 	github.com/k0kubun/pp v2.4.0+incompatible
-	github.com/k0kubun/pp/v3 v3.1.0
 	github.com/super-yaoj/yaoj-core v0.0.20
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
@@ -24,6 +24,7 @@ require (
 	github.com/gorilla/sessions v1.2.1 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/k0kubun/colorstring v0.0.0-20150214042306-9440f1994b88 // indirect
+	github.com/k0kubun/pp/v3 v3.1.0 // indirect
 	github.com/leodido/go-urn v1.2.1 // indirect
 	github.com/mattn/go-colorable v0.1.12 // indirect
 	github.com/mattn/go-isatty v0.0.14 // indirect

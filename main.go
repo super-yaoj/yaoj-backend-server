@@ -1,7 +1,9 @@
 package main
 
 import (
+	"flag"
 	"log"
+	"os"
 	"time"
 	"yao/components"
 	"yao/controllers"
@@ -11,6 +13,7 @@ import (
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
+	"gopkg.in/yaml.v3"
 )
 
 func process(f func(*gin.Context)) func(*gin.Context) {
@@ -29,6 +32,21 @@ func process(f func(*gin.Context)) func(*gin.Context) {
 }
 
 func main() {
+	flag.Parse()
+	if genConfig {
+		data, _ := yaml.Marshal(config)
+		os.WriteFile("config.yaml", data, os.ModePerm)
+		return
+	}
+	if configFile != "" {
+		data, _ := os.ReadFile(configFile)
+		yaml.Unmarshal(data, &config)
+	}
+	libs.FrontDomain = config.FrontDomain
+	libs.BackDomain = config.BackDomain
+	libs.DataDir = config.DataDir
+	libs.TmpDir = config.TmpDir
+
 	libs.DirInit()
 	err := libs.DBInit()
 	if err != nil {
@@ -58,6 +76,6 @@ func main() {
 			}
 		}
 	}
-	app.Run("0.0.0.0:8081")
+	app.Run(config.Listen)
 	defer libs.DBClose()
 }
