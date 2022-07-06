@@ -11,7 +11,6 @@ import (
 	"yao/libs"
 
 	"github.com/gin-gonic/gin"
-	"github.com/k0kubun/pp/v3"
 	"github.com/super-yaoj/yaoj-core/pkg/problem"
 )
 
@@ -114,7 +113,6 @@ func PRQuery(ctx *gin.Context) {
 	}
 
 	prob, err := controllers.PRQuery(problem_id, GetUserId(ctx))
-	pp.Print(prob)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 		return
