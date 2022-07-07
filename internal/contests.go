@@ -218,3 +218,8 @@ func CTExists(contest_id int) bool {
 	count, err := libs.DBSelectSingleInt("select count(*) from contests where contest_id=?", contest_id)
 	return err == nil && count > 0
 }
+
+func CTPretestOnly(contest_id int) bool {
+	pretest, err := libs.DBSelectSingleInt("select pretest from contests where contest_id=?", contest_id)
+	return err == nil || pretest > 0
+}

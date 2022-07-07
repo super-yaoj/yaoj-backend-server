@@ -26,7 +26,7 @@ func PRCanEdit(ctx *gin.Context, problem_id int) bool {
 	return count > 0
 }
 
-func PRCanSeeWithoutContent(ctx *gin.Context, problem_id int) bool {
+func PRCanSeeWithoutContest(ctx *gin.Context, problem_id int) bool {
 	user_id := GetUserId(ctx)
 	if user_id < 0 {
 		count, _ := libs.DBSelectSingleInt("select count(*) from problem_permissions where problem_id=? and permission_id=?", problem_id, libs.DefaultGroup)
@@ -56,7 +56,7 @@ args: contest_id=0 means not in contest
 return: (must see from contest, can see)
 */
 func PRCanSee(ctx *gin.Context, problem_id, contest_id int) (bool, bool) {
-	if !PRCanSeeWithoutContent(ctx, problem_id) {
+	if !PRCanSeeWithoutContest(ctx, problem_id) {
 		if contest_id <= 0 || !PRCanSeeFromContest(ctx, problem_id, contest_id) {
 			libs.APIWriteBack(ctx, 403, "", nil)
 			return false, false

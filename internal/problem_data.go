@@ -149,6 +149,26 @@ func PRModifySample(problem_id int, allow_down string) error {
 	return nil
 }
 
+func totalTests(test *problem.TestdataInfo) int {
+	ret := 0
+	for _, sub := range test.Subtasks {
+		ret += len(sub.Tests)
+	}
+	return ret
+}
+
+func PRHasPretest(pro *Problem) bool {
+	return totalTests(&pro.DataInfo.Pretest) > 0
+}
+
+func PRHasData(pro *Problem) bool {
+	return totalTests(&pro.DataInfo.TestdataInfo) > 0
+}
+
+func PRHasExtra(pro *Problem) bool {
+	return totalTests(&pro.DataInfo.Extra) > 0
+}
+
 var problemRWLock sync.Map
 
 func getProblemRWLock(problem_id int) *sync.RWMutex {

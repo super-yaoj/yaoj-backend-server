@@ -21,6 +21,11 @@ type Judger struct {
 	callback   chan []byte
 }
 
+type JudgeEntry struct {
+	sid int
+	typ string //one of "pretest", "tests", "extra"
+}
+
 func NewJudger(url string) *Judger {
 	return &Judger{url, 0, make(chan []byte)}
 }
@@ -34,19 +39,25 @@ var judgers = []*Judger{
 var waitingList = libs.NewBlockPriorityQueue()
 
 const (
-	Ok int = iota
-	InternalServerError
-	Waiting
-	Judging
+	InternalError 	= -1
+	Waiting 		= 1
+	JudgingPretest 	= 2
+	JudgingTests	= 4
+	JudgingExtra 	= 8
+	Finished 		= 15
 )
 
 func JudgersInit() {
-	ids, err := libs.DBSelectInts("select submission_id from submissions where status in (?, ?)", Waiting, Judging)
+	var sub []Submission
+	err := libs.DBSelectAll(&sub, "select submission_id, problem_id, contest_id from submissions where status < ?", Finished)
 	if err != nil {
 		log.Fatal(err)
 	}
-	for _, i := range ids {
-		InsertSubmission(i, 1)
+	for _, val := range sub {
+		err := JudgeSubmission(val.Id, val.ProblemId, val.ContestId)
+		if err != nil {
+			fmt.Println(err)
+		}
 	}
 	for _, i := range judgers {
 		go JudgerStart(i)
@@ -61,26 +72,28 @@ type judgerResponse struct {
 
 func JudgerStart(judger *Judger) {
 	for {
-		sid := waitingList.Pop().(int)
-		go libs.DBUpdate("update submissions set status=? where submission_id=?", Judging, sid)
+		subm := waitingList.Pop().(JudgeEntry)
+		sid, typ := subm.sid, subm.typ
+		go libs.DBUpdate("update submissions set status=status|? where submission_id=?", Waiting, sid)
 
 		var content []byte
-		err := libs.DBSelectSingleColumn(&content, "select content from submission_content where submission_id=?", sid)
+		err := libs.DBSelectSingleColumn(&content, "select content from submission_details where submission_id=?", sid)
 		prob, err1 := libs.DBSelectSingleInt("select problem_id from submissions where submission_id=?", sid)
 		var check_sum string
 		err2 := libs.DBSelectSingleColumn(&check_sum, "select check_sum from problems where problem_id=?", prob)
 		if err != nil || err1 != nil || err2 != nil {
 			fmt.Printf("%v %v %v", err, err1, err2)
-			libs.DBUpdate("update submissions set status=? where submission_id=?", InternalServerError, sid)
+			libs.DBUpdate("update submissions set status=? where submission_id=?", InternalError, sid)
 			continue
 		}
 
 		failed := true
 		for { //Repeating for data sync
 			res, err := http.Post(judger.url+"/judge?"+libs.GetQuerys(map[string]string{
+				"type": typ,
 				"sum": check_sum,
 				//Give a check_sum of submission_id for security
-				"cb": fmt.Sprintf(libs.BackDomain+"/FinishJudging?submission_id=%d&check_sum=%s", sid, SaltPassword(fmt.Sprint(sid))),
+				"cb": fmt.Sprintf(libs.BackDomain+"/FinishJudging?type=%s&submission_id=%d&check_sum=%s", typ, sid, SaltPassword(typ + fmt.Sprint(sid))),
 			}), "binary", bytes.NewBuffer(content))
 			if err != nil {
 				fmt.Printf("%v\n", err)
@@ -114,21 +127,24 @@ func JudgerStart(judger *Judger) {
 			}
 		}
 		if failed {
-			libs.DBUpdate("update submissions set status=? where submission_id=?", InternalServerError, sid)
+			libs.DBUpdate("update submissions set status=? where submission_id=?", InternalError, sid)
 			continue
 		}
 		//Waiting judger finishes
 		judger.submission = sid
-		err = SMUpdate(sid, prob, <-judger.callback)
-		if err != nil {
-			fmt.Printf("%v\n", err)
-		}
+		ret := <-judger.callback
+		go func() {
+			err = SMUpdate(sid, prob, typ, ret)
+			if err != nil {
+				fmt.Printf("%v\n", err)
+			}
+		}()
 		judger.submission = 0
 	}
 }
 
-func InsertSubmission(sid, priority int) {
-	waitingList.Push(sid, priority)
+func InsertSubmission(sid, priority int, typ string) {
+	waitingList.Push(JudgeEntry{sid, typ}, priority)
 }
 
 func judgerCallback(sid int, result []byte) {
@@ -150,10 +166,11 @@ func FinishJudging(ctx *gin.Context) {
 		fmt.Printf("Judge failed: no submission_id field\n")
 		return
 	}
+	typ := ctx.Query("type")
 	sum := ctx.Query("check_sum")
-	if sum != SaltPassword(fmt.Sprint(sid)) {
+	if sum != SaltPassword(typ + fmt.Sprint(sid)) {
 		libs.APIWriteBack(ctx, 400, "", nil)
-		fmt.Printf("Judge failed: check sum of submission_id error\n")
+		fmt.Printf("Judge failed: check sum of type or submission_id error\n")
 		return
 	}
 	body, _ := ioutil.ReadAll(ctx.Request.Body)

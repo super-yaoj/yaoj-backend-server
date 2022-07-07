@@ -23,68 +23,24 @@ func SMList(ctx *gin.Context) {
 	contest_id := libs.GetIntDefault(ctx, "contest_id", 0)
 	submitter := libs.GetIntDefault(ctx, "submitter", 0)
 	user_id := GetUserId(ctx)
-	columns := "submission_id, submitter, problem_id, contest_id, status, score, time, memory, language, submit_time"
 
 	_, isleft := ctx.GetQuery("left")
-	bound, _ := libs.GetInt(ctx, libs.If(isleft, "left", "right"))
-	query := libs.If(problem_id == 0, "", fmt.Sprintf(" and problem_id=%d", problem_id)) +
-		libs.If(contest_id == 0, "", fmt.Sprintf(" and contest_id=%d", contest_id)) +
-		libs.If(submitter == 0, "", fmt.Sprintf(" and submitter=%d", submitter))
-	must := "1"
-	if !ISAdmin(ctx) {
-		perms, _ := internal.USPermissions(user_id)
-		perm_str := libs.JoinArray(perms)
-		//problems user can see
-		probs, _ := libs.DBSelectInts("select problem_id from problem_permissions where permission_id in (" + perm_str + ")")
-		/*
-			First, user can see all finished contests
-			For running contests, participants cannnot see other's contest submissions if score_private=1
-			For not started contests, they must contain no contest submissions according to the definition, so we can discard them
-		*/
-		conts, _ := libs.DBSelectInts("select contest_id from contest_permissions where permission_id in (" + perm_str + ")")
-		//remove contests that cannot see
-		conts_running, _ := libs.DBSelectInts("select a.contest_id from ((select contest_id from contests where start_time<=? and end_time>=? and score_private=1) as a join (select contest_id from contest_participants where user_id=?) as b on a.contest_id=b.contest_id)", time.Now(), time.Now(), user_id)
-		for i := range conts {
-			//running contests is few, so brute force is just ok
-			if libs.HasIntN(conts_running, conts[i]) {
-				conts[i] = 0
-			}
-		}
-
-		must = "("
-		if problem_id == 0 {
-			must += libs.If(len(probs) == 0, "0", "(problem_id in (" + libs.JoinArray(probs) + "))")
-		} else {
-			must += libs.If(libs.HasIntN(probs, problem_id), "1", "0")
-		}
-		if contest_id == 0 {
-			must += libs.If(len(conts) == 0, "0", " or (contest_id in (" + libs.JoinArray(conts) + "))")
-		} else {
-			must += " or " + libs.If(libs.HasIntN(conts, contest_id), "1", "0")
-		}
-		if submitter == 0 {
-			if user_id > 0 {
-				must += fmt.Sprintf(" or submitter=%d)", user_id)
-			}
-		} else {
-			must += libs.If(submitter == user_id, " or 1)", ")")
+	bound, ok := libs.GetInt(ctx, libs.If(isleft, "left", "right"))
+	if !ok {
+		return
+	}
+	submissions, isfull, err := internal.SMList(bound, pagesize, user_id, submitter, problem_id, contest_id, isleft, ISAdmin(ctx))
+	if err != nil {
+		libs.APIInternalError(ctx, err)
+		return
+	}
+	//Modify scores to sample_scores when users are in pretest-only contests
+	contest_pretest, err := libs.DBSelectInts("select a.contest_id from ((select contest_id from contests where start_time<=? and end_time>=? and pretest=1) as a join (select contest_id from contest_participants where user_id=?) as b on a.contest_id=b.contest_id)", time.Now(), time.Now(), user_id)
+	for key := range submissions {
+		if libs.HasIntN(contest_pretest, submissions[key].ContestId) {
+			internal.SMPretestOnly(&submissions[key])
 		}
 	}
-	pagesize += 1
-	var submissions []internal.Submission
-	if isleft {
-		libs.DBSelectAll(&submissions, fmt.Sprintf("select %s from submissions where submission_id<=%d and %s %s order by submission_id desc limit %d", columns, bound, must, query, pagesize))
-	} else {
-		libs.DBSelectAll(&submissions, fmt.Sprintf("select %s from submissions where submission_id>=%d and %s %s order by submission_id limit %d", columns, bound, must, query, pagesize))
-	}
-	isfull := len(submissions) == pagesize
-	if isfull {
-		submissions = submissions[:pagesize-1]
-	}
-	if !isleft {
-		libs.Reverse(submissions)
-	}
-	internal.SMGetExtraInfo(submissions)
 	libs.APIWriteBack(ctx, 200, "", map[string]any{"data": submissions, "isfull": isfull})
 }
 
@@ -112,13 +68,13 @@ func SMSubmit(ctx *gin.Context) {
 	}
 
 	pro := internal.PRLoad(problem_id)
-	if pro.Id != problem_id {
+	if !internal.PRHasData(pro) {
 		libs.APIWriteBack(ctx, 400, "problem has no data", nil)
 		return
 	}
 	var sub problem.Submission
 	var language utils.LangTag
-	var preview map[string]string
+	var preview map[string]internal.ContentPreview
 	_, all := ctx.GetPostForm("submit_all")
 	if all {
 		sub, preview, language = parseZipFile(ctx, "all.zip", pro.SubmConfig)
@@ -140,14 +96,14 @@ func SMSubmit(ctx *gin.Context) {
 /*
 When the submitted file is a zip file
 */
-func parseZipFile(ctx *gin.Context, field string, config internal.SubmConfig) (problem.Submission, map[string]string, utils.LangTag) {
+func parseZipFile(ctx *gin.Context, field string, config internal.SubmConfig) (problem.Submission, map[string]internal.ContentPreview, utils.LangTag) {
 	file, header, err := ctx.Request.FormFile(field)
 	if err != nil {
 		return nil, nil, 0
 	}
 	language := -1
 	sub := make(problem.Submission)
-	preview := make(map[string]string)
+	preview := make(map[string]internal.ContentPreview)
 
 	var tot_size int64 = 0
 	for _, val := range config {
@@ -182,7 +138,8 @@ func parseZipFile(ctx *gin.Context, field string, config internal.SubmConfig) (p
 			libs.APIWriteBack(ctx, 400, "no field matches file name: " + name, nil)
 			return nil, nil, 0
 		}
-		preview[matched] = getPreview(val, config[matched].Accepted)
+		//TODO: get language by file suffix
+		preview[matched] = getPreview(val, config[matched].Accepted, -1)
 		sub.SetSource(workflow.Gsubm, matched, name, bytes.NewReader(val))
 	}
 	return sub, preview, utils.LangTag(language)
@@ -191,16 +148,16 @@ func parseZipFile(ctx *gin.Context, field string, config internal.SubmConfig) (p
 /*
 When user submits files one by one
 */
-func parseMultiFiles(ctx *gin.Context, config internal.SubmConfig) (problem.Submission, map[string]string, utils.LangTag) {
+func parseMultiFiles(ctx *gin.Context, config internal.SubmConfig) (problem.Submission, map[string]internal.ContentPreview, utils.LangTag) {
 	sub := make(problem.Submission)
-	preview := make(map[string]string)
+	preview := make(map[string]internal.ContentPreview)
 	language := -1
 	for key, val := range config {
 		str, ok := ctx.GetPostForm(key + "_text")
-		name := key
+		name, lang := key, -1
 		//get language
 		if val.Accepted == utils.Csource {
-			lang, ok := libs.PostIntRange(ctx, key+"_lang", 0, len(libs.LangSuf)-1)
+			lang, ok = libs.PostIntRange(ctx, key+"_lang", 0, len(libs.LangSuf)-1)
 			if !ok {
 				return nil, nil, 0
 			}
@@ -214,7 +171,7 @@ func parseMultiFiles(ctx *gin.Context, config internal.SubmConfig) (problem.Subm
 				return nil, nil, 0
 			}
 			byt := []byte(str)
-			preview[key] = getPreview(byt, val.Accepted)
+			preview[key] = getPreview(byt, val.Accepted, utils.LangTag(lang))
 			sub.SetSource(workflow.Gsubm, key, name, bytes.NewReader(byt))
 		} else {
 			//file
@@ -233,7 +190,7 @@ func parseMultiFiles(ctx *gin.Context, config internal.SubmConfig) (problem.Subm
 				libs.APIInternalError(ctx, err)
 				return nil, nil, 0
 			}
-			preview[key] = getPreview(w.Bytes(), val.Accepted)
+			preview[key] = getPreview(w.Bytes(), val.Accepted, utils.LangTag(lang))
 			sub.SetSource(workflow.Gsubm, key, name, w)
 		}
 	}
@@ -243,30 +200,33 @@ func parseMultiFiles(ctx *gin.Context, config internal.SubmConfig) (problem.Subm
 /*
 Get previews of submitted contents
 */
-func getPreview(val []byte, typ utils.CtntType) string {
+func getPreview(val []byte, typ utils.CtntType, lang utils.LangTag) internal.ContentPreview {
 	const preview_length = 256
+	ret := internal.ContentPreview{ Accepted: typ, Language: lang }
 	switch typ {
 	case utils.Cbinary:
 		if len(val) * 2 <= preview_length {
-			return fmt.Sprintf("%X", val)
+			ret.Content = fmt.Sprintf("%X", val)
+		} else {
+			ret.Content = fmt.Sprintf("%X", val[: preview_length / 2]) + "..."
 		}
-		return fmt.Sprintf("%X", val[: preview_length / 2]) + "..."
 	case utils.Cplain:
 		if len(val) <= preview_length {
-			return string(val)
+			ret.Content = string(val)
+		} else {
+			ret.Content = string(val[: preview_length]) + "..."
 		}
-		return string(val[: preview_length]) + "..."
 	case utils.Csource:
-		return string(val)
+		ret.Content = string(val)
 	}
-	return ""
+	return ret
 }
 
 /*
 Query single submission, when user is in contests which score_private=true(i.e. cannot see full result),
 this function will delete extra information.
 
-Along with CalcMethod and SubmissionConfig
+Along with CalcMethod and DataInfo
 */
 func SMQuery(ctx *gin.Context) {
 	sid, ok := libs.GetInt(ctx, "submission_id")
@@ -279,10 +239,14 @@ func SMQuery(ctx *gin.Context) {
 		return
 	}
 	//user cannot see submission details inside contests
-	if !PRCanSeeWithoutContent(ctx, ret.ProblemId) {
+	no_contest := PRCanSeeWithoutContest(ctx, ret.ProblemId)
+	if ret.Submitter != GetUserId(ctx) && !no_contest {
 		libs.APIWriteBack(ctx, 403, "", nil)
 	} else {
+		if !no_contest && internal.CTPretestOnly(ret.ContestId) {
+			internal.SMPretestOnly(&ret)
+		}
 		pro := internal.PRLoad(ret.ProblemId)
-		libs.APIWriteBack(ctx, 200, "", map[string]any{"submission": ret, "calcmethod": pro.DataInfo.CalcMethod, "submconfig": pro.SubmConfig})
+		libs.APIWriteBack(ctx, 200, "", map[string]any{"submission": ret, "datainfo": pro.DataInfo})
 	}
 }

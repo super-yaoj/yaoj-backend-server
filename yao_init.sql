@@ -303,13 +303,13 @@ LOCK TABLES `problems` WRITE;
 UNLOCK TABLES;
 
 --
--- Table structure for table `submission_content`
+-- Table structure for table `submission_details`
 --
 
-DROP TABLE IF EXISTS `submission_content`;
+DROP TABLE IF EXISTS `submission_details`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
  SET character_set_client = utf8mb4 ;
-CREATE TABLE `submission_content` (
+CREATE TABLE `submission_details` (
   `submission_id` int(11) NOT NULL,
   `content` longblob,
   PRIMARY KEY (`submission_id`)
@@ -317,12 +317,12 @@ CREATE TABLE `submission_content` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
--- Dumping data for table `submission_content`
+-- Dumping data for table `submission_details`
 --
 
-LOCK TABLES `submission_content` WRITE;
-/*!40000 ALTER TABLE `submission_content` DISABLE KEYS */;
-/*!40000 ALTER TABLE `submission_content` ENABLE KEYS */;
+LOCK TABLES `submission_details` WRITE;
+/*!40000 ALTER TABLE `submission_details` DISABLE KEYS */;
+/*!40000 ALTER TABLE `submission_details` ENABLE KEYS */;
 UNLOCK TABLES;
 
 --
