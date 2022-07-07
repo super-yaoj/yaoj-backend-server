@@ -51,7 +51,7 @@ func SMGetZipName(submission_id int) string {
 }
 
 //Priority: in contest > not in contest, pretest > data > extra
-func JudgeSubmission(submission_id, problem_id, contest_id int) error {
+func SMJudge(submission_id, problem_id, contest_id int) error {
 	pro := PRLoad(problem_id)
 	status := 0
 	if PRHasPretest(pro) {
@@ -91,7 +91,7 @@ func SMCreate(user_id, problem_id, contest_id int, language utils.LangTag, zipfi
 	if err != nil {
 		return err
 	}
-	return JudgeSubmission(int(id), problem_id, contest_id)
+	return SMJudge(int(id), problem_id, contest_id)
 }
 
 /*
@@ -178,7 +178,7 @@ func SMList(bound, pagesize, user_id, submitter, problem_id, contest_id int, isl
 		}
 		for i := range conts {
 			//running contests is few, so brute force is just ok
-			if libs.HasIntN(conts_running, conts[i]) {
+			if libs.HasElement(conts_running, conts[i]) {
 				conts[i] = 0
 			}
 		}
@@ -187,12 +187,12 @@ func SMList(bound, pagesize, user_id, submitter, problem_id, contest_id int, isl
 		if problem_id == 0 {
 			must += libs.If(len(probs) == 0, "0", "(problem_id in (" + libs.JoinArray(probs) + "))")
 		} else {
-			must += libs.If(libs.HasIntN(probs, problem_id), "1", "0")
+			must += libs.If(libs.HasElement(probs, problem_id), "1", "0")
 		}
 		if contest_id == 0 {
 			must += libs.If(len(conts) == 0, " or 0", " or (contest_id in (" + libs.JoinArray(conts) + "))")
 		} else {
-			must += " or " + libs.If(libs.HasIntN(conts, contest_id), "1", "0")
+			must += " or " + libs.If(libs.HasElement(conts, contest_id), "1", "0")
 		}
 		if submitter == 0 {
 			if user_id > 0 {
@@ -299,4 +299,18 @@ func SMUpdate(sid, pid int, mode string, result []byte) error {
 	}
 	_, err = libs.DBUpdate("update submission_details set " + column_name + "=? where submission_id=?", result, sid)
 	return err
+}
+
+func SMJudgeCustomTest(content []byte) []byte {
+	callback := make(chan []byte)
+	//find a free submission_id
+	sid, err := libs.DBInsertGetId("insert into custom_tests values (null, ?)", content)
+	if err != nil {
+		fmt.Println(err)
+		return []byte{}
+	}
+	InsertCustomTest(int(sid), &callback)
+	result := <- callback
+	go libs.DBUpdate("delete from custom_tests where id=?", sid)
+	return result
 }

@@ -54,7 +54,7 @@ func HasInt(srt []int, val int) bool {
 	return i < len(srt) && srt[i] == val
 }
 
-func HasIntN(arr []int, val int) bool {
+func HasElement[T comparable](arr []T, val T) bool {
 	for _, v := range arr {
 		if v == val {
 			return true

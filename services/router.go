@@ -45,6 +45,7 @@ var Router map[string][]Request = map[string][]Request{
 
 	"/submission":  {{"GET", SMQuery}, {"POST", SMSubmit}},
 	"/submissions": {{"GET", SMList}},
+	"/custom_test": {{"POST", SMCustomTest}},
 }
 
 func GetTime(ctx *gin.Context) {

@@ -9,6 +9,7 @@ import (
 	"yao/libs"
 
 	"github.com/gin-gonic/gin"
+	"github.com/goccy/go-json"
 	"github.com/super-yaoj/yaoj-core/pkg/problem"
 	"github.com/super-yaoj/yaoj-core/pkg/utils"
 	"github.com/super-yaoj/yaoj-core/pkg/workflow"
@@ -37,7 +38,7 @@ func SMList(ctx *gin.Context) {
 	//Modify scores to sample_scores when users are in pretest-only contests
 	contest_pretest, err := libs.DBSelectInts("select a.contest_id from ((select contest_id from contests where start_time<=? and end_time>=? and pretest=1) as a join (select contest_id from contest_participants where user_id=?) as b on a.contest_id=b.contest_id)", time.Now(), time.Now(), user_id)
 	for key := range submissions {
-		if libs.HasIntN(contest_pretest, submissions[key].ContestId) {
+		if libs.HasElement(contest_pretest, submissions[key].ContestId) {
 			internal.SMPretestOnly(&submissions[key])
 		}
 	}
@@ -158,7 +159,7 @@ func parseMultiFiles(ctx *gin.Context, config internal.SubmConfig) (problem.Subm
 		//get language
 		if val.Accepted == utils.Csource {
 			lang, ok = libs.PostIntRange(ctx, key+"_lang", 0, len(libs.LangSuf)-1)
-			if !ok {
+			if !ok || (val.Langs != nil && !libs.HasElement(val.Langs, utils.LangTag(lang))) {
 				return nil, nil, 0
 			}
 			language = lang
@@ -246,4 +247,26 @@ func SMQuery(ctx *gin.Context) {
 		}
 		libs.APIWriteBack(ctx, 200, "", map[string]any{"submission": ret})
 	}
+}
+
+func SMCustomTest(ctx *gin.Context) {
+	config := internal.SubmConfig {
+		"source": {Langs: nil, Accepted: utils.Csource, Length: 64 * 1024},
+		"input": {Langs: nil, Accepted: utils.Cplain, Length: 10 * 1024 * 1024},
+	}
+	subm, _, _ := parseMultiFiles(ctx, config)
+	if subm == nil {
+		return
+	}
+	w := bytes.NewBuffer(nil)
+	subm.DumpTo(w)
+	result := internal.SMJudgeCustomTest(w.Bytes())
+	if len(result) == 0 {
+		result, _ = json.Marshal(map[string]any{
+			"Memory": -1,
+			"Time": -1,
+			"Title": "Internal Error",
+		})
+	}
+	libs.APIWriteBack(ctx, 200, "", map[string]any{ "result": string(result) })
 }
