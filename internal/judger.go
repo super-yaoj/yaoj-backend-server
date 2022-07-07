@@ -50,7 +50,7 @@ const (
 
 func JudgersInit() {
 	var sub []Submission
-	err := libs.DBSelectAll(&sub, "select submission_id, problem_id, contest_id from submissions where status < ?", Finished)
+	err := libs.DBSelectAll(&sub, "select submission_id, problem_id, contest_id from submissions where status < ? and status >= 0", Finished)
 	if err != nil {
 		log.Fatal(err)
 	}
