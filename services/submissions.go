@@ -200,10 +200,10 @@ func parseMultiFiles(ctx *gin.Context, config internal.SubmConfig) (problem.Subm
 /*
 Get previews of submitted contents
 */
-func getPreview(val []byte, typ utils.CtntType, lang utils.LangTag) internal.ContentPreview {
+func getPreview(val []byte, mode utils.CtntType, lang utils.LangTag) internal.ContentPreview {
 	const preview_length = 256
-	ret := internal.ContentPreview{ Accepted: typ, Language: lang }
-	switch typ {
+	ret := internal.ContentPreview{ Accepted: mode, Language: lang }
+	switch mode {
 	case utils.Cbinary:
 		if len(val) * 2 <= preview_length {
 			ret.Content = fmt.Sprintf("%X", val)

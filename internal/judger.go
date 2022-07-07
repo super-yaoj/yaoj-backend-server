@@ -16,18 +16,18 @@ import (
 
 type Judger struct {
 	url string
-	//The submission which this judger is running on, 0 means free
-	submission int
+	//unique random judger id, change after each request
+	jid string
 	callback   chan []byte
 }
 
 type JudgeEntry struct {
 	sid int
-	typ string //one of "pretest", "tests", "extra"
+	mode string //one of "pretest", "tests", "extra"
 }
 
 func NewJudger(url string) *Judger {
-	return &Judger{url, 0, make(chan []byte)}
+	return &Judger{url, libs.RandomString(64), make(chan []byte)}
 }
 
 var judgers = []*Judger{
@@ -73,7 +73,7 @@ type judgerResponse struct {
 func JudgerStart(judger *Judger) {
 	for {
 		subm := waitingList.Pop().(JudgeEntry)
-		sid, typ := subm.sid, subm.typ
+		sid, mode := subm.sid, subm.mode
 		go libs.DBUpdate("update submissions set status=status|? where submission_id=?", Waiting, sid)
 
 		var content []byte
@@ -89,11 +89,13 @@ func JudgerStart(judger *Judger) {
 
 		failed := true
 		for { //Repeating for data sync
+			//get a new judger id
+			judger.jid = libs.RandomString(64)
 			res, err := http.Post(judger.url+"/judge?"+libs.GetQuerys(map[string]string{
-				"type": typ,
+				"mode": mode,
 				"sum": check_sum,
 				//Give a check_sum of submission_id for security
-				"cb": fmt.Sprintf(libs.BackDomain+"/FinishJudging?type=%s&submission_id=%d&check_sum=%s", typ, sid, SaltPassword(typ + fmt.Sprint(sid))),
+				"cb": fmt.Sprintf(libs.BackDomain+"/FinishJudging?jid=%s", judger.jid),
 			}), "binary", bytes.NewBuffer(content))
 			if err != nil {
 				fmt.Printf("%v\n", err)
@@ -131,48 +133,33 @@ func JudgerStart(judger *Judger) {
 			continue
 		}
 		//Waiting judger finishes
-		judger.submission = sid
 		ret := <-judger.callback
 		go func() {
-			err = SMUpdate(sid, prob, typ, ret)
+			err = SMUpdate(sid, prob, mode, ret)
 			if err != nil {
 				fmt.Printf("%v\n", err)
 			}
 		}()
-		judger.submission = 0
+		//change the judger id to avoid attacks
+		judger.jid = libs.RandomString(64)
 	}
 }
 
-func InsertSubmission(sid, priority int, typ string) {
-	waitingList.Push(JudgeEntry{sid, typ}, priority)
+func InsertSubmission(sid, priority int, mode string) {
+	waitingList.Push(JudgeEntry{sid, mode}, priority)
 }
 
-func judgerCallback(sid int, result []byte) {
+func FinishJudging(ctx *gin.Context) {
+	jid := ctx.Query("jid")
+	result, _ := ioutil.ReadAll(ctx.Request.Body)
 	for i := 0; i < 5; i++ {
 		for key := range judgers {
-			if judgers[key].submission == sid {
+			if judgers[key].jid == jid {
 				judgers[key].callback <- result
 				return
 			}
 		}
 		time.Sleep(time.Second)
 	}
-	fmt.Printf("No such judger: submission_id=%d", sid)
-}
-
-func FinishJudging(ctx *gin.Context) {
-	sid, ok := libs.GetInt(ctx, "submission_id")
-	if !ok {
-		fmt.Printf("Judge failed: no submission_id field\n")
-		return
-	}
-	typ := ctx.Query("type")
-	sum := ctx.Query("check_sum")
-	if sum != SaltPassword(typ + fmt.Sprint(sid)) {
-		libs.APIWriteBack(ctx, 400, "", nil)
-		fmt.Printf("Judge failed: check sum of type or submission_id error\n")
-		return
-	}
-	body, _ := ioutil.ReadAll(ctx.Request.Body)
-	judgerCallback(sid, body)
+	fmt.Printf("No such judger: judger_id=%s", jid)
 }

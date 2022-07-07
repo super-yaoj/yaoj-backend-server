@@ -235,7 +235,7 @@ func SMPretestOnly(sub *Submission) {
 	}
 }
 
-func SMUpdate(sid, pid int, typ string, result []byte) error {
+func SMUpdate(sid, pid int, mode string, result []byte) error {
 	res_map := make(map[string]any)
 	err := json.Unmarshal(result, &res_map)
 	if err != nil {
@@ -244,7 +244,7 @@ func SMUpdate(sid, pid int, typ string, result []byte) error {
 	prob := PRLoad(pid)
 	var testdata *problem.TestdataInfo
 	var column_name string
-	switch typ {
+	switch mode {
 	case "pretest":
 		testdata = &prob.DataInfo.Pretest
 		column_name = "pretest_result"
@@ -286,10 +286,10 @@ func SMUpdate(sid, pid int, typ string, result []byte) error {
 		score += sub_score
 	}
 	
-	if typ == "tests" {
+	if mode == "tests" {
 		_, err = libs.DBUpdate("update submissions set status=status|?, score=?, time=?, memory=? where submission_id=?",
 			JudgingTests, score, int(time_used/float64(time.Millisecond)), int(memory_used/1024), sid)
-	} else if typ == "pretest" {
+	} else if mode == "pretest" {
 		_, err = libs.DBUpdate("update submissions set status=status|?, sample_score=? where submission_id=?", JudgingPretest, score, sid)
 	} else {
 		_, err = libs.DBUpdate("update submissions set status=status|? where submission_id=?", JudgingExtra, sid)
