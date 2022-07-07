@@ -225,8 +225,6 @@ func getPreview(val []byte, mode utils.CtntType, lang utils.LangTag) internal.Co
 /*
 Query single submission, when user is in contests which score_private=true(i.e. cannot see full result),
 this function will delete extra information.
-
-Along with CalcMethod and DataInfo
 */
 func SMQuery(ctx *gin.Context) {
 	sid, ok := libs.GetInt(ctx, "submission_id")
@@ -246,7 +244,6 @@ func SMQuery(ctx *gin.Context) {
 		if !no_contest && internal.CTPretestOnly(ret.ContestId) {
 			internal.SMPretestOnly(&ret)
 		}
-		pro := internal.PRLoad(ret.ProblemId)
-		libs.APIWriteBack(ctx, 200, "", map[string]any{"submission": ret, "datainfo": pro.DataInfo})
+		libs.APIWriteBack(ctx, 200, "", map[string]any{"submission": ret})
 	}
 }
