@@ -2,7 +2,6 @@ package internal
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -12,6 +11,7 @@ import (
 	"yao/libs"
 
 	"github.com/gin-gonic/gin"
+	jsoniter "github.com/json-iterator/go"
 )
 
 type Judger struct {
@@ -132,7 +132,7 @@ func judgeSubmission(sid int, uuid int64, mode string, judger *Judger) bool {
 		}
 		body, _ := ioutil.ReadAll(res.Body)
 		var jr judgerResponse
-		json.Unmarshal(body, &jr)
+		jsoniter.Unmarshal(body, &jr)
 
 		if jr.Msg == "ok" {
 			break
@@ -146,7 +146,7 @@ func judgeSubmission(sid int, uuid int64, mode string, judger *Judger) bool {
 				return false
 			}
 			body, _ = ioutil.ReadAll(res.Body)
-			json.Unmarshal(body, &jr)
+			jsoniter.Unmarshal(body, &jr)
 			if jr.Msg != "ok" {
 				fmt.Printf("%s\n", jr.Err)
 				return false
@@ -193,7 +193,7 @@ func judgeCustomTest(sid int, callback *chan []byte, judger *Judger) {
 	}
 	body, _ := ioutil.ReadAll(res.Body)
 	var jr judgerResponse
-	json.Unmarshal(body, &jr)
+	jsoniter.Unmarshal(body, &jr)
 	if jr.Msg != "ok" {
 		fmt.Println(jr.Err)
 		*callback <- []byte{}

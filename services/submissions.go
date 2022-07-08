@@ -239,14 +239,20 @@ func SMQuery(ctx *gin.Context) {
 		return
 	}
 	//user cannot see submission details inside contests
-	no_contest := PRCanSeeWithoutContest(ctx, ret.ProblemId)
-	if ret.Submitter != GetUserId(ctx) && !no_contest {
+	by_problem := PRCanSeeWithoutContest(ctx, ret.ProblemId)
+	can_edit := SMCanEdit(ctx, ret.SubmissionBase)
+	if !can_edit && ret.Submitter != GetUserId(ctx) && !by_problem {
 		libs.APIWriteBack(ctx, 403, "", nil)
 	} else {
-		if !no_contest && internal.CTPretestOnly(ret.ContestId) {
-			internal.SMPretestOnly(&ret)
+		if !can_edit && !by_problem {
+			if internal.CTPretestOnly(ret.ContestId) {
+				internal.SMPretestOnly(&ret)
+			} else {
+				ret.Details.Result = internal.SMRemoveTestDetails(ret.Details.Result)
+				ret.Details.ExtraResult = internal.SMRemoveTestDetails(ret.Details.ExtraResult)
+			}
 		}
-		libs.APIWriteBack(ctx, 200, "", map[string]any{"submission": ret, "can_edit": SMCanEdit(ctx, ret.SubmissionBase)})
+		libs.APIWriteBack(ctx, 200, "", map[string]any{"submission": ret, "can_edit": can_edit})
 	}
 }
 

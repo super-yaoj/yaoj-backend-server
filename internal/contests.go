@@ -221,5 +221,5 @@ func CTExists(contest_id int) bool {
 
 func CTPretestOnly(contest_id int) bool {
 	pretest, err := libs.DBSelectSingleInt("select pretest from contests where contest_id=?", contest_id)
-	return err == nil || pretest > 0
+	return err != nil || pretest > 0
 }

@@ -1,7 +1,6 @@
 package internal
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -9,6 +8,7 @@ import (
 	"time"
 	"yao/libs"
 
+	jsoniter "github.com/json-iterator/go"
 	"github.com/super-yaoj/yaoj-core/pkg/problem"
 	"github.com/super-yaoj/yaoj-core/pkg/utils"
 )
@@ -104,7 +104,7 @@ func SMCreate(user_id, problem_id, contest_id int, language utils.LangTag, zipfi
 	if err != nil {
 		return err
 	}
-	js, err := json.Marshal(preview)
+	js, err := jsoniter.Marshal(preview)
 	if err != nil {
 		return err
 	}
@@ -265,7 +265,7 @@ func SMPretestOnly(sub *Submission) {
 
 func SMUpdate(sid, pid int, mode string, result []byte) error {
 	res_map := make(map[string]any)
-	err := json.Unmarshal(result, &res_map)
+	err := jsoniter.Unmarshal(result, &res_map)
 	if err != nil {
 		return err
 	}
@@ -364,4 +364,19 @@ func SMRejudge(submission_id int) error {
 		return err
 	}
 	return SMJudge(sub, true, current)
+}
+
+func SMRemoveTestDetails(js string) string {
+	var val map[string]any
+	jsoniter.UnmarshalFromString(js, &val)
+	for _, subtask := range val["Subtask"].([]any) {
+		for _, test := range subtask.(map[string]any)["Testcase"].([]any) {
+			test.(map[string]any)["File"] = nil
+		}
+	}
+	ret, err := jsoniter.MarshalToString(val)
+	if err != nil {
+		fmt.Println(err)
+	}
+	return ret
 }

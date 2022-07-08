@@ -4,7 +4,6 @@ import (
 	"archive/zip"
 	"bytes"
 	"crypto/sha256"
-	"encoding/json"
 	"fmt"
 	"io"
 	"math/rand"
@@ -13,15 +12,17 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	jsoniter "github.com/json-iterator/go"
 )
 
 func Struct2Map(a interface{}) (map[string]any, error) {
-	str, err := json.Marshal(a)
+	str, err := jsoniter.Marshal(a)
 	if err != nil {
 		return nil, err
 	}
 	var ret map[string]any
-	err = json.Unmarshal(str, &ret)
+	err = jsoniter.Unmarshal(str, &ret)
 	if err != nil {
 		return nil, err
 	}
