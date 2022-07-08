@@ -108,6 +108,11 @@ func judgeSubmission(sid int, uuid int64, mode string, judger *Judger) bool {
 		return true
 	}
 	
+	pro := PRLoad(tinfo.Prob)
+	if !PRHasData(pro, mode) {
+		go SMUpdate(sid, tinfo.Prob, mode, nil)
+		return true
+	}
 	var content []byte
 	err = libs.DBSelectSingleColumn(&content, "select content from submission_details where submission_id=?", sid)
 	go libs.DBUpdate("update submissions set status=status|? where submission_id=?", Waiting, sid)

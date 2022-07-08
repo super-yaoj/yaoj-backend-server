@@ -70,7 +70,7 @@ func SMSubmit(ctx *gin.Context) {
 	}
 
 	pro := internal.PRLoad(problem_id)
-	if !internal.PRHasData(pro) {
+	if !internal.PRHasData(pro, "tests") {
 		libs.APIWriteBack(ctx, 400, "problem has no data", nil)
 		return
 	}

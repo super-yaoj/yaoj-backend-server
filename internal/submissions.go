@@ -1,7 +1,6 @@
 package internal
 
 import (
-	"errors"
 	"fmt"
 	"math"
 	"sort"
@@ -74,26 +73,8 @@ func SMPriority(contest, rejudge bool, mode string) int {
 Process a whole judge on single problem submission
 */
 func SMJudge(sub SubmissionBase, rejudge bool, uuid int64) error {
-	pro := PRLoad(sub.ProblemId)
-	status := 0
-	if PRHasPretest(pro) {
-		InsertSubmission(int(sub.Id), uuid, SMPriority(sub.ContestId > 0, rejudge, "pretest"), "pretest")
-	} else {
-		status |= JudgingPretest
-	}
-	if PRHasData(pro) {
-		InsertSubmission(int(sub.Id), uuid, SMPriority(sub.ContestId > 0, rejudge, "tests"), "tests")
-	} else {
-		return errors.New("Problem has no data!")
-	}
-	if PRHasExtra(pro) {
-		InsertSubmission(int(sub.Id), uuid, SMPriority(sub.ContestId > 0, rejudge, "extra"), "extra")
-	} else {
-		status |= JudgingExtra
-	}
-	_, err := libs.DBUpdate("update submissions set status=? where submission_id=?", status, sub.Id)
-	if err != nil {
-		return err
+	for _, val := range []string{"pretest", "tests", "extra"} {
+		InsertSubmission(int(sub.Id), uuid, SMPriority(sub.ContestId > 0, rejudge, val), val)
 	}
 	return nil
 }
@@ -264,11 +245,6 @@ func SMPretestOnly(sub *Submission) {
 }
 
 func SMUpdate(sid, pid int, mode string, result []byte) error {
-	res_map := make(map[string]any)
-	err := jsoniter.Unmarshal(result, &res_map)
-	if err != nil {
-		return err
-	}
 	prob := PRLoad(pid)
 	var testdata *problem.TestdataInfo
 	var column_name string
@@ -285,33 +261,44 @@ func SMUpdate(sid, pid int, mode string, result []byte) error {
 	}
 
 	var score, time_used, memory_used float64 = 0, 0, 0
-	is_subtask := res_map["IsSubtask"].(bool)
-	for _, subtask := range res_map["Subtask"].([]any) {
-		var sub_score float64
-		first := true
-		for _, test := range subtask.(map[string]any)["Testcase"].([]any) {
-			test_score := test.(map[string]any)["Score"].(float64)
-			time_used += test.(map[string]any)["Time"].(float64)
-			memory_used = math.Max(memory_used, test.(map[string]any)["Memory"].(float64))
-			if first {
-				sub_score = test_score
-				first = false
-				continue
-			}
-			if is_subtask {
-				switch testdata.CalcMethod {
-				case problem.Mmin:
-					sub_score = math.Min(sub_score, test_score)
-				case problem.Mmax:
-					sub_score = math.Max(sub_score, test_score)
-				case problem.Msum:
+	accepted := false
+	var err error
+	res_map := make(map[string]any)
+	err = jsoniter.Unmarshal(result, &res_map)
+	is_subtask, has_data := res_map["IsSubtask"].(bool)
+	
+	if err == nil && has_data {
+		accepted = true
+		for _, subtask := range res_map["Subtask"].([]any) {
+			var sub_score float64
+			first := true
+			for _, test := range subtask.(map[string]any)["Testcase"].([]any) {
+				test_score := test.(map[string]any)["Score"].(float64)
+				time_used += test.(map[string]any)["Time"].(float64)
+				memory_used = math.Max(memory_used, test.(map[string]any)["Memory"].(float64))
+				if first {
+					sub_score = test_score
+					first = false
+					continue
+				}
+				if is_subtask {
+					switch testdata.CalcMethod {
+					case problem.Mmin:
+						sub_score = math.Min(sub_score, test_score)
+					case problem.Mmax:
+						sub_score = math.Max(sub_score, test_score)
+					case problem.Msum:
+						sub_score += test_score
+					}
+				} else {
 					sub_score += test_score
 				}
-			} else {
-				sub_score += test_score
+			}
+			score += sub_score
+			if sub_score != subtask.(map[string]any)["Fullscore"].(float64) {
+				accepted = false
 			}
 		}
-		score += sub_score
 	}
 	
 	if mode == "tests" {
@@ -320,7 +307,7 @@ func SMUpdate(sid, pid int, mode string, result []byte) error {
 	} else if mode == "pretest" {
 		_, err = libs.DBUpdate("update submissions set status=status|?, sample_score=? where submission_id=?", JudgingPretest, score, sid)
 	} else {
-		_, err = libs.DBUpdate("update submissions set status=status|? where submission_id=?", JudgingExtra, sid)
+		_, err = libs.DBUpdate("update submissions set status=status|?, hacked=? where submission_id=?", JudgingExtra, !accepted, sid)
 	}
 	if err != nil {
 		return err
@@ -359,7 +346,7 @@ func SMRejudge(submission_id int) error {
 	}
 	//update uuid to cancel other entries in the judging queue
 	current := libs.TimeStamp()
-	_, err = libs.DBUpdate("update submissions set uuid=? where submission_id=?", current, submission_id)
+	_, err = libs.DBUpdate("update submissions set uuid=?, status=0 where submission_id=?", current, submission_id)
 	if err != nil {
 		return err
 	}

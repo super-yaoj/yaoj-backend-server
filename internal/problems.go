@@ -149,32 +149,12 @@ func PRRejudge(problem_id int) error {
 		return err
 	}
 	//update uuid to current time-stamp
-	_, err = libs.DBUpdate("update submissions set uuid=? where problem_id=?", current, problem_id)
+	_, err = libs.DBUpdate("update submissions set uuid=?, status=0 where problem_id=?", current, problem_id)
 	if err != nil {
 		return err
 	}
-	pro := PRLoad(problem_id)
-	status := libs.If(PRHasPretest(pro), 0, JudgingPretest) |
-			libs.If(PRHasData(pro), 0, JudgingTests) |
-			libs.If(PRHasExtra(pro), 0, JudgingExtra)
-	_, err = libs.DBUpdate("update submissions set status=? where problem_id=?", status, problem_id)
-	if err != nil {
-		return err
-	}
-	if PRHasPretest(pro) {
-		for _, i := range sub {
-			InsertSubmission(i.Id, current, SMPriority(i.ContestId > 0, true, "pretest"), "pretest")
-		}
-	}
-	if PRHasData(pro) {
-		for _, i := range sub {
-			InsertSubmission(i.Id, current, SMPriority(i.ContestId > 0, true, "tests"), "tests")
-		}
-	}
-	if PRHasExtra(pro) {
-		for _, i := range sub {
-			InsertSubmission(i.Id, current, SMPriority(i.ContestId > 0, true, "extra"), "extra")
-		}
+	for _, i := range sub {
+		SMJudge(i, true, current)
 	}
 	return nil
 }

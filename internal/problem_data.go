@@ -157,16 +157,16 @@ func totalTests(test *problem.TestdataInfo) int {
 	return ret
 }
 
-func PRHasPretest(pro *Problem) bool {
-	return totalTests(&pro.DataInfo.Pretest) > 0
-}
-
-func PRHasData(pro *Problem) bool {
-	return totalTests(&pro.DataInfo.TestdataInfo) > 0
-}
-
-func PRHasExtra(pro *Problem) bool {
-	return totalTests(&pro.DataInfo.Extra) > 0
+func PRHasData(pro *Problem, mode string) bool {
+	switch mode {
+	case "pretest":
+		return totalTests(&pro.DataInfo.Pretest) > 0
+	case "tests":
+		return totalTests(&pro.DataInfo.TestdataInfo) > 0
+	case "extra":
+		return totalTests(&pro.DataInfo.Extra) > 0
+	}
+	return false
 }
 
 var problemRWLock sync.Map
