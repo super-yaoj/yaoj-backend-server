@@ -110,7 +110,7 @@ func judgeSubmission(sid int, uuid int64, mode string, judger *Judger) bool {
 	
 	pro := PRLoad(tinfo.Prob)
 	if !PRHasData(pro, mode) {
-		go SMUpdate(sid, tinfo.Prob, mode, nil)
+		go SMUpdate(sid, tinfo.Prob, mode, []byte{})
 		return true
 	}
 	var content []byte
