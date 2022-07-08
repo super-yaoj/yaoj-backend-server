@@ -20,18 +20,16 @@ type ContentPreview struct {
 }
 
 type SubmissionDetails struct {
-	ContentPreview string `db:"content_preview" json:"content_preview"`
+	ContentPreview string `db:"content_preview" json:"content_preview"`//json encoding of ContentPreview
 	Result 		   string `db:"result" json:"result"`
 	PretestResult  string `db:"pretest_result" json:"pretest_result"`
 	ExtraResult    string `db:"extra_result" json:"extra_result"`
 }
 
 type Submission struct {
-	Id            int       `db:"submission_id" json:"submission_id"`
+	SubmissionBase
 	Submitter     int       `db:"submitter" json:"submitter"`
-	ProblemId     int       `db:"problem_id" json:"problem_id"`
 	ProblemName   string    `db:"problem_name" json:"problem_name"`
-	ContestId     int       `db:"contest_id" json:"contest_id"`
 	SubmitterName string    `db:"submitter_name" json:"submitter_name"`
 	Status        int       `db:"status" json:"status"`
 	Score         float64   `db:"score" json:"score"`
@@ -44,42 +42,65 @@ type Submission struct {
 	Hacked 		  bool 		`db:"hacked" json:"hacked"`
 	
 	Details 	  SubmissionDetails `json:"details"`
+	Uuid 		  int64 //useless field for submission query
 }
 
-func SMGetZipName(submission_id int) string {
-	return libs.TmpDir + fmt.Sprintf("submission_%d.zip", submission_id)
+type SubmissionBase struct {
+	Id            int       `db:"submission_id" json:"submission_id"`
+	ProblemId     int       `db:"problem_id" json:"problem_id"`
+	ContestId     int       `db:"contest_id" json:"contest_id"`
 }
 
-//Priority: in contest > not in contest, pretest > data > extra
-func SMJudge(submission_id, problem_id, contest_id int) error {
-	pro := PRLoad(problem_id)
+/*
+Priority: in contest > not in contest, real-time judge > rejudge, pretest > tests > extra
+
+in contest, real-time, pretest judge > custom test > in contest, real-time data judge
+*/
+func SMPriority(contest, rejudge bool, mode string) int {
+	switch mode {
+	case "custom_test":
+		return 165
+	case "pretest":
+		return libs.If(contest, 100, 0) + libs.If(rejudge, 0, 50) + 20
+	case "tests":
+		return libs.If(contest, 100, 0) + libs.If(rejudge, 0, 50) + 10
+	case "extra":
+		return libs.If(contest, 100, 0) + libs.If(rejudge, 0, 50)
+	}
+	return 0
+}
+
+/*
+Process a whole judge on single problem submission
+*/
+func SMJudge(sub SubmissionBase, rejudge bool, uuid int64) error {
+	pro := PRLoad(sub.ProblemId)
 	status := 0
 	if PRHasPretest(pro) {
-		InsertSubmission(int(submission_id), libs.If(contest_id > 0, 3, 0) + 3, "pretest")
+		InsertSubmission(int(sub.Id), uuid, SMPriority(sub.ContestId > 0, rejudge, "pretest"), "pretest")
 	} else {
 		status |= JudgingPretest
 	}
 	if PRHasData(pro) {
-		InsertSubmission(int(submission_id), libs.If(contest_id > 0, 3, 0) + 2, "tests")
+		InsertSubmission(int(sub.Id), uuid, SMPriority(sub.ContestId > 0, rejudge, "tests"), "tests")
 	} else {
 		return errors.New("Problem has no data!")
 	}
 	if PRHasExtra(pro) {
-		InsertSubmission(int(submission_id), libs.If(contest_id > 0, 3, 0) + 1, "extra")
+		InsertSubmission(int(sub.Id), uuid, SMPriority(sub.ContestId > 0, rejudge, "extra"), "extra")
 	} else {
 		status |= JudgingExtra
 	}
-	if status != 0 {
-		_, err := libs.DBUpdate("update submissions set status=status|? where submission_id=?", status, submission_id)
-		if err != nil {
-			return err
-		}
+	_, err := libs.DBUpdate("update submissions set status=? where submission_id=?", status, sub.Id)
+	if err != nil {
+		return err
 	}
 	return nil
 }
 
 func SMCreate(user_id, problem_id, contest_id int, language utils.LangTag, zipfile []byte, preview map[string]ContentPreview) error {
-	id, err := libs.DBInsertGetId("insert into submissions values (null, ?, ?, ?, ?, 0, -1, -1, ?, ?, 0, 0)", user_id, problem_id, contest_id, Waiting, language, time.Now())
+	current := libs.TimeStamp()
+	id, err := libs.DBInsertGetId("insert into submissions values (null, ?, ?, ?, ?, 0, -1, -1, ?, ?, 0, 0, ?)", user_id, problem_id, contest_id, Waiting, language, time.Now(), current)
 	if err != nil {
 		return err
 	}
@@ -91,7 +112,7 @@ func SMCreate(user_id, problem_id, contest_id int, language utils.LangTag, zipfi
 	if err != nil {
 		return err
 	}
-	return SMJudge(int(id), problem_id, contest_id)
+	return SMJudge(SubmissionBase{int(id), problem_id, contest_id}, false, current)
 }
 
 /*
@@ -122,10 +143,17 @@ func SMGetExtraInfo(subs []Submission) {
 	}
 }
 
+func SMGetBaseInfo(submission_id int) (SubmissionBase, error) {
+	ret := SubmissionBase{Id: submission_id}
+	err := libs.DBSelectSingle(&ret, "select problem_id, contest_id from submissions where submission_id=?", submission_id)
+	return ret, err
+}
+
 func SMQuery(sid int) (Submission, error) {
 	var ret Submission
 	err := libs.DBSelectSingle(&ret, "select * from submissions where submission_id=?", sid)
 	if err != nil {
+		fmt.Println(err)
 		return ret, err
 	}
 	err = libs.DBSelectSingle(&ret.Details, "select content_preview, result, pretest_result, extra_result from submission_details where submission_id=?", sid)
@@ -313,4 +341,27 @@ func SMJudgeCustomTest(content []byte) []byte {
 	result := <- callback
 	go libs.DBUpdate("delete from custom_tests where id=?", sid)
 	return result
+}
+
+func SMDelete(id int) error {
+	_, err := libs.DBUpdate("delete from submissions where submission_id=?", id)
+	if err != nil {
+		return err
+	}
+	_, err = libs.DBUpdate("delete from submission_details where submission_id=?", id)
+	return err
+}
+
+func SMRejudge(submission_id int) error {
+	sub, err := SMGetBaseInfo(submission_id)
+	if err != nil {
+		return err
+	}
+	//update uuid to cancel other entries in the judging queue
+	current := libs.TimeStamp()
+	_, err = libs.DBUpdate("update submissions set uuid=? where submission_id=?", current, submission_id)
+	if err != nil {
+		return err
+	}
+	return SMJudge(sub, true, current)
 }

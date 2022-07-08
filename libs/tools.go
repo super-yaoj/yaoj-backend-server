@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 )
 
 func Struct2Map(a interface{}) (map[string]any, error) {
@@ -137,4 +138,8 @@ func StartsWith(a, b string) bool {
 		return false
 	}
 	return a[: len(b)] == b
+}
+
+func TimeStamp() int64 {
+	return time.Now().UnixMilli()
 }

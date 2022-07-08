@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"strconv"
 	"time"
 	"yao/internal"
 	"yao/libs"
@@ -245,7 +246,7 @@ func SMQuery(ctx *gin.Context) {
 		if !no_contest && internal.CTPretestOnly(ret.ContestId) {
 			internal.SMPretestOnly(&ret)
 		}
-		libs.APIWriteBack(ctx, 200, "", map[string]any{"submission": ret})
+		libs.APIWriteBack(ctx, 200, "", map[string]any{"submission": ret, "can_edit": SMCanEdit(ctx, ret.SubmissionBase)})
 	}
 }
 
@@ -268,5 +269,71 @@ func SMCustomTest(ctx *gin.Context) {
 			"Title": "Internal Error",
 		})
 	}
-	libs.APIWriteBack(ctx, 200, "", map[string]any{ "result": string(result) })
+	libs.APIWriteBack(ctx, 200, "", map[string]any{"result": string(result)})
+}
+
+func SMCanEdit(ctx *gin.Context, sub internal.SubmissionBase) bool {
+	return PRCanEdit(ctx, sub.ProblemId) || (sub.ContestId > 0 && CTCanEdit(ctx, sub.ContestId))
+}
+
+func SMDelete(ctx *gin.Context) {
+	id, ok := libs.GetInt(ctx, "submission_id")
+	if !ok {
+		return
+	}
+	sub, err := internal.SMGetBaseInfo(id)
+	if err != nil {
+		libs.APIWriteBack(ctx, 404, "", nil)
+		return
+	}
+	if !SMCanEdit(ctx, sub) {
+		libs.APIWriteBack(ctx, 403, "", nil)
+		return
+	}
+	err = internal.SMDelete(id)
+	if err != nil {
+		libs.APIInternalError(ctx, err)
+	}
+}
+
+func Rejudge(ctx *gin.Context) {
+	_, isprob := ctx.GetPostForm("problem_id")
+	if isprob {
+		problem_id, err := strconv.Atoi(ctx.PostForm("problem_id"))
+		if err != nil {
+			libs.RPCWriteBack(ctx, 400, -32600, "param problem_id isn't int", nil)
+			return
+		}
+		if !internal.PRExists(problem_id) {
+			libs.RPCWriteBack(ctx, 404, -32600, "", nil)
+			return
+		}
+		if !PRCanEdit(ctx, problem_id) {
+			libs.RPCWriteBack(ctx, 403, -32600, "", nil)
+			return
+		}
+		err = internal.PRRejudge(problem_id)
+		if err != nil {
+			libs.RPCInternalError(ctx, err)
+		}
+	} else {
+		submission_id, err := strconv.Atoi(ctx.PostForm("submission_id"))
+		if err != nil {
+			libs.RPCWriteBack(ctx, 400, -32600, "param submission_id isn't int", nil)
+			return
+		}
+		sub, err := internal.SMGetBaseInfo(submission_id)
+		if err != nil {
+			libs.RPCWriteBack(ctx, 404, -32600, "", nil)
+			return
+		}
+		if !SMCanEdit(ctx, sub) {
+			libs.RPCWriteBack(ctx, 403, -32600, "", nil)
+			return
+		}
+		err = internal.SMRejudge(submission_id)
+		if err != nil {
+			libs.RPCInternalError(ctx, err)
+		}
+	}
 }

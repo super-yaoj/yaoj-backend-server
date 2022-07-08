@@ -24,6 +24,7 @@ type Judger struct {
 type JudgeEntry struct {
 	sid 		int
 	mode 		string //one of "pretest", "tests", "extra", "custom_test"
+	uuid 		int64 //if mode != "custom_test"(i.e. normal submission), uuid means whether this submission is the recent entry in the judging queue(set by time-stamp)
 	callback 	*chan []byte //if mode="custom_test", you should give a callback channel which returns the result
 }
 
@@ -39,6 +40,7 @@ var judgers = []*Judger{
 
 var waitingList = libs.NewBlockPriorityQueue()
 
+//1 on each bit means that the corresponding status has finished
 const (
 	InternalError 	= -1
 	Waiting 		= 1
@@ -50,18 +52,18 @@ const (
 
 func JudgersInit() {
 	var sub []Submission
-	err := libs.DBSelectAll(&sub, "select submission_id, problem_id, contest_id from submissions where status < ? and status >= 0", Finished)
+	err := libs.DBSelectAll(&sub, "select submission_id, problem_id, contest_id, uuid from submissions where status < ? and status >= 0", Finished)
 	if err != nil {
 		log.Fatal(err)
 	}
 	for _, val := range sub {
-		err := SMJudge(val.Id, val.ProblemId, val.ContestId)
+		err := SMJudge(val.SubmissionBase, true, val.Uuid)
 		if err != nil {
 			fmt.Println(err)
 		}
 	}
 	for _, i := range judgers {
-		go JudgerStart(i)
+		go judgerStart(i)
 	}
 }
 
@@ -71,16 +73,18 @@ type judgerResponse struct {
 	Msg      string `json:"message"`
 }
 
-func JudgerStart(judger *Judger) {
+func judgerStart(judger *Judger) {
 	for {
+		//wait for a submission
 		subm := waitingList.Pop().(JudgeEntry)
-		sid, mode := subm.sid, subm.mode
+		sid, uuid, mode := subm.sid, subm.uuid, subm.mode
 		if mode != "custom_test" {
-			if !JudgeSubmission(sid, mode, judger) {
+			if !judgeSubmission(sid, uuid, mode, judger) {
 				libs.DBUpdate("update submissions set status=? where submission_id=?", InternalError, sid)
+				libs.DBUpdate("update submission_details set result=\"\", pretest_result=\"\", extra_result=\"\" where submission_id=?", sid)
 			}
 		} else {
-			JudgeCustomTest(sid, subm.callback, judger)
+			judgeCustomTest(sid, subm.callback, judger)
 		}
 		//change the judger id to avoid attacks
 		judger.jid = libs.RandomString(64)
@@ -88,15 +92,29 @@ func JudgerStart(judger *Judger) {
 }
 
 //return true or false indicates whether judging succeeds
-func JudgeSubmission(sid int, mode string, judger *Judger) bool {
-	go libs.DBUpdate("update submissions set status=status|? where submission_id=?", Waiting, sid)
+func judgeSubmission(sid int, uuid int64, mode string, judger *Judger) bool {
+	type TempInfo struct {
+		Prob int   `db:"problem_id"`
+		Uuid int64 `db:"uuid"`
+	}
+	var tinfo TempInfo
+	err := libs.DBSelectSingle(&tinfo, "select problem_id, uuid from submissions where submission_id=?", sid)
+	if err != nil {
+		fmt.Println(err)
+		return false
+	}
+	if tinfo.Uuid != uuid {
+		//this judge entry isn't the recent entry in the judging queue
+		return true
+	}
+	
 	var content []byte
-	err := libs.DBSelectSingleColumn(&content, "select content from submission_details where submission_id=?", sid)
-	prob, err1 := libs.DBSelectSingleInt("select problem_id from submissions where submission_id=?", sid)
+	err = libs.DBSelectSingleColumn(&content, "select content from submission_details where submission_id=?", sid)
+	go libs.DBUpdate("update submissions set status=status|? where submission_id=?", Waiting, sid)
 	var check_sum string
-	err2 := libs.DBSelectSingleColumn(&check_sum, "select check_sum from problems where problem_id=?", prob)
-	if err != nil || err1 != nil || err2 != nil {
-		fmt.Println(err, err1, err2)
+	err1 := libs.DBSelectSingleColumn(&check_sum, "select check_sum from problems where problem_id=?", tinfo.Prob)
+	if err != nil || err1 != nil {
+		fmt.Println(err, err1)
 		return false
 	}
 
@@ -119,10 +137,10 @@ func JudgeSubmission(sid int, mode string, judger *Judger) bool {
 		if jr.Msg == "ok" {
 			break
 		} else if jr.Err_code == 1 {
-			ProblemRLock(prob)
-			file, err := os.Open(PRGetDataZip(prob))
+			ProblemRLock(tinfo.Prob)
+			file, err := os.Open(PRGetDataZip(tinfo.Prob))
 			res, err1 = http.Post(judger.url+"/sync?"+libs.GetQuerys(map[string]string{"sum": check_sum}), "binary", file)
-			ProblemRUnlock(prob)
+			ProblemRUnlock(tinfo.Prob)
 			if err != nil || err1 != nil {
 				fmt.Printf("%v %v\n", err, err1)
 				return false
@@ -140,16 +158,24 @@ func JudgeSubmission(sid int, mode string, judger *Judger) bool {
 	}
 	//Waiting judger finishes
 	ret := <-judger.callback
-	go func() {
-		err := SMUpdate(sid, prob, mode, ret)
-		if err != nil {
-			fmt.Printf("%v\n", err)
-		}
-	}()
+	err = libs.DBSelectSingleColumn(&tinfo.Uuid, "select uuid from submissions where submission_id=?", sid)
+	if err != nil {
+		fmt.Println(err)
+		return false
+	}
+	if tinfo.Uuid == uuid {
+		//Update status if and only if this is the recent submission
+		go func() {
+			err := SMUpdate(sid, tinfo.Prob, mode, ret)
+			if err != nil {
+				fmt.Printf("%v\n", err)
+			}
+		}()
+	}
 	return true
 }
 
-func JudgeCustomTest(sid int, callback *chan []byte, judger *Judger) {
+func judgeCustomTest(sid int, callback *chan []byte, judger *Judger) {
 	var content []byte
 	err := libs.DBSelectSingleColumn(&content, "select content from custom_tests where id=?", sid)
 	if err != nil {
@@ -176,12 +202,12 @@ func JudgeCustomTest(sid int, callback *chan []byte, judger *Judger) {
 	*callback <- <- judger.callback
 }
 
-func InsertSubmission(sid, priority int, mode string) {
-	waitingList.Push(JudgeEntry{sid, mode, nil}, priority)
+func InsertSubmission(sid int, uuid int64, priority int, mode string) {
+	waitingList.Push(JudgeEntry{sid, mode, uuid, nil}, priority)
 }
 
 func InsertCustomTest(sid int, callback *chan []byte) {
-	waitingList.Push(JudgeEntry{sid, "custom_test", callback}, 0)
+	waitingList.Push(JudgeEntry{sid, "custom_test", 0, callback}, 0)
 }
 
 func FinishJudging(ctx *gin.Context) {

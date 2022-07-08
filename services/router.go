@@ -12,11 +12,17 @@ type Request struct {
 	Function func(*gin.Context)
 }
 
+/*
+The router table for yaoj back-end server
+
+urls with first letter upper are rpcs, others are apis.
+*/
 var Router map[string][]Request = map[string][]Request{
 	"/GetTime":    {{"POST", GetTime}},
 	"/Init":       {{"POST", USInit}},
 	"/UserLogin":  {{"POST", USLogin}},
 	"/UserLogout": {{"POST", USLogout}},
+	"/Rejudge":	   {{"POST", Rejudge}},
 
 	"/user":             {{"GET", USQuery}, {"POST", USSignup}, {"PUT", USModify}, {"PATCH", USGroupEdit}},
 	"/captcha":          {{"GET", CaptchaImage}, {"POST", CaptchaId}, {"PATCH", ReloadCaptchaImage}},
@@ -43,8 +49,8 @@ var Router map[string][]Request = map[string][]Request{
 	"/contest_participants": {{"GET", CTGetParticipants}, {"POST", CTSignup}, {"DELETE", CTSignout}},
 	"/contest_problems":     {{"GET", CTGetProblems}, {"POST", CTAddProblem}, {"DELETE", CTDeleteProblem}},
 
-	"/submission":  {{"GET", SMQuery}, {"POST", SMSubmit}},
-	"/submissions": {{"GET", SMList}},
+	"/submissions":	{{"GET", SMList}},
+	"/submission":  {{"GET", SMQuery}, {"POST", SMSubmit}, {"DELETE", SMDelete}},
 	"/custom_test": {{"POST", SMCustomTest}},
 }
 
