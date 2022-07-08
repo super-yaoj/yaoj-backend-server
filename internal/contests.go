@@ -140,7 +140,7 @@ func CTGetProblems(contest_id int) ([]Problem, error) {
 
 func CTCreate() (int64, error) {
 	start := time.Now().AddDate(0, 0, 1)
-	return libs.DBInsertGetId("insert into contests values (null, \"New Contest\", ?, ?, 0, 0, 0, 0)", start, start.Add(time.Hour))
+	return libs.DBInsertGetId("insert into contests values (null, \"New Contest\", ?, ?, 0, 0, 0, 0, 0)", start, start.Add(time.Hour))
 }
 
 func CTModify(contest_id int, title string, start time.Time, last int, pretest int, score_private int) error {
