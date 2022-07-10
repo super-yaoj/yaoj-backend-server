@@ -8,6 +8,7 @@ import (
 
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
+	"github.com/k0kubun/pp"
 )
 
 // Universal Web API Parameter Design
@@ -35,6 +36,7 @@ func GinHandler[T any](handler StdHandlerFunc[T]) gin.HandlerFunc {
 			log.Printf("[bind]: %s", err)
 			return
 		}
+		pp.Print(data)
 		handler(ctx, data)
 	}
 }
