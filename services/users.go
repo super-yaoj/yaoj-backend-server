@@ -139,12 +139,14 @@ func USInit(ctx *gin.Context) {
 	ret(user)
 }
 
+// 根据 session 中的 user_group 判断是否是管理
 func ISAdmin(ctx *gin.Context) bool {
 	sess := sessions.Default(ctx)
 	user_group, err := sess.Get("user_group").(int)
 	return err && user_group <= 1
 }
 
+// 从 session 中获取 userid
 func GetUserId(ctx *gin.Context) int {
 	sess := sessions.Default(ctx)
 	user_id, err := sess.Get("user_id").(int)

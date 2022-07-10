@@ -31,7 +31,7 @@ type Problem struct {
 	HasSample  bool        `json:"has_sample"`
 	Statements []Statement `json:"statements"`
 	//01-string denotes which files can be downloaded
-	AllowDown  string                       `db:"allow_down" json:"allow_down"`
+	AllowDown  string     `db:"allow_down" json:"allow_down"`
 	SubmConfig SubmConfig `json:"subm_config"`
 	//Could only be seen by admins
 	DataInfo problem.DataInfo `json:"data"`
@@ -77,9 +77,11 @@ func PRList(bound, pagesize, user_id int, isleft, isadmin bool) ([]Problem, bool
 		}
 
 		isfull := len(ids) == pagesize
-		if isfull { ids = ids[: pagesize - 1] }
+		if isfull {
+			ids = ids[:pagesize-1]
+		}
 		if len(ids) != 0 {
-			err = libs.DBSelectAll(&problems, "select problem_id, title, `like` from problems where problem_id in (" + libs.JoinArray(ids) + ")")
+			err = libs.DBSelectAll(&problems, "select problem_id, title, `like` from problems where problem_id in ("+libs.JoinArray(ids)+")")
 			if err != nil {
 				return nil, false, err
 			}
@@ -136,6 +138,7 @@ func PRDeletePermission(problem_id, permission_id int) error {
 	return err
 }
 
+// 数据库查询是否存在该题目
 func PRExists(problem_id int) bool {
 	count, _ := libs.DBSelectSingleInt("select count(*) from problems where problem_id=?", problem_id)
 	return count > 0
