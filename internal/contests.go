@@ -135,6 +135,7 @@ func CTQuery(contest_id, user_id int) (Contest, error) {
 func CTGetProblems(contest_id int) ([]Problem, error) {
 	var problems []Problem
 	err := libs.DBSelectAll(&problems, "select a.problem_id, title from ((select problem_id from contest_problems where contest_id=?) as a join problems on a.problem_id=problems.problem_id)", contest_id)
+	sort.Slice(problems, func(i, j int) bool { return problems[i].Id < problems[j].Id })
 	return problems, err
 }
 

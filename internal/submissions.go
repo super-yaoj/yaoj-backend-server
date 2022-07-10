@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"sort"
+	"sync"
 	"time"
 	"yao/libs"
 
@@ -27,7 +28,6 @@ type SubmissionDetails struct {
 
 type Submission struct {
 	SubmissionBase
-	Submitter     int       `db:"submitter" json:"submitter"`
 	ProblemName   string    `db:"problem_name" json:"problem_name"`
 	SubmitterName string    `db:"submitter_name" json:"submitter_name"`
 	Status        int       `db:"status" json:"status"`
@@ -48,6 +48,7 @@ type SubmissionBase struct {
 	Id            int       `db:"submission_id" json:"submission_id"`
 	ProblemId     int       `db:"problem_id" json:"problem_id"`
 	ContestId     int       `db:"contest_id" json:"contest_id"`
+	Submitter     int       `db:"submitter" json:"submitter"`
 }
 
 /*
@@ -93,7 +94,7 @@ func SMCreate(user_id, problem_id, contest_id int, language utils.LangTag, zipfi
 	if err != nil {
 		return err
 	}
-	return SMJudge(SubmissionBase{int(id), problem_id, contest_id}, false, current)
+	return SMJudge(SubmissionBase{int(id), problem_id, contest_id, user_id}, false, current)
 }
 
 /*
@@ -126,7 +127,7 @@ func SMGetExtraInfo(subs []Submission) {
 
 func SMGetBaseInfo(submission_id int) (SubmissionBase, error) {
 	ret := SubmissionBase{Id: submission_id}
-	err := libs.DBSelectSingle(&ret, "select problem_id, contest_id from submissions where submission_id=?", submission_id)
+	err := libs.DBSelectSingle(&ret, "select problem_id, contest_id, submitter from submissions where submission_id=?", submission_id)
 	return ret, err
 }
 
@@ -244,7 +245,10 @@ func SMPretestOnly(sub *Submission) {
 	}
 }
 
+var sm_update_mutex = sync.Mutex{}
 func SMUpdate(sid, pid int, mode string, result []byte) error {
+	sm_update_mutex.Lock()
+	defer sm_update_mutex.Unlock()
 	prob := PRLoad(pid)
 	var testdata *problem.TestdataInfo
 	var column_name string
@@ -313,7 +317,24 @@ func SMUpdate(sid, pid int, mode string, result []byte) error {
 		return err
 	}
 	_, err = libs.DBUpdate("update submission_details set " + column_name + "=? where submission_id=?", result, sid)
-	return err
+	if err != nil {
+		return err
+	}
+	var subinfo struct {
+		SubmissionBase
+		Status int  `db:"status"`
+	}
+	err = libs.DBSelectSingle(&subinfo, "select submission_id, problem_id, contest_id, status from submissions where submission_id=?", sid)
+	if err != nil {
+		return err
+	}
+	if subinfo.Status == Finished {
+		//TODO: some corresponding updates
+		if subinfo.ContestId > 0 {
+			CTSUpdateSubmission(subinfo.ContestId, subinfo.Id)
+		}
+	}
+	return nil
 }
 
 func SMJudgeCustomTest(content []byte) []byte {
@@ -330,13 +351,19 @@ func SMJudgeCustomTest(content []byte) []byte {
 	return result
 }
 
-func SMDelete(id int) error {
-	_, err := libs.DBUpdate("delete from submissions where submission_id=?", id)
+func SMDelete(sub SubmissionBase) error {
+	_, err := libs.DBUpdate("delete from submissions where submission_id=?", sub.Id)
 	if err != nil {
 		return err
 	}
-	_, err = libs.DBUpdate("delete from submission_details where submission_id=?", id)
-	return err
+	_, err = libs.DBUpdate("delete from submission_details where submission_id=?", sub.Id)
+	if err != nil {
+		return err
+	}
+	if sub.ContestId > 0 {
+		CTSDeleteSubmission(sub)
+	}
+	return nil
 }
 
 func SMRejudge(submission_id int) error {

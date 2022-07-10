@@ -2,7 +2,65 @@ package libs
 
 import (
 	"sync"
+	"time"
 )
+
+//-------memory cached map with a expiring time
+
+type mapEntry struct {
+	last_visit time.Time
+	data       any
+}
+
+type cacheMap struct {
+	mutex           sync.RWMutex
+	mp              map[int]*mapEntry
+	cacheExpireTime time.Duration
+	maxCheckLength  int
+}
+
+type MemoryCache interface {
+	Set(string, any)
+	Get(string) (any, bool)
+	Delete(string)
+}
+
+func NewMemoryCache(expire time.Duration, check_length int) *cacheMap {
+	return &cacheMap{sync.RWMutex{}, make(map[int]*mapEntry), expire, check_length}
+}
+
+func (cm *cacheMap) Set(key int, val any) {
+	cm.mutex.Lock()
+	cm.mp[key] = &mapEntry{time.Now(), val}
+	if len(cm.mp) >= cm.maxCheckLength {
+		current := time.Now().Add(-cm.cacheExpireTime)
+		for i := range cm.mp {
+			if cm.mp[i].last_visit.Before(current) {
+				delete(cm.mp, i)
+			}
+		}
+	}
+	cm.mutex.Unlock()
+}
+
+func (cm *cacheMap) Get(key int) (any, bool) {
+	cm.mutex.RLock()
+	defer cm.mutex.RUnlock()
+	a, ok := cm.mp[key]
+	if !ok {
+		return nil, false
+	}
+	a.last_visit = time.Now()
+	return a.data, true
+}
+
+func (cm *cacheMap) Delete(key int) {
+	cm.mutex.Lock()
+	delete(cm.mp, key)
+	cm.mutex.Unlock()
+}
+
+//-------Blocked priority queue
 
 type queueEntry struct {
 	val      any
@@ -125,4 +183,47 @@ func (pq *blockPriorityQueue) Pop() any {
 	}
 	defer pq.cond.L.Unlock()
 	return pq.queue.Pop()
+}
+
+
+//---------Multi RWlock
+
+type MultiRWLock interface {
+	Lock(int)
+	Unlock(int)
+	RLock(int)
+	RUnlock(int)
+}
+
+type mappedMultiRWLock struct {
+	lockmap sync.Map
+}
+
+func (mml *mappedMultiRWLock) getMutex(id int) *sync.RWMutex {
+	lock, ok := mml.lockmap.Load(id)
+	if !ok {
+		lock = new(sync.RWMutex)
+		mml.lockmap.Store(id, lock)
+	}
+	return lock.(*sync.RWMutex)
+}
+
+func (mml *mappedMultiRWLock) Lock(id int) {
+	mml.getMutex(id).Lock()
+}
+
+func (mml *mappedMultiRWLock) Unlock(id int) {
+	mml.getMutex(id).Unlock()
+}
+
+func (mml *mappedMultiRWLock) RLock(id int) {
+	mml.getMutex(id).RLock()
+}
+
+func (mml *mappedMultiRWLock) RUnlock(id int) {
+	mml.getMutex(id).RUnlock()
+}
+
+func NewMappedMultiRWMutex() MultiRWLock {
+	return new(mappedMultiRWLock)
 }

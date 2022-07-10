@@ -7,12 +7,17 @@ import (
 	"log"
 	"os"
 	"path"
-	"sync"
+	"time"
 	"yao/libs"
 
 	"github.com/k0kubun/pp"
 	"github.com/super-yaoj/yaoj-core/pkg/problem"
 	"github.com/super-yaoj/yaoj-core/pkg/utils"
+)
+
+var (
+	ProblemRWLock = libs.NewMappedMultiRWMutex()
+	ProblemCache  = libs.NewMemoryCache(time.Hour, 100)
 )
 
 func PRGetDir(problem_id int) string {
@@ -27,9 +32,6 @@ func PRGetSampleZip(problem_id int) string {
 	return libs.DataDir + fmt.Sprint(problem_id) + "_sample.zip"
 }
 
-func PRGetKey(problem_id int) string {
-	return fmt.Sprintf("problem_%d", problem_id)
-}
 
 /*
 Put problem data in tmp dir first. You should put data zip in tmpdir/1.zip
@@ -43,8 +45,8 @@ func PRPutData(problem_id int, tmpdir string) error {
 		return err
 	}
 	//Success now
-	ProblemWLock(problem_id)
-	defer ProblemWUnlock(problem_id)
+	ProblemRWLock.Lock(problem_id)
+	defer ProblemRWLock.Unlock(problem_id)
 	data_zip := PRGetDataZip(problem_id)
 	data_dir := PRGetDir(problem_id)
 	sample_zip := PRGetSampleZip(problem_id)
@@ -56,17 +58,17 @@ func PRPutData(problem_id int, tmpdir string) error {
 	os.Rename(path.Join(tmpdir, "1.zip"), data_zip)
 	os.Rename(path.Join(tmpdir, "1"), data_dir)
 
-	libs.CacheMap.Delete(PRGetKey(problem_id))
+	ProblemCache.Delete(problem_id)
 	libs.DBUpdate("update problems set check_sum=?, allow_down=\"\" where problem_id=?", utils.FileChecksum(data_zip).String(), problem_id)
 	return err
 }
 
 //Load a problem into memory by problem_id. This function will get the reading lock.
 func PRLoad(problem_id int) *Problem {
-	val, ok := libs.CacheMap.Get(PRGetKey(problem_id))
+	val, ok := ProblemCache.Get(problem_id)
 	if !ok {
-		ProblemRLock(problem_id)
-		defer ProblemRUnlock(problem_id)
+		ProblemRWLock.RLock(problem_id)
+		defer ProblemRWLock.RUnlock(problem_id)
 		pro, err := problem.LoadDir(PRGetDir(problem_id))
 		if err != nil {
 			log.Print("prload", err)
@@ -74,7 +76,7 @@ func PRLoad(problem_id int) *Problem {
 		}
 		pp.Print(pro)
 		PRSetCache(problem_id, pro)
-		ret, _ := libs.CacheMap.Get(PRGetKey(problem_id))
+		ret, _ := ProblemCache.Get(problem_id)
 		return ret.(*Problem)
 	} else {
 		return val.(*Problem)
@@ -89,7 +91,7 @@ func PRSetCache(problem_id int, pro problem.Problem) {
 			stmts = append(stmts, Statement{key, val})
 		}
 	}
-	libs.CacheMap.Set(PRGetKey(problem_id), &Problem{
+	ProblemCache.Set(problem_id, &Problem{
 		Id:           problem_id,
 		Statement_zh: string(pro.Stmt("zh")),
 		Statement_en: string(pro.Stmt("en")),
@@ -106,8 +108,8 @@ func PRSetCache(problem_id int, pro problem.Problem) {
 
 //You should ensure that you have the writing lock before calling this function.
 func PRModifySample(problem_id int, allow_down string) error {
-	ProblemWLock(problem_id)
-	defer ProblemWUnlock(problem_id)
+	ProblemRWLock.Lock(problem_id)
+	defer ProblemRWLock.Unlock(problem_id)
 	sample_dir := PRGetSampleZip(problem_id)
 	data_dir := PRGetDir(problem_id)
 	os.RemoveAll(sample_dir)
@@ -167,31 +169,4 @@ func PRHasData(pro *Problem, mode string) bool {
 		return totalTests(&pro.DataInfo.Extra) > 0
 	}
 	return false
-}
-
-var problemRWLock sync.Map
-
-func getProblemRWLock(problem_id int) *sync.RWMutex {
-	lock, ok := problemRWLock.Load(problem_id)
-	if !ok {
-		lock = new(sync.RWMutex)
-		problemRWLock.Store(problem_id, lock)
-	}
-	return lock.(*sync.RWMutex)
-}
-
-func ProblemRLock(problem_id int) {
-	getProblemRWLock(problem_id).RLock()
-}
-
-func ProblemRUnlock(problem_id int) {
-	getProblemRWLock(problem_id).RUnlock()
-}
-
-func ProblemWLock(problem_id int) {
-	getProblemRWLock(problem_id).Lock()
-}
-
-func ProblemWUnlock(problem_id int) {
-	getProblemRWLock(problem_id).Unlock()
 }

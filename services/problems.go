@@ -310,8 +310,8 @@ func PRDownloadData(ctx *gin.Context) {
 		return
 	}
 	t := ctx.Query("type")
-	internal.ProblemRLock(problem_id)
-	defer internal.ProblemRUnlock(problem_id)
+	internal.ProblemRWLock.RLock(problem_id)
+	defer internal.ProblemRWLock.RUnlock(problem_id)
 	if t == "data" {
 		if !PRCanEdit(ctx, problem_id) {
 			libs.APIWriteBack(ctx, 403, "", nil)

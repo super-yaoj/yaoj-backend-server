@@ -142,10 +142,10 @@ func judgeSubmission(sid int, uuid int64, mode string, judger *Judger) bool {
 		if jr.Msg == "ok" {
 			break
 		} else if jr.Err_code == 1 {
-			ProblemRLock(tinfo.Prob)
+			ProblemRWLock.RLock(tinfo.Prob)
 			file, err := os.Open(PRGetDataZip(tinfo.Prob))
 			res, err1 = http.Post(judger.url+"/sync?"+libs.GetQuerys(map[string]string{"sum": check_sum}), "binary", file)
-			ProblemRUnlock(tinfo.Prob)
+			ProblemRWLock.RUnlock(tinfo.Prob)
 			if err != nil || err1 != nil {
 				fmt.Printf("%v %v\n", err, err1)
 				return false

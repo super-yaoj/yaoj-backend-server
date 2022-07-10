@@ -9,7 +9,7 @@ require (
 	github.com/go-sql-driver/mysql v1.6.0
 	github.com/jmoiron/sqlx v1.3.5
 	github.com/k0kubun/pp v2.4.0+incompatible
-	github.com/super-yaoj/yaoj-core v0.0.24
+	github.com/super-yaoj/yaoj-core v0.0.31
 	gopkg.in/yaml.v3 v3.0.1
 )
 

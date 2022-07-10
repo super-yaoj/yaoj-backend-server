@@ -296,7 +296,7 @@ func SMDelete(ctx *gin.Context) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
-	err = internal.SMDelete(id)
+	err = internal.SMDelete(sub)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	}

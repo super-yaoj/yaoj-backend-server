@@ -2,7 +2,6 @@ package libs
 
 import (
 	"os"
-	"time"
 )
 
 var (
@@ -15,7 +14,6 @@ var (
 	Day          int         = 86400
 	Month        int         = Day * 30
 	Year         int         = Day * 365
-	CacheMap     MemoryCache = NewMemoryCache(time.Hour, 1000)
 	LangSuf      []string    = []string{".cpp98.cpp", ".cpp11.cpp", ".cpp14.cpp", ".cpp17.cpp", ".cpp20.cpp", ".py2.py", ".py3.py", ".go", ".java", ".c"}
 )
 
