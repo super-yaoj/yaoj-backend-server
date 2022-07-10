@@ -58,7 +58,7 @@ CREATE TABLE `blog_comments` (
   PRIMARY KEY (`comment_id`),
   KEY `blog_id` (`blog_id`),
   KEY `author` (`author`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -97,7 +97,7 @@ CREATE TABLE `blogs` (
 
 LOCK TABLES `blogs` WRITE;
 /*!40000 ALTER TABLE `blogs` DISABLE KEYS */;
-INSERT INTO `blogs` VALUES (1,1,'Yaoj 指南','### OJ 理念\n\n察今大部分 OJ 各有弊端，UOJ 虽开源但源码架构混乱不堪，运行效率低下；LOJ 采用前后端分离架构但渲染速度仍然不高。而同时，大部分 OJ 的造题理念均不够新颖——只支持传统造题模式，传统题、提答、交互题的配置虽比较简单，一旦涉及自由度更大、idea 更新颖的题目时便心有余而力不足，一道 UOJ 通信题往往耗费出题人半天到一天的时间琢磨 judger 源码并重写。洛谷等 OJ 更是完全不支持此等高级题目。\n\n故，为提高 OJ 效率，Yaoj 采用前后端 MVVM 架构和单页面模式，极大提高缓存复用率；同时后端采用 GO 编写，加之数据库精心设计，速度相比 UOJ 有了极大的提高。\n\n最重要的，黄队提出了题目的 Workflow 测试模式，使出题人们在不用花长时间琢磨 judger 源码的条件下可以高效率造出自己心满意足的新型题目。后文中也会介绍 Workflow 具体设计——通信题与普通题目的差别仅在于 Workflow 图中多了一个点而已。\n\n### OJ 功能\n\n#### 题目\n\n#### 比赛\n\n#### 杂项\n\n1. 左侧刷新按钮可实现页面内刷新（不需要重新加载 javascript），比普通刷新更流畅。\n2. 为了加快分页速度，所有分页的表格仅仅支持左右翻一页，但是你可以调整表格行数呀！\n3. 表格翻页后页码会缓存，第二次点击表格时会自动跳转到上次的页码，页面内刷新也无法恢复。但是如果使用 F5 刷新或点击分页表格的刷新按钮（最中间的那个）则会刷新数据且回到表首。\n4. 表格刷新按钮会清空查询信息和页码缓存并重新读取数据，如果你只是想重新读取数据而并不想清空查询信息，请点击页面左侧的刷新按钮。\n4. 右上角搜索框可以搜索用户名（输入用户名的任何一个前缀即可）。\n5. 无论是新建博客还是修改博客都会在本地产生额外的一份草稿（保存后草稿存在本地，不会随着关闭浏览器丢失，可以在 My blogs 中看到），而当点击提交时草稿会被删除并把内容发送到服务器。\n\n### TODO List\n\n1. Judger 评测结果正确显示\n2. Submission List 筛选 + 比赛提交记录显示\n3. Submission Detail 页面\n4. 支持题面 markdown 自带 images\n5. 支持在线编辑题面\n6. 比赛排行榜\n7. 中英文切换\n8. 比赛 rating',0,'2022-07-04 00:39:00',0,0);
+INSERT INTO `blogs` VALUES (1,1,'Yaoj 指南','### OJ 理念\n\n察今大部分 OJ 各有弊端，UOJ 虽开源但源码架构混乱不堪，运行效率低下；LOJ 采用前后端分离架构但渲染速度仍然不高。而同时，大部分 OJ 的造题理念均不够新颖——只支持传统造题模式，传统题、提答、交互题的配置虽比较简单，一旦涉及自由度更大、idea 更新颖的题目时便心有余而力不足，一道 UOJ 通信题往往耗费出题人半天到一天的时间琢磨 judger 源码并重写。洛谷等 OJ 更是完全不支持此等高级题目。\n\n故，为提高 OJ 效率，Yaoj 采用前后端 MVVM 架构和单页面模式，极大提高缓存复用率；同时后端采用 GO 编写，加之数据库精心设计，速度相比 UOJ 有了极大的提高。\n\n最重要的，黄队提出了题目的 Workflow 测试模式，使出题人们在不用花长时间琢磨 judger 源码的条件下可以高效率造出自己心满意足的新型题目。后文中也会介绍 Workflow 具体设计——通信题与普通题目的差别仅在于 Workflow 图中多了一个点而已。\n\n### OJ 功能\n\n#### 题目\n\n#### 比赛\n\n#### 杂项\n\n1. 左侧刷新按钮可实现页面内刷新（不需要重新加载 javascript），比普通刷新更流畅。\n2. 为了加快分页速度，所有分页的表格仅仅支持左右翻一页，但是你可以调整表格行数呀！\n3. 有一些表格翻页后页码会缓存（例如题目列表、比赛列表、用户列表，提交记录作为易变列表不具有缓存），第二次点击表格时会自动跳转到上次的页码，页面内刷新也无法恢复。但是如果使用 F5 刷新或点击分页表格的刷新按钮（最中间的那个）则会刷新数据且回到表首。\n4. 表格刷新按钮会清空查询信息和页码缓存并重新读取数据，如果你只是想重新读取数据而并不想清空查询信息，请点击页面左侧的刷新按钮。\n4. 右上角搜索框可以搜索用户名（输入用户名的任何一个前缀即可）。\n5. 无论是新建博客还是修改博客都会在本地产生额外的一份草稿（保存后草稿存在本地，不会随着关闭浏览器丢失，可以在 My blogs 中看到），而当点击提交时草稿会被删除并把内容发送到服务器。\n\n### TODO List\n\n1. Judger 评测结果正确显示\n2. Submission List 筛选 + 比赛提交记录显示\n3. Submission Detail 页面\n4. 支持题面 markdown 自带 images\n5. 支持在线编辑题面\n6. 比赛排行榜\n7. 中英文切换\n8. 比赛 rating',0,'2022-07-04 00:39:00',0,0);
 /*!40000 ALTER TABLE `blogs` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -146,6 +146,7 @@ CREATE TABLE `contest_participants` (
 
 LOCK TABLES `contest_participants` WRITE;
 /*!40000 ALTER TABLE `contest_participants` DISABLE KEYS */;
+INSERT INTO `contest_participants` VALUES (1,2);
 /*!40000 ALTER TABLE `contest_participants` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -170,6 +171,7 @@ CREATE TABLE `contest_permissions` (
 
 LOCK TABLES `contest_permissions` WRITE;
 /*!40000 ALTER TABLE `contest_permissions` DISABLE KEYS */;
+INSERT INTO `contest_permissions` VALUES (1,1);
 /*!40000 ALTER TABLE `contest_permissions` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -184,7 +186,7 @@ CREATE TABLE `contest_problems` (
   `contest_id` int(11) DEFAULT NULL,
   `problem_id` int(11) DEFAULT NULL,
   UNIQUE KEY `contest_id` (`contest_id`,`problem_id`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -193,7 +195,31 @@ CREATE TABLE `contest_problems` (
 
 LOCK TABLES `contest_problems` WRITE;
 /*!40000 ALTER TABLE `contest_problems` DISABLE KEYS */;
+INSERT INTO `contest_problems` VALUES (1,1),(1,2);
 /*!40000 ALTER TABLE `contest_problems` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `contest_standing`
+--
+
+DROP TABLE IF EXISTS `contest_standing`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+ SET character_set_client = utf8mb4 ;
+CREATE TABLE `contest_standing` (
+  `contest_id` int(11) NOT NULL,
+  `standing` mediumblob,
+  PRIMARY KEY (`contest_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `contest_standing`
+--
+
+LOCK TABLES `contest_standing` WRITE;
+/*!40000 ALTER TABLE `contest_standing` DISABLE KEYS */;
+/*!40000 ALTER TABLE `contest_standing` ENABLE KEYS */;
 UNLOCK TABLES;
 
 --
@@ -215,7 +241,7 @@ CREATE TABLE `contests` (
   `registrants` int(11) DEFAULT NULL,
   PRIMARY KEY (`contest_id`),
   KEY `end_time` (`end_time`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=MyISAM AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -224,7 +250,31 @@ CREATE TABLE `contests` (
 
 LOCK TABLES `contests` WRITE;
 /*!40000 ALTER TABLE `contests` DISABLE KEYS */;
+INSERT INTO `contests` VALUES (1,'New Contest','2022-07-08 08:31:00','2022-07-08 18:31:00',0,0,0,0,1);
 /*!40000 ALTER TABLE `contests` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `custom_tests`
+--
+
+DROP TABLE IF EXISTS `custom_tests`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+ SET character_set_client = utf8mb4 ;
+CREATE TABLE `custom_tests` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `content` mediumblob,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB AUTO_INCREMENT=10 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `custom_tests`
+--
+
+LOCK TABLES `custom_tests` WRITE;
+/*!40000 ALTER TABLE `custom_tests` DISABLE KEYS */;
+/*!40000 ALTER TABLE `custom_tests` ENABLE KEYS */;
 UNLOCK TABLES;
 
 --
@@ -248,7 +298,7 @@ CREATE TABLE `permissions` (
 
 LOCK TABLES `permissions` WRITE;
 /*!40000 ALTER TABLE `permissions` DISABLE KEYS */;
-INSERT INTO `permissions` VALUES (1,'Default Group',0);
+INSERT INTO `permissions` VALUES (1,'Default Group',1);
 /*!40000 ALTER TABLE `permissions` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -290,7 +340,7 @@ CREATE TABLE `problems` (
   `check_sum` char(64) DEFAULT NULL,
   `allow_down` varchar(256) DEFAULT NULL,
   PRIMARY KEY (`problem_id`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=MyISAM AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -299,6 +349,7 @@ CREATE TABLE `problems` (
 
 LOCK TABLES `problems` WRITE;
 /*!40000 ALTER TABLE `problems` DISABLE KEYS */;
+INSERT INTO `problems` VALUES (1,'The First Problem!!!!!😊',0,'280f257162880bfd0a1d998b5cb321c152c12211fe5c0a2a24133ae733582ba3',''),(2,'New Problem',0,'64469d5f7070564af17f6b8aeae34795adbe3dcc31dc2a9782a2bca8d63e596b','');
 /*!40000 ALTER TABLE `problems` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -312,8 +363,12 @@ DROP TABLE IF EXISTS `submission_details`;
 CREATE TABLE `submission_details` (
   `submission_id` int(11) NOT NULL,
   `content` longblob,
+  `content_preview` mediumblob,
+  `result` mediumblob,
+  `pretest_result` mediumblob,
+  `extra_result` mediumblob,
   PRIMARY KEY (`submission_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -343,13 +398,15 @@ CREATE TABLE `submissions` (
   `memory` int(11) DEFAULT NULL,
   `language` int(11) DEFAULT NULL,
   `submit_time` datetime DEFAULT NULL,
-  `result` mediumblob,
+  `sample_score` float DEFAULT NULL,
+  `hacked` tinyint(1) DEFAULT NULL,
+  `uuid` bigint(20) DEFAULT NULL,
   PRIMARY KEY (`submission_id`),
   KEY `submitter` (`submitter`),
   KEY `problem_id` (`problem_id`),
   KEY `contest_id` (`contest_id`),
   KEY `status` (`status`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=40 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -383,7 +440,7 @@ CREATE TABLE `user_info` (
   PRIMARY KEY (`user_id`),
   UNIQUE KEY `user_name` (`user_name`),
   UNIQUE KEY `rating` (`rating` DESC,`user_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -392,7 +449,7 @@ CREATE TABLE `user_info` (
 
 LOCK TABLES `user_info` WRITE;
 /*!40000 ALTER TABLE `user_info` DISABLE KEYS */;
-INSERT INTO `user_info` VALUES (1,'root','BFBBCEEB2D6402DF09EF79FE161F8A86A5466B183835F86FAF96584A09D41154','',1,'2022-06-18 20:56:40','RFbD56TI2smTyVsGd5Xav0yu99ZAMPTA',0,0,'','');
+INSERT INTO `user_info` VALUES (1,'root','BFBBCEEB2D6402DF09EF79FE161F8A86A5466B183835F86FAF96584A09D41154','',1,'2022-06-18 20:56:40','xNeBscCEIx0pwA8p46vsnhwnxcA04yaA',0,0,'',''),(2,'wzy','BFBBCEEB2D6402DF09EF79FE161F8A86A5466B183835F86FAF96584A09D41154','',0,'2022-07-08 08:32:15','G8twAEsVsqbpgS1jIm4ecqCnejW7ddIu',2,0,'','');
 /*!40000 ALTER TABLE `user_info` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -417,6 +474,7 @@ CREATE TABLE `user_permissions` (
 
 LOCK TABLES `user_permissions` WRITE;
 /*!40000 ALTER TABLE `user_permissions` DISABLE KEYS */;
+INSERT INTO `user_permissions` VALUES (1,1),(2,1);
 /*!40000 ALTER TABLE `user_permissions` ENABLE KEYS */;
 UNLOCK TABLES;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
@@ -429,4 +487,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2022-07-05  9:18:57
+-- Dump completed on 2022-07-10 21:18:10
