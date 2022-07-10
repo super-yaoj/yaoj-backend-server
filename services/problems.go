@@ -11,6 +11,7 @@ import (
 	"yao/libs"
 
 	"github.com/gin-gonic/gin"
+	"github.com/k0kubun/pp"
 	"github.com/super-yaoj/yaoj-core/pkg/problem"
 )
 
@@ -98,21 +99,27 @@ func PRCreate(ctx *gin.Context) {
 	}
 }
 
-func PRQuery(ctx *gin.Context) {
-	problem_id, ok := libs.GetInt(ctx, "problem_id")
-	if !ok {
+// 查询问题
+type ProbGetParam struct {
+	ProbID  *int `query:"problem_id"`
+	CtstID  int  `query:"contest_id"`
+	UserID  int  `session:"user_id"`
+	UserGrp int  `session:"user_group"`
+}
+
+func ProbGet(ctx *gin.Context, param ProbGetParam) {
+	if param.ProbID == nil {
 		return
 	}
-	if !internal.PRExists(problem_id) {
+	if !internal.PRExists(*param.ProbID) {
 		libs.APIWriteBack(ctx, 404, "", nil)
 		return
 	}
-	in_contest, ok := PRCanSee(ctx, problem_id, libs.GetIntDefault(ctx, "contest_id", 0))
+	in_contest, ok := PRCanSee(ctx, *param.ProbID, param.CtstID)
 	if !ok {
 		return
 	}
-
-	prob, err := internal.PRQuery(problem_id, GetUserId(ctx))
+	prob, err := internal.PRQuery(*param.ProbID, param.UserID)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 		return
@@ -121,27 +128,31 @@ func PRQuery(ctx *gin.Context) {
 		prob.Tutorial_zh = ""
 		prob.Tutorial_en = ""
 	}
-	can_edit := PRCanEdit(ctx, problem_id)
+	can_edit := PRCanEdit(ctx, *param.ProbID)
 	if !can_edit {
 		prob.DataInfo = problem.DataInfo{}
 	}
 	libs.APIWriteBack(ctx, 200, "", map[string]any{"problem": *prob, "can_edit": can_edit})
 }
 
-func PRGetPermissions(ctx *gin.Context) {
-	problem_id, ok := libs.GetInt(ctx, "problem_id")
-	if !ok {
+// 获取题目权限
+type ProbGetPermParam struct {
+	ProbID *int `query:"problem_id"`
+}
+
+func ProbGetPerm(ctx *gin.Context, param ProbGetPermParam) {
+	if param.ProbID == nil {
 		return
 	}
-	if !internal.PRExists(problem_id) {
+	if !internal.PRExists(*param.ProbID) {
 		libs.APIWriteBack(ctx, 404, "", nil)
 		return
 	}
-	if !PRCanEdit(ctx, problem_id) {
+	if !PRCanEdit(ctx, *param.ProbID) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
-	pers, err := internal.PRGetPermissions(problem_id)
+	pers, err := internal.PRGetPermissions(*param.ProbID)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	} else {
@@ -149,47 +160,54 @@ func PRGetPermissions(ctx *gin.Context) {
 	}
 }
 
-func PRAddPermission(ctx *gin.Context) {
-	problem_id, ok := libs.PostInt(ctx, "problem_id")
-	if !ok {
+type ProbAddPermParam struct {
+	ProbID *int `body:"problem_id"`
+	PermID *int `body:"permission_id"`
+}
+
+func ProbAddPerm(ctx *gin.Context, param ProbAddPermParam) {
+	pp.Print(param)
+	if param.ProbID == nil {
 		return
 	}
-	permission_id, ok := libs.PostInt(ctx, "permission_id")
-	if !ok {
+	if param.PermID == nil {
 		return
 	}
-	if !internal.PRExists(problem_id) {
+	if !internal.PRExists(*param.ProbID) {
 		libs.APIWriteBack(ctx, 404, "", nil)
 		return
 	}
-	if !PRCanEdit(ctx, problem_id) {
+	if !PRCanEdit(ctx, *param.ProbID) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
-	if !internal.PMExists(permission_id) {
+	if !internal.PMExists(*param.PermID) {
 		libs.APIWriteBack(ctx, 400, "no such permission id", nil)
 		return
 	}
-	err := internal.PRAddPermission(problem_id, permission_id)
+	err := internal.PRAddPermission(*param.ProbID, *param.PermID)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	}
 }
 
-func PRDeletePermission(ctx *gin.Context) {
-	problem_id, ok := libs.GetInt(ctx, "problem_id")
-	if !ok {
+type ProbDelPermParam struct {
+	ProbID *int `query:"problem_id"`
+	PermID *int `query:"problem_id"`
+}
+
+func ProbDelPerm(ctx *gin.Context, param ProbDelPermParam) {
+	if param.ProbID == nil {
 		return
 	}
-	permission_id, ok := libs.GetInt(ctx, "permission_id")
-	if !ok {
+	if param.PermID == nil {
 		return
 	}
-	if !PRCanEdit(ctx, problem_id) {
+	if !PRCanEdit(ctx, *param.ProbID) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
-	err := internal.PRDeletePermission(problem_id, permission_id)
+	err := internal.PRDeletePermission(*param.ProbID, *param.PermID)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	}
