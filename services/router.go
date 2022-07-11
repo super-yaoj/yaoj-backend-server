@@ -37,12 +37,19 @@ var Router map[string][]Request = map[string][]Request{
 
 	"/blog":          {{"GET", BLQuery}, {"POST", BLCreate}, {"PUT", BLEdit}, {"DELETE", BLDelete}},
 	"/blogs":         {{"GET", BLList}},
-	"/likes":         {{"POST", ClickLike}},
+	"/likes":         {{"POST", service.GinHandler(ClickLike)}},
 	"/blog_comments": {{"GET", BLGetComments}, {"POST", BLCreateComment}, {"DELETE", BLDeleteComment}},
-	"/announcements": {{"GET", ANQuery}, {"POST", ANCreate}, {"DELETE", ANDelete}},
-
+	"/announcements": {
+		{"GET", service.GinHandler(AnceGet)},
+		{"POST", service.GinHandler(AnceCreate)},
+		{"DELETE", service.GinHandler(AnceDel)},
+	},
 	"/problems": {{"GET", service.GinHandler(ProbList)}},
-	"/problem":  {{"GET", service.GinHandler(ProbGet)}, {"POST", PRCreate}, {"PATCH", service.GinHandler(ProbModify)}},
+	"/problem": {
+		{"GET", service.GinHandler(ProbGet)},
+		{"POST", PRCreate},
+		{"PATCH", service.GinHandler(ProbModify)},
+	},
 	"/problem_permissions": {
 		{"GET", service.GinHandler(ProbGetPerm)},
 		{"POST", service.GinHandler(ProbAddPerm)},

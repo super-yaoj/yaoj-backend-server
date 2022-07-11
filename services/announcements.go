@@ -1,47 +1,61 @@
 package services
 
 import (
+	"fmt"
 	"yao/internal"
 	"yao/libs"
 
 	"github.com/gin-gonic/gin"
 )
 
-func ANCreate(ctx *gin.Context) {
+type AnceCreateParam struct {
+	BlogID   *int `body:"blog_id"`
+	Priority *int `body:"priority"`
+}
+
+func AnceCreate(ctx *gin.Context, param AnceCreateParam) {
 	if !ISAdmin(ctx) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
-	blog_id, ok := libs.PostInt(ctx, "blog_id")
-	priority, ok1 := libs.PostIntRange(ctx, "priority", 1, 10)
-	if !ok || !ok1 {
+	if param.BlogID == nil || param.Priority == nil {
 		return
 	}
+	if *param.Priority < 1 || *param.Priority > 10 {
+		libs.APIWriteBack(ctx, 400, fmt.Sprintf("invalid request: parameter priority should be in [%d, %d]", 1, 10), nil)
+	}
 
-	count, err := libs.DBSelectSingleInt("select count(*) from blogs where blog_id=?", blog_id)
+	count, err := libs.DBSelectSingleInt("select count(*) from blogs where blog_id=?", *param.BlogID)
 	if err != nil || count == 0 {
 		libs.APIWriteBack(ctx, 400, "invalid request", nil)
 		return
 	}
-	err = internal.ANCreate(blog_id, priority)
+	err = internal.ANCreate(*param.BlogID, *param.Priority)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 		return
 	}
 }
 
-func ANQuery(ctx *gin.Context) {
-	libs.APIWriteBack(ctx, 200, "", map[string]any{"data": internal.ANQuery(GetUserId(ctx))})
+type AnceGetParam struct {
+	UserID int `session:"user_id"`
 }
 
-func ANDelete(ctx *gin.Context) {
+func AnceGet(ctx *gin.Context, param AnceGetParam) {
+	libs.APIWriteBack(ctx, 200, "", map[string]any{"data": internal.ANQuery(param.UserID)})
+}
+
+type AnceDelParam struct {
+	ID *int `query:"id"`
+}
+
+func AnceDel(ctx *gin.Context, param AnceDelParam) {
 	if !ISAdmin(ctx) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
-	id, ok := libs.GetInt(ctx, "id")
-	if !ok {
+	if param.ID == nil {
 		return
 	}
-	internal.ANDelete(id)
+	internal.ANDelete(*param.ID)
 }
