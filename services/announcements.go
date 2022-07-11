@@ -46,7 +46,7 @@ func AnceGet(ctx *gin.Context, param AnceGetParam) {
 }
 
 type AnceDelParam struct {
-	ID *int `query:"id"`
+	ID int `query:"id" binding:"required"`
 }
 
 func AnceDel(ctx *gin.Context, param AnceDelParam) {
@@ -54,8 +54,5 @@ func AnceDel(ctx *gin.Context, param AnceDelParam) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
-	if param.ID == nil {
-		return
-	}
-	internal.ANDelete(*param.ID)
+	internal.ANDelete(param.ID)
 }

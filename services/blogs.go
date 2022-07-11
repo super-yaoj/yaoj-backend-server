@@ -84,41 +84,35 @@ func BlogEdit(ctx *gin.Context, param BlogEditParam) {
 }
 
 type BlogDelParam struct {
-	BlogID *int `query:"blog_id"`
+	BlogID int `query:"blog_id" binding:"required"`
 }
 
 func BlogDel(ctx *gin.Context, param BlogDelParam) {
-	if param.BlogID == nil {
-		return
-	}
-	if !BLCanEdit(ctx, *param.BlogID) {
+	if !BLCanEdit(ctx, param.BlogID) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
-	err := internal.BLDelete(*param.BlogID)
+	err := internal.BLDelete(param.BlogID)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	}
 }
 
 type BlogGetParam struct {
-	BlogID *int `query:"blog_id"`
-	UserID int  `session:"user_id"`
+	BlogID int `query:"blog_id" binding:"required"`
+	UserID int `session:"user_id"`
 }
 
 func BlogGet(ctx *gin.Context, param BlogGetParam) {
-	if param.BlogID == nil {
-		return
-	}
-	if !internal.BLExists(*param.BlogID) {
+	if !internal.BLExists(param.BlogID) {
 		libs.APIWriteBack(ctx, 404, "", nil)
 		return
 	}
-	if !BLCanSee(ctx, *param.BlogID) {
+	if !BLCanSee(ctx, param.BlogID) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
-	blog, err := internal.BLQuery(*param.BlogID, param.UserID)
+	blog, err := internal.BLQuery(param.BlogID, param.UserID)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	} else {
