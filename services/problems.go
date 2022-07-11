@@ -3,6 +3,7 @@ package services
 import (
 	"fmt"
 	"log"
+	"mime/multipart"
 	"os"
 	"path"
 	"strings"
@@ -260,7 +261,8 @@ func ProbDelMgr(ctx *gin.Context, param ProbDelMgrParam) {
 }
 
 type ProbPutDataParam struct {
-	ProbID int `body:"problem_id" binding:"required"`
+	ProbID int                   `body:"problem_id" binding:"required"`
+	Data   *multipart.FileHeader `body:"data" binding:"required"`
 }
 
 func ProbPutData(ctx *gin.Context, param ProbPutDataParam) {
@@ -272,20 +274,15 @@ func ProbPutData(ctx *gin.Context, param ProbPutDataParam) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
-	file, err := ctx.FormFile("data")
-	if err != nil {
-		libs.APIWriteBack(ctx, 400, err.Error(), nil)
-		return
-	}
-	ext := path.Ext(file.Filename)
+	ext := path.Ext(param.Data.Filename)
 	if ext != ".zip" {
-		libs.APIWriteBack(ctx, 400, "doesn't support file extension "+ext, nil)
+		libs.APIWriteBack(ctx, 400, "unsupported file extension "+ext, nil)
 		return
 	}
 
 	tmpdir := libs.GetTempDir()
 	defer os.RemoveAll(tmpdir)
-	err = ctx.SaveUploadedFile(file, path.Join(tmpdir, "1.zip"))
+	err := ctx.SaveUploadedFile(param.Data, path.Join(tmpdir, "1.zip"))
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 		return
