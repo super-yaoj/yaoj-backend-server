@@ -8,6 +8,7 @@ import (
 
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
+	"github.com/go-playground/validator/v10"
 	"github.com/k0kubun/pp"
 )
 
@@ -25,6 +26,8 @@ import (
 // T 为参数类型结构体
 type StdHandlerFunc[T any] func(ctx *gin.Context, param T)
 
+var defaultValidator = validator.New()
+
 // 将标准化的 API handler 转化为 gin handler
 // route string, method string,
 func GinHandler[T any](handler StdHandlerFunc[T]) gin.HandlerFunc {
@@ -34,6 +37,12 @@ func GinHandler[T any](handler StdHandlerFunc[T]) gin.HandlerFunc {
 		if err != nil {
 			ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			log.Printf("[bind]: %s", err)
+			return
+		}
+		err = defaultValidator.Struct(data)
+		if err != nil {
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			log.Printf("[validate]: %s", err)
 			return
 		}
 		pp.Println(data)
