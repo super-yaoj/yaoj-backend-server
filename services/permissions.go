@@ -80,7 +80,7 @@ func PermDel(ctx *gin.Context, param PermDelParam) {
 }
 
 type PermGetParam struct {
-	PageSize int  `query:"pagesize" binding:"required"`
+	PageSize int  `query:"pagesize" binding:"required" validate:"gte=1,lte=100"`
 	Left     *int `query:"left"`
 	Right    *int `query:"right"`
 }
@@ -88,9 +88,6 @@ type PermGetParam struct {
 func PermGet(ctx *gin.Context, param PermGetParam) {
 	if !ISAdmin(ctx) {
 		libs.APIWriteBack(ctx, 403, "", nil)
-		return
-	}
-	if param.PageSize < 1 || param.PageSize > 100 {
 		return
 	}
 	var bound int

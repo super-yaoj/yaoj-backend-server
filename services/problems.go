@@ -70,14 +70,10 @@ type ProbListParam struct {
 	UserID   int  `session:"user_id"`
 	Left     *int `query:"left"`
 	Right    *int `query:"right"`
-	PageSize int  `query:"pagesize" binding:"required"`
+	PageSize int  `query:"pagesize" binding:"required" validate:"gte=1,lte=100"`
 }
 
 func ProbList(ctx *gin.Context, param ProbListParam) {
-	if param.PageSize > 100 || param.PageSize < 1 {
-		libs.APIWriteBack(ctx, 400, fmt.Sprintf("invalid request: parameter pagesize should be in [%d, %d]", 1, 100), nil)
-		return
-	}
 	var bound int
 	if param.Left != nil {
 		bound = *param.Left
@@ -302,8 +298,9 @@ func ProbPutData(ctx *gin.Context, param ProbPutDataParam) {
 }
 
 type ProbDownDataParam struct {
-	ProbID int `query:"problem_id" binding:"required"`
-	CtstID int `query:"contest_id"`
+	ProbID   int    `query:"problem_id" binding:"required"`
+	CtstID   int    `query:"contest_id"`
+	DataType string `query:"type"`
 }
 
 func ProbDownData(ctx *gin.Context, param ProbDownDataParam) {
@@ -311,10 +308,9 @@ func ProbDownData(ctx *gin.Context, param ProbDownDataParam) {
 		libs.APIWriteBack(ctx, 404, "", nil)
 		return
 	}
-	t := ctx.Query("type")
 	internal.ProblemRWLock.RLock(param.ProbID)
 	defer internal.ProblemRWLock.RUnlock(param.ProbID)
-	if t == "data" {
+	if param.DataType == "data" {
 		if !PRCanEdit(ctx, param.ProbID) {
 			libs.APIWriteBack(ctx, 403, "", nil)
 			return
@@ -343,8 +339,9 @@ func ProbDownData(ctx *gin.Context, param ProbDownDataParam) {
 }
 
 type ProbModifyParam struct {
-	ProbID int    `body:"problem_id" binding:"required"`
-	Title  string `body:"title"`
+	ProbID    int    `body:"problem_id" binding:"required"`
+	Title     string `body:"title"`
+	AllowDown string `body:"allow_down"`
 }
 
 func ProbModify(ctx *gin.Context, param ProbModifyParam) {
@@ -379,9 +376,8 @@ func ProbModify(ctx *gin.Context, param ProbModifyParam) {
 		libs.APIWriteBack(ctx, 404, "", nil)
 		return
 	}
-	new_allow := ctx.PostForm("allow_down")
 	allow_down = fix(allow_down)
-	new_allow = fix(new_allow)
+	new_allow := fix(param.AllowDown)
 	if allow_down != new_allow {
 		libs.DBUpdate("update problems set title=?, allow_down=? where problem_id=?", param.Title, new_allow, param.ProbID)
 		err := internal.PRModifySample(param.ProbID, new_allow)

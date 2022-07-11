@@ -284,7 +284,7 @@ func UserGrpEdit(ctx *gin.Context, param UserGrpEditParam) {
 }
 
 type UserListParam struct {
-	PageSize    int     `query:"pagesize" binding:"required"`
+	PageSize    int     `query:"pagesize" binding:"required" validate:"gte=1,lte=100"`
 	UserName    *string `query:"user_name"`
 	Left        *int    `query:"left"`
 	Right       *int    `query:"right"`
@@ -295,9 +295,6 @@ type UserListParam struct {
 }
 
 func UserList(ctx *gin.Context, param UserListParam) {
-	if param.PageSize < 1 || param.PageSize > 100 {
-		return
-	}
 	if param.UserName != nil {
 		var bound int
 		if param.Left != nil {
