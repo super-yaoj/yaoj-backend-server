@@ -39,16 +39,10 @@ func (r SessionBinder) Bind(value reflect.Value, field reflect.StructField) (isS
 			if sf.PkgPath != "" && !sf.Anonymous {
 				continue
 			}
-			name, ok := sf.Tag.Lookup("session")
-			if !ok || r.Session.Get(name) == nil {
-				continue
-			}
-
 			isSet, err = r.Bind(value.Field(i), sf)
 			if err != nil {
-				return false, err
+				return
 			}
-
 		}
 		return isSet, nil
 	}
@@ -67,8 +61,5 @@ func (r SessionBinder) Bind(value reflect.Value, field reflect.StructField) (isS
 	// ptrSessVal.Elem().Set(sessVal)
 
 	value.Set(sessVal)
-	if err != nil {
-		return false, err
-	}
-	return isSet, nil
+	return
 }

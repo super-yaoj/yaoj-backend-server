@@ -78,6 +78,9 @@ func (r BasicBinder) Bind(value reflect.Value) (bool, error) {
 type arrayBinder []string
 
 func (r arrayBinder) Bind(value reflect.Value) (isSet bool, err error) {
+	if r == nil { // no value
+		return false, nil
+	}
 	if value.Kind() != reflect.Slice {
 		return false, fmt.Errorf("invalid array type %q", value.Kind().String())
 	}

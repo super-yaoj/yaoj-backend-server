@@ -38,7 +38,7 @@ func (r BodyBinder) BindPostForm(value reflect.Value, field reflect.StructField)
 		}
 		isSet, err = r.BindPostForm(vptr.Elem(), field)
 		if err != nil {
-			return false, err
+			return
 		}
 		if isNew && isSet {
 			value.Set(vptr)
@@ -55,31 +55,32 @@ func (r BodyBinder) BindPostForm(value reflect.Value, field reflect.StructField)
 			if sf.PkgPath != "" && !sf.Anonymous {
 				continue
 			}
-			name, ok := sf.Tag.Lookup("body")
-			if !ok || r.ctx.PostForm(name) == "" {
-				continue
-			}
-
 			isSet, err = r.BindPostForm(value.Field(i), sf)
 			if err != nil {
-				return false, err
+				return
 			}
-
 		}
 		return isSet, nil
 	}
 
 	name, ok := field.Tag.Lookup("body")
-	if !ok || r.ctx.PostForm(name) == "" {
+	if !ok {
 		return false, nil
 	}
+	bindOpt, _ := field.Tag.Lookup("binding")
 
 	if value.Kind() == reflect.Slice {
-		return false, fmt.Errorf("can't bind postform value to slice")
+		isSet, err = false, fmt.Errorf("can't bind postform value to slice")
+	} else if r.ctx.PostForm(name) == "" {
+		isSet, err = false, nil
+	} else {
+		isSet, err = BasicBinder(r.ctx.PostForm(name)).Bind(value)
 	}
-	isSet, err = BasicBinder(r.ctx.PostForm(name)).Bind(value)
 	if err != nil {
-		return false, err
+		return
 	}
-	return isSet, nil
+	if strings.Contains(bindOpt, "required") && !isSet {
+		err = fmt.Errorf("field %q of type %q required but not binded", field.Name, value.Type())
+	}
+	return
 }

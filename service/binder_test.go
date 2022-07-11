@@ -13,7 +13,7 @@ func TestFormBinder(t *testing.T) {
 		"aaa":   {"1", "2", "3", "4", "5a"},
 	}
 	type Data struct {
-		Color []string `query:"color"`
+		Color []string `query:"color" binding:"required"`
 		Sum   *int     `query:"sum"`
 		Ints  []int    `query:"aaa"`
 	}

@@ -13,7 +13,6 @@ type FormBinder map[string][]string
 // 注意不支持 map, array！
 // 支持 required
 func (r FormBinder) Bind(value reflect.Value, field reflect.StructField) (isSet bool, err error) {
-	log.Printf("form bind %s %q", value.Type(), field.Name)
 	if value.Kind() == reflect.Pointer {
 		isNew := false
 		vptr := value
@@ -40,11 +39,6 @@ func (r FormBinder) Bind(value reflect.Value, field reflect.StructField) (isSet 
 			if sf.PkgPath != "" && !sf.Anonymous {
 				continue
 			}
-			name, ok := sf.Tag.Lookup("query")
-			if !ok || r[name] == nil || len(r[name]) == 0 {
-				continue
-			}
-
 			isSet, err = r.Bind(value.Field(i), sf)
 			if err != nil {
 				return false, err
@@ -54,10 +48,11 @@ func (r FormBinder) Bind(value reflect.Value, field reflect.StructField) (isSet 
 	}
 
 	name, ok := field.Tag.Lookup("query")
-	bindOpt, _ := field.Tag.Lookup("binding")
-	if !ok || r[name] == nil || len(r[name]) == 0 {
+	if !ok {
 		return false, nil
 	}
+	bindOpt, _ := field.Tag.Lookup("binding")
+	log.Printf("form bind %s %q %q", value.Type(), field.Name, bindOpt)
 
 	if value.Kind() == reflect.Slice {
 		if !value.CanSet() {
@@ -65,20 +60,17 @@ func (r FormBinder) Bind(value reflect.Value, field reflect.StructField) (isSet 
 		}
 
 		isSet, err = arrayBinder(r[name]).Bind(value)
-		if err != nil {
-			return false, err
-		}
-		if strings.Contains(bindOpt, "required") && !isSet {
-			err = fmt.Errorf("field %q of type %q required but not binded", field.Name, value.Type())
-		}
-		return isSet, err
+	} else if r[name] == nil || len(r[name]) == 0 {
+		isSet, err = false, nil
+	} else {
+		isSet, err = BasicBinder(r[name][0]).Bind(value)
 	}
-	isSet, err = BasicBinder(r[name][0]).Bind(value)
+
 	if err != nil {
-		return false, err
+		return
 	}
 	if strings.Contains(bindOpt, "required") && !isSet {
 		err = fmt.Errorf("field %q of type %q required but not binded", field.Name, value.Type())
 	}
-	return isSet, err
+	return
 }
