@@ -30,20 +30,17 @@ func BLCanEdit(ctx *gin.Context, blog_id int) bool {
 
 type BlogCreateParam struct {
 	UserID  int    `session:"user_id"`
-	Private *int   `body:"private"`
+	Private int    `body:"private" binding:"required"`
 	Title   string `body:"title"`
 	Content string `body:"content"`
 }
 
 func BlogCreate(ctx *gin.Context, param BlogCreateParam) {
-	if param.Private == nil {
-		return
-	}
 	if !internal.BLValidTitle(param.Title) {
 		libs.APIWriteBack(ctx, 400, "invalid title", nil)
 		return
 	}
-	id, err := internal.BLCreate(param.UserID, *param.Private, param.Title, param.Content)
+	id, err := internal.BLCreate(param.UserID, param.Private, param.Title, param.Content)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	} else {
@@ -52,14 +49,11 @@ func BlogCreate(ctx *gin.Context, param BlogCreateParam) {
 }
 
 type BlogEditParam struct {
-	BlogID *int `body:"blog_id"`
+	BlogID int `body:"blog_id" binding:"required"`
 }
 
 func BlogEdit(ctx *gin.Context, param BlogEditParam) {
-	if param.BlogID == nil {
-		return
-	}
-	if !internal.BLExists(*param.BlogID) {
+	if !internal.BLExists(param.BlogID) {
 		libs.APIWriteBack(ctx, 404, "", nil)
 		return
 	}
@@ -67,7 +61,7 @@ func BlogEdit(ctx *gin.Context, param BlogEditParam) {
 	if !ok {
 		return
 	}
-	if !BLCanEdit(ctx, *param.BlogID) {
+	if !BLCanEdit(ctx, param.BlogID) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
@@ -77,7 +71,7 @@ func BlogEdit(ctx *gin.Context, param BlogEditParam) {
 		return
 	}
 	content := ctx.PostForm("content")
-	err := internal.BLEdit(*param.BlogID, private, title, content)
+	err := internal.BLEdit(param.BlogID, private, title, content)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	}

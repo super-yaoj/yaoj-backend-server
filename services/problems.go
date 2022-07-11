@@ -11,7 +11,6 @@ import (
 	"yao/libs"
 
 	"github.com/gin-gonic/gin"
-	"github.com/k0kubun/pp"
 	"github.com/super-yaoj/yaoj-core/pkg/problem"
 )
 
@@ -164,31 +163,24 @@ func ProbGetPerm(ctx *gin.Context, param ProbGetPermParam) {
 }
 
 type ProbAddPermParam struct {
-	ProbID *int `body:"problem_id"`
-	PermID *int `body:"permission_id"`
+	ProbID int `body:"problem_id" binding:"required"`
+	PermID int `body:"permission_id" binding:"required"`
 }
 
 func ProbAddPerm(ctx *gin.Context, param ProbAddPermParam) {
-	pp.Print(param)
-	if param.ProbID == nil {
-		return
-	}
-	if param.PermID == nil {
-		return
-	}
-	if !internal.PRExists(*param.ProbID) {
+	if !internal.PRExists(param.ProbID) {
 		libs.APIWriteBack(ctx, 404, "", nil)
 		return
 	}
-	if !PRCanEdit(ctx, *param.ProbID) {
+	if !PRCanEdit(ctx, param.ProbID) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
-	if !internal.PMExists(*param.PermID) {
+	if !internal.PMExists(param.PermID) {
 		libs.APIWriteBack(ctx, 400, "no such permission id", nil)
 		return
 	}
-	err := internal.PRAddPermission(*param.ProbID, *param.PermID)
+	err := internal.PRAddPermission(param.ProbID, param.PermID)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	}
@@ -232,30 +224,24 @@ func ProbGetMgr(ctx *gin.Context, param ProbGetMgrParam) {
 }
 
 type ProbAddMgrParam struct {
-	ProbID *int `body:"problem_id"`
-	UserID *int `body:"user_id"`
+	ProbID int `body:"problem_id" binding:"required"`
+	UserID int `body:"user_id" binding:"required"`
 }
 
 func ProbAddMgr(ctx *gin.Context, param ProbAddMgrParam) {
-	if param.ProbID == nil {
-		return
-	}
-	if param.UserID == nil {
-		return
-	}
-	if !internal.PRExists(*param.ProbID) {
+	if !internal.PRExists(param.ProbID) {
 		libs.APIWriteBack(ctx, 404, "", nil)
 		return
 	}
-	if !PRCanEdit(ctx, *param.ProbID) {
+	if !PRCanEdit(ctx, param.ProbID) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
-	if !internal.USExists(*param.UserID) {
+	if !internal.USExists(param.UserID) {
 		libs.APIWriteBack(ctx, 400, "no such user id", nil)
 		return
 	}
-	err := internal.PRAddPermission(*param.ProbID, -*param.UserID)
+	err := internal.PRAddPermission(param.ProbID, -param.UserID)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	}
@@ -278,18 +264,15 @@ func ProbDelMgr(ctx *gin.Context, param ProbDelMgrParam) {
 }
 
 type ProbPutDataParam struct {
-	ProbID *int `body:"problem_id"`
+	ProbID int `body:"problem_id" binding:"required"`
 }
 
 func ProbPutData(ctx *gin.Context, param ProbPutDataParam) {
-	if param.ProbID == nil {
-		return
-	}
-	if !internal.PRExists(*param.ProbID) {
+	if !internal.PRExists(param.ProbID) {
 		libs.APIWriteBack(ctx, 404, "", nil)
 		return
 	}
-	if !PRCanEdit(ctx, *param.ProbID) {
+	if !PRCanEdit(ctx, param.ProbID) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
@@ -312,7 +295,7 @@ func ProbPutData(ctx *gin.Context, param ProbPutDataParam) {
 		return
 	}
 	log.Printf("file uploaded saves at %s", path.Join(tmpdir, "1.zip"))
-	err = internal.PRPutData(*param.ProbID, tmpdir)
+	err = internal.PRPutData(param.ProbID, tmpdir)
 	if err != nil {
 		libs.APIWriteBack(ctx, 400, err.Error(), nil)
 	}
@@ -360,19 +343,16 @@ func ProbDownData(ctx *gin.Context, param ProbDownDataParam) {
 }
 
 type ProbModifyParam struct {
-	ProbID *int   `body:"problem_id"`
+	ProbID int    `body:"problem_id" binding:"required"`
 	Title  string `body:"title"`
 }
 
 func ProbModify(ctx *gin.Context, param ProbModifyParam) {
-	if param.ProbID == nil {
-		return
-	}
-	if !internal.PRExists(*param.ProbID) {
+	if !internal.PRExists(param.ProbID) {
 		libs.APIWriteBack(ctx, 404, "", nil)
 		return
 	}
-	if !PRCanEdit(ctx, *param.ProbID) {
+	if !PRCanEdit(ctx, param.ProbID) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
@@ -381,7 +361,7 @@ func ProbModify(ctx *gin.Context, param ProbModifyParam) {
 		return
 	}
 
-	pro := internal.PRLoad(*param.ProbID)
+	pro := internal.PRLoad(param.ProbID)
 	length := len(pro.Statements)
 	fix := func(str string) string {
 		if len(str) > length {
@@ -394,7 +374,7 @@ func ProbModify(ctx *gin.Context, param ProbModifyParam) {
 	}
 
 	var allow_down string
-	err := libs.DBSelectSingleColumn(&allow_down, "select allow_down from problems where problem_id=?", *param.ProbID)
+	err := libs.DBSelectSingleColumn(&allow_down, "select allow_down from problems where problem_id=?", param.ProbID)
 	if err != nil {
 		libs.APIWriteBack(ctx, 404, "", nil)
 		return
@@ -403,12 +383,12 @@ func ProbModify(ctx *gin.Context, param ProbModifyParam) {
 	allow_down = fix(allow_down)
 	new_allow = fix(new_allow)
 	if allow_down != new_allow {
-		libs.DBUpdate("update problems set title=?, allow_down=? where problem_id=?", param.Title, new_allow, *param.ProbID)
-		err := internal.PRModifySample(*param.ProbID, new_allow)
+		libs.DBUpdate("update problems set title=?, allow_down=? where problem_id=?", param.Title, new_allow, param.ProbID)
+		err := internal.PRModifySample(param.ProbID, new_allow)
 		if err != nil {
 			libs.APIInternalError(ctx, err)
 		}
 	} else {
-		libs.DBUpdate("update problems set title=? where problem_id=?", param.Title, *param.ProbID)
+		libs.DBUpdate("update problems set title=? where problem_id=?", param.Title, param.ProbID)
 	}
 }

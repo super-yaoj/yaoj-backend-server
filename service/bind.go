@@ -36,7 +36,7 @@ func GinHandler[T any](handler StdHandlerFunc[T]) gin.HandlerFunc {
 			log.Printf("[bind]: %s", err)
 			return
 		}
-		pp.Print(data)
+		pp.Println(data)
 		handler(ctx, data)
 	}
 }

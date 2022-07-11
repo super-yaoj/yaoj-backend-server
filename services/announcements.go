@@ -9,8 +9,8 @@ import (
 )
 
 type AnceCreateParam struct {
-	BlogID   *int `body:"blog_id"`
-	Priority *int `body:"priority"`
+	BlogID   int `body:"blog_id" binding:"required"`
+	Priority int `body:"priority" binding:"required"`
 }
 
 func AnceCreate(ctx *gin.Context, param AnceCreateParam) {
@@ -18,19 +18,16 @@ func AnceCreate(ctx *gin.Context, param AnceCreateParam) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
-	if param.BlogID == nil || param.Priority == nil {
-		return
-	}
-	if *param.Priority < 1 || *param.Priority > 10 {
+	if param.Priority < 1 || param.Priority > 10 {
 		libs.APIWriteBack(ctx, 400, fmt.Sprintf("invalid request: parameter priority should be in [%d, %d]", 1, 10), nil)
 	}
 
-	count, err := libs.DBSelectSingleInt("select count(*) from blogs where blog_id=?", *param.BlogID)
+	count, err := libs.DBSelectSingleInt("select count(*) from blogs where blog_id=?", param.BlogID)
 	if err != nil || count == 0 {
 		libs.APIWriteBack(ctx, 400, "invalid request", nil)
 		return
 	}
-	err = internal.ANCreate(*param.BlogID, *param.Priority)
+	err = internal.ANCreate(param.BlogID, param.Priority)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 		return
