@@ -21,11 +21,16 @@ urls with first letter upper are rpcs, others are apis.
 var Router map[string][]Request = map[string][]Request{
 	"/GetTime":    {{"POST", GetTime}},
 	"/Init":       {{"POST", USInit}},
-	"/UserLogin":  {{"POST", USLogin}},
+	"/UserLogin":  {{"POST", service.GinHandler(UserLogin)}},
 	"/UserLogout": {{"POST", USLogout}},
 	"/Rejudge":    {{"POST", Rejudge}},
 
-	"/user": {{"GET", USQuery}, {"POST", USSignup}, {"PUT", USModify}, {"PATCH", USGroupEdit}},
+	"/user": {
+		{"GET", service.GinHandler(UserGet)},
+		{"POST", service.GinHandler(UserSignUp)},
+		{"PUT", service.GinHandler(UserEdit)},
+		{"PATCH", service.GinHandler(UserGrpEdit)},
+	},
 	"/captcha": {
 		{"GET", service.GinHandler(CaptchaGet)},
 		{"POST", service.GinHandler(CaptchaPost)},
@@ -33,7 +38,7 @@ var Router map[string][]Request = map[string][]Request{
 	},
 	"/permissions":      {{"GET", PMQuery}, {"POST", PMCreate}, {"PATCH", PMChangeName}, {"DELETE", PMDelete}},
 	"/user_permissions": {{"GET", PMQueryUser}, {"POST", PMAddUser}, {"DELETE", PMDeleteUser}},
-	"/users":            {{"GET", USList}},
+	"/users":            {{"GET", service.GinHandler(UserList)}},
 
 	"/blog": {
 		{"GET", service.GinHandler(BlogGet)},

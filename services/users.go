@@ -30,52 +30,65 @@ func checkPU(ctx *gin.Context, name, password string) bool {
 	return true
 }
 
-func USSignup(ctx *gin.Context) {
-	name := ctx.PostForm("user_name")
-	password := ctx.PostForm("password")
-	remember := ctx.PostForm("remember")
-	if !checkPU(ctx, name, password) {
+type UserSignUpParam struct {
+	UserName   string `body:"user_name"`
+	Passwd     string `body:"password"`
+	Memo       string `body:"remember"`
+	VerifyID   string `body:"verify_id"`
+	VerifyCode string `body:"verify_code"`
+}
+
+func UserSignUp(ctx *gin.Context, param UserSignUpParam) {
+	if !checkPU(ctx, param.UserName, param.Passwd) {
 		return
 	}
-	verify_id, verify_code := ctx.PostForm("verify_id"), ctx.PostForm("verify_code")
-	if !VerifyCaptcha(verify_id, verify_code) {
+	if !VerifyCaptcha(param.VerifyID, param.VerifyCode) {
 		libs.APIWriteBack(ctx, 400, "verify code is wrong", nil)
 		return
 	}
-	password = internal.SaltPassword(password)
+	password := internal.SaltPassword(param.Passwd)
 	remember_token := ""
-	if remember == "true" {
+	if param.Memo == "true" {
 		remember_token = libs.RandomString(32)
 	}
-	user_id, err := libs.DBInsertGetId("insert into user_info values (null, ?, ?, \"\", 0, ?, ?, ?, 0, \"\", \"\")", name, password, time.Now(), remember_token, USNormal)
+	user_id, err := libs.DBInsertGetId(
+		"insert into user_info values (null, ?, ?, \"\", 0, ?, ?, ?, 0, \"\", \"\")",
+		param.UserName, password, time.Now(), remember_token, USNormal,
+	)
 	if err != nil {
 		libs.APIWriteBack(ctx, 400, "username has been used by others", nil)
 		return
 	}
 	sess := sessions.Default(ctx)
 	sess.Set("user_id", int(user_id))
-	sess.Set("user_name", name)
+	sess.Set("user_name", param.UserName)
 	sess.Set("user_group", USNormal)
 	libs.DBUpdate("insert into user_permissions values (?, ?)", user_id, libs.DefaultGroup)
 	libs.DBUpdate("update permissions set count = count + 1 where permission_id=1")
 	sess.Save()
-	if remember == "true" {
+	if param.Memo == "true" {
 		libs.SetCookie(ctx, "user_id", fmt.Sprint(user_id), true)
 		libs.SetCookie(ctx, "remember_token", remember_token, true)
 	}
 	libs.APIWriteBack(ctx, 200, "", nil)
 }
 
-func USLogin(ctx *gin.Context) {
-	name := ctx.PostForm("user_name")
-	password := ctx.PostForm("password")
-	remember := ctx.PostForm("remember")
-	if !checkPU(ctx, name, password) {
+type UserLoginParam struct {
+	UserName string `body:"user_name"`
+	Passwd   string `body:"password"`
+	Memo     string `body:"remember"`
+}
+
+func UserLogin(ctx *gin.Context, param UserLoginParam) {
+	if !checkPU(ctx, param.UserName, param.Passwd) {
 		return
 	}
-	password = internal.SaltPassword(password)
-	user := internal.UserSmall{Name: name}
-	err := libs.DBSelectSingle(&user, "select user_id, user_group from user_info where user_name=? and password=?", name, password)
+	password := internal.SaltPassword(param.Passwd)
+	user := internal.UserSmall{Name: param.UserName}
+	err := libs.DBSelectSingle(
+		&user, "select user_id, user_group from user_info where user_name=? and password=?",
+		param.UserName, password,
+	)
 	if err != nil {
 		libs.RPCWriteBack(ctx, 400, -32600, "username or password is wrong", nil)
 		return
@@ -89,7 +102,7 @@ func USLogin(ctx *gin.Context) {
 	sess.Set("user_name", user.Name)
 	sess.Set("user_group", user.Usergroup)
 	sess.Save()
-	if remember == "true" {
+	if param.Memo == "true" {
 		remember_token := libs.RandomString(32)
 		libs.SetCookie(ctx, "user_id", fmt.Sprint(user.Id), true)
 		libs.SetCookie(ctx, "remember_token", remember_token, true)
@@ -164,12 +177,12 @@ func GetUserId(ctx *gin.Context) int {
 	return user_id
 }
 
-func USQuery(ctx *gin.Context) {
-	id, ok := libs.GetInt(ctx, "user_id")
-	if !ok {
-		return
-	}
-	user, err := internal.USQuery(id)
+type UserGetParam struct {
+	UserID int `query:"user_id" binding:"required"`
+}
+
+func UserGet(ctx *gin.Context, param UserGetParam) {
+	user, err := internal.USQuery(param.UserID)
 	if err != nil {
 		libs.APIWriteBack(ctx, 400, "no such user id", nil)
 		return
@@ -183,19 +196,24 @@ func USQuery(ctx *gin.Context) {
 	}
 }
 
-func USModify(ctx *gin.Context) {
-	sess := sessions.Default(ctx)
-	cur, ok := sess.Get("user_id").(int)
-	user_id, ok1 := libs.PostInt(ctx, "user_id")
-	if !ok1 {
-		return
-	}
-	if !ok || user_id != cur {
+type UserEditParam struct {
+	CurUserID int    `session:"user_id"`
+	UserID    int    `body:"user_id" binding:"required"`
+	Gender    int    `body:"gender" binding:"required"`
+	Passwd    string `body:"password"`
+	NewPasswd string `body:"new_password"`
+	Motto     string `body:"motto"`
+	Email     string `body:"email"`
+	Org       string `body:"organization"`
+}
+
+func UserEdit(ctx *gin.Context, param UserEditParam) {
+	if param.UserID != param.CurUserID {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
-	password := ctx.PostForm("password")
-	ok, err := internal.CheckPassword(user_id, password)
+	password := param.Passwd
+	ok, err := internal.CheckPassword(param.UserID, password)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 		return
@@ -204,16 +222,15 @@ func USModify(ctx *gin.Context) {
 		libs.APIWriteBack(ctx, 400, "wrong password", nil)
 		return
 	}
-	new_password := ctx.PostForm("new_password")
+	new_password := param.NewPasswd
 	if new_password != "" && internal.ValidPassword(new_password) {
 		password = new_password
 	}
 	password = internal.SaltPassword(password)
-	gender, ok := libs.PostIntRange(ctx, "gender", 0, 2)
-	if !ok {
+	if param.Gender < 0 || param.Gender > 2 {
 		return
 	}
-	motto, email, organization := ctx.PostForm("motto"), ctx.PostForm("email"), ctx.PostForm("organization")
+	motto, email, organization := param.Motto, param.Email, param.Org
 	if len(motto) > 350 || len(organization) > 150 {
 		libs.APIWriteBack(ctx, 400, "length of motto or organization is too long", nil)
 		return
@@ -222,36 +239,33 @@ func USModify(ctx *gin.Context) {
 		libs.APIWriteBack(ctx, 400, "invalid email", nil)
 		return
 	}
-	err = internal.USModify(password, gender, motto, email, organization, user_id)
+	err = internal.USModify(password, param.Gender, motto, email, organization, param.UserID)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 		return
 	}
 }
 
-func USGroupEdit(ctx *gin.Context) {
-	user_id, ok := libs.PostInt(ctx, "user_id")
-	if !ok {
-		return
-	}
-	user_group, ok := libs.PostIntRange(ctx, "user_group", USBanned, USAdmin)
-	if !ok {
-		return
-	}
-	cur_group, ok := sessions.Default(ctx).Get("user_group").(int)
-	if !ok || !ISAdmin(ctx) || cur_group <= user_group {
+type UserGrpEditParam struct {
+	UserID  int `body:"user_id" binding:"required"`
+	UserGrp int `body:"user_group" binding:"required"`
+	CurGrp  int `session:"user_group"`
+}
+
+func UserGrpEdit(ctx *gin.Context, param UserGrpEditParam) {
+	if !ISAdmin(ctx) || param.CurGrp <= param.UserGrp {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
-	target, err := internal.USQuerySmall(user_id)
+	target, err := internal.USQuerySmall(param.UserGrp)
 	if err != nil {
 		libs.APIWriteBack(ctx, 400, "no such user id", nil)
 		return
-	} else if target.Usergroup >= cur_group {
+	} else if target.Usergroup >= param.CurGrp {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
-	err = internal.USGroupEdit(user_id, user_group)
+	err = internal.USGroupEdit(param.UserID, param.UserGrp)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	} else {
@@ -259,35 +273,48 @@ func USGroupEdit(ctx *gin.Context) {
 	}
 }
 
-func USList(ctx *gin.Context) {
-	pagesize, ok := libs.GetIntRange(ctx, "pagesize", 1, 100)
-	if !ok {
+type UserListParam struct {
+	PageSize    int     `query:"pagesize" binding:"required"`
+	UserName    *string `query:"user_name"`
+	Left        *int    `query:"left"`
+	Right       *int    `query:"right"`
+	LeftUserID  *int    `query:"left_user_id"`
+	RightUserID *int    `query:"right_user_id"`
+	LeftRating  *int    `query:"left_rating"`
+	RightRating *int    `query:"right_rating"`
+}
+
+func UserList(ctx *gin.Context, param UserListParam) {
+	if param.PageSize < 1 || param.PageSize > 100 {
 		return
 	}
-	user_name, searchname := ctx.GetQuery("user_name")
-	if searchname {
-		_, isleft := ctx.GetQuery("left")
-		bound, ok := libs.GetInt(ctx, libs.If(isleft, "left", "right"))
-		if !ok {
+	if param.UserName != nil {
+		var bound int
+		if param.Left != nil {
+			bound = *param.Left
+		} else if param.Right != nil {
+			bound = *param.Right
+		} else {
 			return
 		}
-		users, isfull, err := internal.USListByName(user_name+"%", bound, pagesize, isleft)
+		users, isfull, err := internal.USListByName(*param.UserName+"%", bound, param.PageSize, param.Left != nil)
 		if err != nil {
 			libs.APIInternalError(ctx, err)
 		} else {
 			libs.APIWriteBack(ctx, 200, "", map[string]any{"data": users, "isfull": isfull})
 		}
 	} else {
-		_, isleft := ctx.GetQuery("left_user_id")
-		bound_user_id, ok := libs.GetInt(ctx, libs.If(isleft, "left_user_id", "right_user_id"))
-		if !ok {
+		var bound_user_id, bound_rating int
+		if param.LeftUserID != nil {
+			bound_user_id = *param.LeftUserID
+			bound_rating = *param.LeftRating
+		} else if param.RightUserID != nil {
+			bound_user_id = *param.RightUserID
+			bound_rating = *param.RightRating
+		} else {
 			return
 		}
-		bound_rating, ok := libs.GetInt(ctx, libs.If(isleft, "left_rating", "right_user_id"))
-		if !ok {
-			return
-		}
-		users, isfull, err := internal.USList(bound_user_id, bound_rating, pagesize, isleft)
+		users, isfull, err := internal.USList(bound_user_id, bound_rating, param.PageSize, param.LeftUserID != nil)
 		if err != nil {
 			libs.APIInternalError(ctx, err)
 		} else {
