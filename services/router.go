@@ -36,9 +36,18 @@ var Router map[string][]Request = map[string][]Request{
 		{"POST", service.GinHandler(CaptchaPost)},
 		{"PATCH", service.GinHandler(CaptchaReload)},
 	},
-	"/permissions":      {{"GET", PMQuery}, {"POST", PMCreate}, {"PATCH", PMChangeName}, {"DELETE", PMDelete}},
-	"/user_permissions": {{"GET", PMQueryUser}, {"POST", PMAddUser}, {"DELETE", PMDeleteUser}},
-	"/users":            {{"GET", service.GinHandler(UserList)}},
+	"/permissions": {
+		{"GET", service.GinHandler(PermGet)},
+		{"POST", service.GinHandler(PermCreate)},
+		{"PATCH", service.GinHandler(PermRename)},
+		{"DELETE", service.GinHandler(PermDel)},
+	},
+	"/user_permissions": {
+		{"GET", service.GinHandler(PermGetUser)},
+		{"POST", service.GinHandler(PermAddUser)},
+		{"DELETE", service.GinHandler(PermDelUser)},
+	},
+	"/users": {{"GET", service.GinHandler(UserList)}},
 
 	"/blog": {
 		{"GET", service.GinHandler(BlogGet)},

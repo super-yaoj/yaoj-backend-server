@@ -131,7 +131,13 @@ func USInit(ctx *gin.Context) {
 			libs.RPCWriteBack(ctx, 400, -32600, "user is banned", nil)
 			return
 		}
-		libs.RPCWriteBack(ctx, 200, 0, "", map[string]any{"user_id": user.Id, "user_name": user.Name, "user_group": user.Usergroup, "server_time": time.Now()})
+		libs.RPCWriteBack(ctx, 200, 0, "", gin.H{
+			"user_id":     user.Id,
+			"user_name":   user.Name,
+			"user_group":  user.Usergroup,
+			"server_time": time.Now(),
+			"is_admin":    IsAdmin(user.Usergroup),
+		})
 	}
 
 	tmp, err := ctx.Cookie("user_id")
@@ -160,11 +166,15 @@ func USInit(ctx *gin.Context) {
 	ret(user)
 }
 
+func IsAdmin(user_group int) bool {
+	return (user_group == USAdmin || user_group == USRoot)
+}
+
 // 根据 session 中的 user_group 判断是否是管理
 func ISAdmin(ctx *gin.Context) bool {
 	sess := sessions.Default(ctx)
-	user_group, err := sess.Get("user_group").(int)
-	return err && (user_group == USAdmin || user_group == USRoot)
+	user_group, ok := sess.Get("user_group").(int)
+	return ok && IsAdmin(user_group)
 }
 
 // 从 session 中获取 userid

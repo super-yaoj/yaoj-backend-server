@@ -11,62 +11,65 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func PMCreate(ctx *gin.Context) {
+type PermCreateParam struct {
+	PermName string `body:"permission_name"`
+}
+
+func PermCreate(ctx *gin.Context, param PermCreateParam) {
 	if !ISAdmin(ctx) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
-	name := ctx.PostForm("permission_name")
-	if len(name) > 190 {
+	if len(param.PermName) > 190 {
 		libs.APIWriteBack(ctx, 400, "permission name is too long", nil)
 		return
 	}
-	id, err := internal.PMCreate(name)
+	id, err := internal.PMCreate(param.PermName)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	} else {
-		libs.APIWriteBack(ctx, 200, "", map[string]any{"permission_id": id})
+		libs.APIWriteBack(ctx, 200, "", gin.H{"permission_id": id})
 	}
 }
 
-func PMChangeName(ctx *gin.Context) {
+type PermRenameParam struct {
+	PermID   int    `body:"permission_id" binding:"required"`
+	PermName string `body:"permission_name"`
+}
+
+func PermRename(ctx *gin.Context, param PermRenameParam) {
 	if !ISAdmin(ctx) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
-	id, ok := libs.PostInt(ctx, "permission_id")
-	if !ok {
-		return
-	}
-	name := ctx.PostForm("permission_name")
-	if len(name) > 190 {
+	if len(param.PermName) > 190 {
 		libs.APIWriteBack(ctx, 400, "permission name is too long", nil)
 		return
 	}
-	if !internal.PMExists(id) {
+	if !internal.PMExists(param.PermID) {
 		libs.APIWriteBack(ctx, 400, "no such permission id", nil)
 		return
 	}
-	err := internal.PMChangeName(id, name)
+	err := internal.PMChangeName(param.PermID, param.PermName)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	}
 }
 
-func PMDelete(ctx *gin.Context) {
+type PermDelParam struct {
+	PermID int `query:"permission_id" binding:"required"`
+}
+
+func PermDel(ctx *gin.Context, param PermDelParam) {
 	if !ISAdmin(ctx) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
-	id, ok := libs.GetInt(ctx, "permission_id")
-	if !ok {
-		return
-	}
-	if id == libs.DefaultGroup {
+	if param.PermID == libs.DefaultGroup {
 		libs.APIWriteBack(ctx, 400, "you cannot modify the default group", nil)
 		return
 	}
-	num, err := internal.PMDelete(id)
+	num, err := internal.PMDelete(param.PermID)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	} else if num != 1 {
@@ -76,55 +79,60 @@ func PMDelete(ctx *gin.Context) {
 	}
 }
 
-func PMQuery(ctx *gin.Context) {
+type PermGetParam struct {
+	PageSize int  `query:"pagesize" binding:"required"`
+	Left     *int `query:"left"`
+	Right    *int `query:"right"`
+}
+
+func PermGet(ctx *gin.Context, param PermGetParam) {
 	if !ISAdmin(ctx) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
-	pagesize, ok := libs.GetIntRange(ctx, "pagesize", 1, 100)
-	if !ok {
+	if param.PageSize < 1 || param.PageSize > 100 {
 		return
 	}
-	_, isleft := ctx.GetQuery("left")
-	bound, ok := libs.GetInt(ctx, libs.If(isleft, "left", "right"))
-	if !ok {
+	var bound int
+	if param.Left != nil {
+		bound = *param.Left
+	} else if param.Right != nil {
+		bound = *param.Right
+	} else {
 		return
 	}
-	p, isfull, err := internal.PMQuery(bound, pagesize, isleft)
+	p, isfull, err := internal.PMQuery(bound, param.PageSize, param.Left != nil)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	} else {
-		libs.APIWriteBack(ctx, 200, "", map[string]any{"isfull": isfull, "data": p})
+		libs.APIWriteBack(ctx, 200, "", gin.H{"isfull": isfull, "data": p})
 	}
 }
 
-func PMQueryUser(ctx *gin.Context) {
-	_, ok := ctx.GetQuery("permission_id")
-	if ok {
+type PermGetUserParam struct {
+	PermID    *int `query:"permission_id"`
+	UserID    int  `query:"user_id"`
+	CurUserID int  `session:"user_id"`
+}
+
+func PermGetUser(ctx *gin.Context, param PermGetUserParam) {
+	if param.PermID != nil {
 		if !ISAdmin(ctx) {
 			libs.APIWriteBack(ctx, 403, "", nil)
 			return
 		}
-		id, ok := libs.GetInt(ctx, "permission_id")
-		if !ok {
-			return
-		}
-		users, err := internal.PMQueryUser(id)
+		users, err := internal.PMQueryUser(*param.PermID)
 		if err != nil {
 			libs.APIInternalError(ctx, err)
 		} else {
 			libs.APIWriteBack(ctx, 200, "", map[string]any{"data": users})
 		}
 	} else {
-		id, ok := libs.GetInt(ctx, "user_id")
-		if !ok {
-			return
-		}
-		if !ISAdmin(ctx) && id != GetUserId(ctx) {
+		if !ISAdmin(ctx) && param.UserID != param.CurUserID {
 			libs.APIWriteBack(ctx, 403, "", nil)
 			return
 		}
-		permissions, err := internal.USQueryPermission(id)
+		permissions, err := internal.USQueryPermission(param.UserID)
 		if err != nil {
 			libs.APIInternalError(ctx, err)
 		} else {
@@ -133,26 +141,26 @@ func PMQueryUser(ctx *gin.Context) {
 	}
 }
 
-func PMAddUser(ctx *gin.Context) {
+type PermAddUserParam struct {
+	PermID  int    `body:"permission_id" binding:"required"`
+	UserIDs string `body:"user_ids"`
+}
+
+func PermAddUser(ctx *gin.Context, param PermAddUserParam) {
 	if !ISAdmin(ctx) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
-	id, ok := libs.PostInt(ctx, "permission_id")
-	if !ok {
-		return
-	}
-	str := ctx.PostForm("user_ids")
-	user_ids := strings.Split(str, ",")
+	user_ids := strings.Split(param.UserIDs, ",")
 	if len(user_ids) == 0 {
 		libs.APIWriteBack(ctx, 400, "there's no user", nil)
 		return
 	}
-	if id == libs.DefaultGroup {
+	if param.PermID == libs.DefaultGroup {
 		libs.APIWriteBack(ctx, 400, "you cannot modify the default group", nil)
 		return
 	}
-	if !internal.PMExists(id) {
+	if !internal.PMExists(param.PermID) {
 		libs.APIWriteBack(ctx, 400, "invalid request: permission id is wrong", nil)
 		return
 	}
@@ -166,7 +174,7 @@ func PMAddUser(ctx *gin.Context) {
 			return
 		}
 	}
-	real_ids, err := libs.DBSelectInts(fmt.Sprintf("select user_id from user_info where user_id in (%s) order by user_id", str))
+	real_ids, err := libs.DBSelectInts(fmt.Sprintf("select user_id from user_info where user_id in (%s) order by user_id", param.UserIDs))
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 		return
@@ -179,32 +187,32 @@ func PMAddUser(ctx *gin.Context) {
 		}
 	}
 	if len(invalid_ids) != 0 {
-		libs.APIWriteBack(ctx, 400, "invalid ids exist", map[string]any{"invalid_ids": invalid_ids})
+		libs.APIWriteBack(ctx, 400, "invalid ids exist", gin.H{"invalid_ids": invalid_ids})
 		return
 	}
-	res, err := internal.PMAddUser(real_ids, id)
+	res, err := internal.PMAddUser(real_ids, param.PermID)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	} else {
-		libs.APIWriteBack(ctx, 200, "", map[string]any{"affected": res})
+		libs.APIWriteBack(ctx, 200, "", gin.H{"affected": res})
 	}
 }
 
-func PMDeleteUser(ctx *gin.Context) {
+type PermDelUserParam struct {
+	PermID int `query:"permission_id" binding:"required"`
+	UserID int `query:"user_id" binding:"required"`
+}
+
+func PermDelUser(ctx *gin.Context, param PermDelUserParam) {
 	if !ISAdmin(ctx) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
-	pid, ok := libs.GetInt(ctx, "permission_id")
-	uid, ok1 := libs.GetInt(ctx, "user_id")
-	if !ok || !ok1 {
-		return
-	}
-	if pid == libs.DefaultGroup {
+	if param.PermID == libs.DefaultGroup {
 		libs.APIWriteBack(ctx, 400, "you cannot modify the default group", nil)
 		return
 	}
-	res, err := internal.PMDeleteUser(pid, uid)
+	res, err := internal.PMDeleteUser(param.PermID, param.UserID)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	} else if res != 1 {
