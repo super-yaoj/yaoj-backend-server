@@ -41,6 +41,7 @@ func RPCInternalError(ctx *gin.Context, err error) {
 	ctx.JSON(500, map[string]any{"_error": map[string]any{"code": -32603, "message": err.Error()}})
 }
 
+// 从 query 中获取对应字段的值
 func GetInt(ctx *gin.Context, name string) (int, bool) {
 	ret, err := strconv.Atoi(ctx.Query(name))
 	if err != nil {

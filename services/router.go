@@ -3,6 +3,7 @@ package services
 import (
 	"time"
 	"yao/libs"
+	"yao/service"
 
 	"github.com/gin-gonic/gin"
 )
@@ -22,10 +23,14 @@ var Router map[string][]Request = map[string][]Request{
 	"/Init":       {{"POST", USInit}},
 	"/UserLogin":  {{"POST", USLogin}},
 	"/UserLogout": {{"POST", USLogout}},
-	"/Rejudge":	   {{"POST", Rejudge}},
+	"/Rejudge":    {{"POST", Rejudge}},
 
-	"/user":             {{"GET", USQuery}, {"POST", USSignup}, {"PUT", USModify}, {"PATCH", USGroupEdit}},
-	"/captcha":          {{"GET", CaptchaImage}, {"POST", CaptchaId}, {"PATCH", ReloadCaptchaImage}},
+	"/user": {{"GET", USQuery}, {"POST", USSignup}, {"PUT", USModify}, {"PATCH", USGroupEdit}},
+	"/captcha": {
+		{"GET", service.GinHandler(CaptchaGet)},
+		{"POST", service.GinHandler(CaptchaPost)},
+		{"PATCH", service.GinHandler(CaptchaReload)},
+	},
 	"/permissions":      {{"GET", PMQuery}, {"POST", PMCreate}, {"PATCH", PMChangeName}, {"DELETE", PMDelete}},
 	"/user_permissions": {{"GET", PMQueryUser}, {"POST", PMAddUser}, {"DELETE", PMDeleteUser}},
 	"/users":            {{"GET", USList}},
@@ -36,11 +41,22 @@ var Router map[string][]Request = map[string][]Request{
 	"/blog_comments": {{"GET", BLGetComments}, {"POST", BLCreateComment}, {"DELETE", BLDeleteComment}},
 	"/announcements": {{"GET", ANQuery}, {"POST", ANCreate}, {"DELETE", ANDelete}},
 
-	"/problems":            {{"GET", PRList}},
-	"/problem":             {{"GET", PRQuery}, {"POST", PRCreate}, {"PATCH", PRModify}},
-	"/problem_permissions": {{"GET", PRGetPermissions}, {"POST", PRAddPermission}, {"DELETE", PRDeletePermission}},
-	"/problem_managers":    {{"GET", PRGetManagers}, {"POST", PRAddManager}, {"DELETE", PRDeleteManager}},
-	"/problem_data":        {{"GET", PRDownloadData}, {"PUT", PRPutData}},
+	"/problems": {{"GET", service.GinHandler(ProbList)}},
+	"/problem":  {{"GET", service.GinHandler(ProbGet)}, {"POST", PRCreate}, {"PATCH", service.GinHandler(ProbModify)}},
+	"/problem_permissions": {
+		{"GET", service.GinHandler(ProbGetPerm)},
+		{"POST", service.GinHandler(ProbAddPerm)},
+		{"DELETE", service.GinHandler(ProbDelPerm)},
+	},
+	"/problem_managers": {
+		{"GET", service.GinHandler(ProbGetMgr)},
+		{"POST", service.GinHandler(ProbAddMgr)},
+		{"DELETE", service.GinHandler(ProbDelMgr)},
+	},
+	"/problem_data": {
+		{"GET", service.GinHandler(ProbDownData)},
+		{"PUT", service.GinHandler(ProbPutData)},
+	},
 
 	"/contests":             {{"GET", CTList}},
 	"/contest":              {{"GET", CTQuery}, {"POST", CTCreate}, {"PATCH", CTModify}},
@@ -49,7 +65,7 @@ var Router map[string][]Request = map[string][]Request{
 	"/contest_participants": {{"GET", CTGetParticipants}, {"POST", CTSignup}, {"DELETE", CTSignout}},
 	"/contest_problems":     {{"GET", CTGetProblems}, {"POST", CTAddProblem}, {"DELETE", CTDeleteProblem}},
 
-	"/submissions":	{{"GET", SMList}},
+	"/submissions": {{"GET", SMList}},
 	"/submission":  {{"GET", SMQuery}, {"POST", SMSubmit}, {"DELETE", SMDelete}},
 	"/custom_test": {{"POST", SMCustomTest}},
 }

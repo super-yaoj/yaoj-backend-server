@@ -2,35 +2,47 @@ package services
 
 import (
 	"bytes"
-	"strconv"
 	"yao/libs"
 
 	"github.com/dchest/captcha"
 	"github.com/gin-gonic/gin"
 )
 
-func CaptchaId(ctx *gin.Context) {
-	len, err := strconv.Atoi(ctx.DefaultPostForm("length", "4"))
-	if err != nil || len < 1 || len > 10 {
+type CaptchaPostParam struct {
+	Length int `body:"length"`
+}
+
+func CaptchaPost(ctx *gin.Context, param CaptchaPostParam) {
+	// default value
+	if param.Length == 0 {
+		param.Length = 4
+	}
+	// len, err := strconv.Atoi(ctx.DefaultPostForm("length", "4"))
+	if param.Length < 1 || param.Length > 10 {
 		libs.APIWriteBack(ctx, 400, "invalid request", nil)
 		return
 	}
-	id := captcha.NewLen(len)
+	id := captcha.NewLen(param.Length)
 	libs.APIWriteBack(ctx, 200, "", map[string]any{"id": id})
 }
 
-func CaptchaImage(ctx *gin.Context) {
-	id := ctx.Query("id")
-	width, err := strconv.Atoi(ctx.DefaultQuery("width", "95"))
-	height, err1 := strconv.Atoi(ctx.DefaultQuery("height", "45"))
-	if err != nil || err1 != nil {
-		libs.APIWriteBack(ctx, 400, "invalid request", nil)
-		return
+type CaptchaGetParam struct {
+	ID     string `query:"id"`
+	Width  int    `query:"width"`
+	Height int    `query:"height"`
+}
+
+func CaptchaGet(ctx *gin.Context, param CaptchaGetParam) {
+	if param.Width == 0 {
+		param.Width = 95
+	}
+	if param.Height == 0 {
+		param.Height = 45
 	}
 	ctx.Header("Cache-Control", "no-cache, no-store, must-revalidate")
 
 	var content bytes.Buffer
-	err = captcha.WriteImage(&content, id, width, height)
+	err := captcha.WriteImage(&content, param.ID, param.Width, param.Height)
 	if err != nil {
 		libs.APIWriteBack(ctx, 400, err.Error(), nil)
 		return
@@ -38,9 +50,12 @@ func CaptchaImage(ctx *gin.Context) {
 	ctx.Data(200, "image/png", content.Bytes())
 }
 
-func ReloadCaptchaImage(ctx *gin.Context) {
-	id := ctx.PostForm("id")
-	if captcha.Reload(id) {
+type CaptchaReloadParam struct {
+	ID string `body:"id"`
+}
+
+func CaptchaReload(ctx *gin.Context, param CaptchaReloadParam) {
+	if captcha.Reload(param.ID) {
 		libs.APIWriteBack(ctx, 200, "", nil)
 	} else {
 		libs.APIWriteBack(ctx, 400, "id doesn't exist", nil)

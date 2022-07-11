@@ -11,6 +11,7 @@ import (
 	"yao/libs"
 
 	"github.com/gin-gonic/gin"
+	"github.com/k0kubun/pp"
 	"github.com/super-yaoj/yaoj-core/pkg/problem"
 )
 
@@ -66,18 +67,31 @@ func PRCanSee(ctx *gin.Context, problem_id, contest_id int) (bool, bool) {
 	return false, true
 }
 
-func PRList(ctx *gin.Context) {
-	user_id := GetUserId(ctx)
-	_, isleft := ctx.GetQuery("left")
-	pagesize, ok := libs.GetIntRange(ctx, "pagesize", 1, 100)
-	if !ok {
+type ProbListParam struct {
+	UserID   int  `session:"user_id"`
+	Left     *int `query:"left"`
+	Right    *int `query:"right"`
+	PageSize *int `query:"pagesize"`
+}
+
+func ProbList(ctx *gin.Context, param ProbListParam) {
+	if param.PageSize == nil {
 		return
 	}
-	bound, ok := libs.GetInt(ctx, libs.If(isleft, "left", "right"))
-	if !ok {
+	if *param.PageSize > 100 || *param.PageSize < 1 {
+		libs.APIWriteBack(ctx, 400, fmt.Sprintf("invalid request: parameter pagesize should be in [%d, %d]", 1, 100), nil)
 		return
 	}
-	problems, isfull, err := internal.PRList(bound, pagesize, user_id, isleft, ISAdmin(ctx))
+	var bound int
+	if param.Left == nil {
+		if param.Right == nil {
+			return
+		}
+		bound = *param.Right
+	} else {
+		bound = *param.Left
+	}
+	problems, isfull, err := internal.PRList(bound, *param.PageSize, param.UserID, param.Left != nil, ISAdmin(ctx))
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	} else {
@@ -98,21 +112,27 @@ func PRCreate(ctx *gin.Context) {
 	}
 }
 
-func PRQuery(ctx *gin.Context) {
-	problem_id, ok := libs.GetInt(ctx, "problem_id")
-	if !ok {
+// 查询问题
+type ProbGetParam struct {
+	ProbID  *int `query:"problem_id"`
+	CtstID  int  `query:"contest_id"`
+	UserID  int  `session:"user_id"`
+	UserGrp int  `session:"user_group"`
+}
+
+func ProbGet(ctx *gin.Context, param ProbGetParam) {
+	if param.ProbID == nil {
 		return
 	}
-	if !internal.PRExists(problem_id) {
+	if !internal.PRExists(*param.ProbID) {
 		libs.APIWriteBack(ctx, 404, "", nil)
 		return
 	}
-	in_contest, ok := PRCanSee(ctx, problem_id, libs.GetIntDefault(ctx, "contest_id", 0))
+	in_contest, ok := PRCanSee(ctx, *param.ProbID, param.CtstID)
 	if !ok {
 		return
 	}
-
-	prob, err := internal.PRQuery(problem_id, GetUserId(ctx))
+	prob, err := internal.PRQuery(*param.ProbID, param.UserID)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 		return
@@ -121,27 +141,31 @@ func PRQuery(ctx *gin.Context) {
 		prob.Tutorial_zh = ""
 		prob.Tutorial_en = ""
 	}
-	can_edit := PRCanEdit(ctx, problem_id)
+	can_edit := PRCanEdit(ctx, *param.ProbID)
 	if !can_edit {
 		prob.DataInfo = problem.DataInfo{}
 	}
 	libs.APIWriteBack(ctx, 200, "", map[string]any{"problem": *prob, "can_edit": can_edit})
 }
 
-func PRGetPermissions(ctx *gin.Context) {
-	problem_id, ok := libs.GetInt(ctx, "problem_id")
-	if !ok {
+// 获取题目权限
+type ProbGetPermParam struct {
+	ProbID *int `query:"problem_id"`
+}
+
+func ProbGetPerm(ctx *gin.Context, param ProbGetPermParam) {
+	if param.ProbID == nil {
 		return
 	}
-	if !internal.PRExists(problem_id) {
+	if !internal.PRExists(*param.ProbID) {
 		libs.APIWriteBack(ctx, 404, "", nil)
 		return
 	}
-	if !PRCanEdit(ctx, problem_id) {
+	if !PRCanEdit(ctx, *param.ProbID) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
-	pers, err := internal.PRGetPermissions(problem_id)
+	pers, err := internal.PRGetPermissions(*param.ProbID)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	} else {
@@ -149,66 +173,76 @@ func PRGetPermissions(ctx *gin.Context) {
 	}
 }
 
-func PRAddPermission(ctx *gin.Context) {
-	problem_id, ok := libs.PostInt(ctx, "problem_id")
-	if !ok {
+type ProbAddPermParam struct {
+	ProbID *int `body:"problem_id"`
+	PermID *int `body:"permission_id"`
+}
+
+func ProbAddPerm(ctx *gin.Context, param ProbAddPermParam) {
+	pp.Print(param)
+	if param.ProbID == nil {
 		return
 	}
-	permission_id, ok := libs.PostInt(ctx, "permission_id")
-	if !ok {
+	if param.PermID == nil {
 		return
 	}
-	if !internal.PRExists(problem_id) {
+	if !internal.PRExists(*param.ProbID) {
 		libs.APIWriteBack(ctx, 404, "", nil)
 		return
 	}
-	if !PRCanEdit(ctx, problem_id) {
+	if !PRCanEdit(ctx, *param.ProbID) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
-	if !internal.PMExists(permission_id) {
+	if !internal.PMExists(*param.PermID) {
 		libs.APIWriteBack(ctx, 400, "no such permission id", nil)
 		return
 	}
-	err := internal.PRAddPermission(problem_id, permission_id)
+	err := internal.PRAddPermission(*param.ProbID, *param.PermID)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	}
 }
 
-func PRDeletePermission(ctx *gin.Context) {
-	problem_id, ok := libs.GetInt(ctx, "problem_id")
-	if !ok {
+type ProbDelPermParam struct {
+	ProbID *int `query:"problem_id"`
+	PermID *int `query:"problem_id"`
+}
+
+func ProbDelPerm(ctx *gin.Context, param ProbDelPermParam) {
+	if param.ProbID == nil {
 		return
 	}
-	permission_id, ok := libs.GetInt(ctx, "permission_id")
-	if !ok {
+	if param.PermID == nil {
 		return
 	}
-	if !PRCanEdit(ctx, problem_id) {
+	if !PRCanEdit(ctx, *param.ProbID) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
-	err := internal.PRDeletePermission(problem_id, permission_id)
+	err := internal.PRDeletePermission(*param.ProbID, *param.PermID)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	}
 }
 
-func PRGetManagers(ctx *gin.Context) {
-	problem_id, ok := libs.GetInt(ctx, "problem_id")
-	if !ok {
+type ProbGetMgrParam struct {
+	ProbID *int `query:"problem_id"`
+}
+
+func ProbGetMgr(ctx *gin.Context, param ProbGetMgrParam) {
+	if param.ProbID == nil {
 		return
 	}
-	if !internal.PRExists(problem_id) {
+	if !internal.PRExists(*param.ProbID) {
 		libs.APIWriteBack(ctx, 404, "", nil)
 		return
 	}
-	if !PRCanEdit(ctx, problem_id) {
+	if !PRCanEdit(ctx, *param.ProbID) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
-	users, err := internal.PRGetManagers(problem_id)
+	users, err := internal.PRGetManagers(*param.ProbID)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	} else {
@@ -216,62 +250,71 @@ func PRGetManagers(ctx *gin.Context) {
 	}
 }
 
-func PRAddManager(ctx *gin.Context) {
-	problem_id, ok := libs.PostInt(ctx, "problem_id")
-	if !ok {
+type ProbAddMgrParam struct {
+	ProbID *int `body:"problem_id"`
+	UserID *int `body:"user_id"`
+}
+
+func ProbAddMgr(ctx *gin.Context, param ProbAddMgrParam) {
+	if param.ProbID == nil {
 		return
 	}
-	user_id, ok := libs.PostInt(ctx, "user_id")
-	if !ok {
+	if param.UserID == nil {
 		return
 	}
-	if !internal.PRExists(problem_id) {
+	if !internal.PRExists(*param.ProbID) {
 		libs.APIWriteBack(ctx, 404, "", nil)
 		return
 	}
-	if !PRCanEdit(ctx, problem_id) {
+	if !PRCanEdit(ctx, *param.ProbID) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
-	if !internal.USExists(user_id) {
+	if !internal.USExists(*param.UserID) {
 		libs.APIWriteBack(ctx, 400, "no such user id", nil)
 		return
 	}
-	err := internal.PRAddPermission(problem_id, -user_id)
+	err := internal.PRAddPermission(*param.ProbID, -*param.UserID)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	}
 }
 
-func PRDeleteManager(ctx *gin.Context) {
-	problem_id, ok := libs.GetInt(ctx, "problem_id")
-	if !ok {
+type ProbDelMgrParam struct {
+	ProbID *int `query:"problem_id"`
+	UserID *int `query:"user_id"`
+}
+
+func ProbDelMgr(ctx *gin.Context, param ProbDelMgrParam) {
+	if param.ProbID == nil {
 		return
 	}
-	user_id, ok := libs.GetInt(ctx, "user_id")
-	if !ok {
+	if param.UserID == nil {
 		return
 	}
-	if !PRCanEdit(ctx, problem_id) {
+	if !PRCanEdit(ctx, *param.ProbID) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
-	err := internal.PRDeletePermission(problem_id, -user_id)
+	err := internal.PRDeletePermission(*param.ProbID, -*param.UserID)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	}
 }
 
-func PRPutData(ctx *gin.Context) {
-	problem_id, ok := libs.PostInt(ctx, "problem_id")
-	if !ok {
+type ProbPutDataParam struct {
+	ProbID *int `body:"problem_id"`
+}
+
+func ProbPutData(ctx *gin.Context, param ProbPutDataParam) {
+	if param.ProbID == nil {
 		return
 	}
-	if !internal.PRExists(problem_id) {
+	if !internal.PRExists(*param.ProbID) {
 		libs.APIWriteBack(ctx, 404, "", nil)
 		return
 	}
-	if !PRCanEdit(ctx, problem_id) {
+	if !PRCanEdit(ctx, *param.ProbID) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
@@ -280,9 +323,9 @@ func PRPutData(ctx *gin.Context) {
 		libs.APIWriteBack(ctx, 400, err.Error(), nil)
 		return
 	}
-	ext := strings.Split(file.Filename, ".")
-	if ext[len(ext)-1] != "zip" {
-		libs.APIWriteBack(ctx, 400, "doesn't support file extension "+ext[len(ext)-1], nil)
+	ext := path.Ext(file.Filename)
+	if ext != ".zip" {
+		libs.APIWriteBack(ctx, 400, "doesn't support file extension "+ext, nil)
 		return
 	}
 
@@ -294,73 +337,79 @@ func PRPutData(ctx *gin.Context) {
 		return
 	}
 	log.Printf("file uploaded saves at %s", path.Join(tmpdir, "1.zip"))
-	err = internal.PRPutData(problem_id, tmpdir)
+	err = internal.PRPutData(*param.ProbID, tmpdir)
 	if err != nil {
 		libs.APIWriteBack(ctx, 400, err.Error(), nil)
 	}
 }
 
-func PRDownloadData(ctx *gin.Context) {
-	problem_id, ok := libs.GetInt(ctx, "problem_id")
-	if !ok {
+type ProbDownDataParam struct {
+	ProbID *int `query:"problem_id"`
+	CtstID int  `query:"contest_id"`
+}
+
+func ProbDownData(ctx *gin.Context, param ProbDownDataParam) {
+	if param.ProbID == nil {
 		return
 	}
-	if !internal.PRExists(problem_id) {
+	if !internal.PRExists(*param.ProbID) {
 		libs.APIWriteBack(ctx, 404, "", nil)
 		return
 	}
 	t := ctx.Query("type")
-	internal.ProblemRWLock.RLock(problem_id)
-	defer internal.ProblemRWLock.RUnlock(problem_id)
+	internal.ProblemRWLock.RLock(*param.ProbID)
+	defer internal.ProblemRWLock.RUnlock(*param.ProbID)
 	if t == "data" {
-		if !PRCanEdit(ctx, problem_id) {
+		if !PRCanEdit(ctx, *param.ProbID) {
 			libs.APIWriteBack(ctx, 403, "", nil)
 			return
 		}
-		path := internal.PRGetDataZip(problem_id)
+		path := internal.PRGetDataZip(*param.ProbID)
 		_, err := os.Stat(path)
 		if err != nil {
 			libs.APIWriteBack(ctx, 400, "no data", nil)
 		} else {
-			ctx.FileAttachment(path, fmt.Sprintf("problem_%d.zip", problem_id))
+			ctx.FileAttachment(path, fmt.Sprintf("problem_%d.zip", *param.ProbID))
 		}
 	} else {
-		contest_id := libs.GetIntDefault(ctx, "contest_id", 0)
-		_, ok := PRCanSee(ctx, problem_id, contest_id)
+		_, ok := PRCanSee(ctx, *param.ProbID, param.CtstID)
 		if !ok {
 			libs.APIWriteBack(ctx, 403, "", nil)
 			return
 		}
-		path := internal.PRGetSampleZip(problem_id)
+		path := internal.PRGetSampleZip(*param.ProbID)
 		_, err := os.Stat(path)
 		if err != nil {
 			libs.APIWriteBack(ctx, 400, "no data", nil)
 		} else {
-			ctx.FileAttachment(path, fmt.Sprintf("sample_%d.zip", problem_id))
+			ctx.FileAttachment(path, fmt.Sprintf("sample_%d.zip", *param.ProbID))
 		}
 	}
 }
 
-func PRModify(ctx *gin.Context) {
-	problem_id, ok := libs.PostInt(ctx, "problem_id")
-	if !ok {
+type ProbModifyParam struct {
+	ProbID *int   `body:"problem_id"`
+	Title  string `body:"title"`
+}
+
+func ProbModify(ctx *gin.Context, param ProbModifyParam) {
+	if param.ProbID == nil {
 		return
 	}
-	if !internal.PRExists(problem_id) {
+	if !internal.PRExists(*param.ProbID) {
 		libs.APIWriteBack(ctx, 404, "", nil)
 		return
 	}
-	if !PRCanEdit(ctx, problem_id) {
+	if !PRCanEdit(ctx, *param.ProbID) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
-	title := ctx.PostForm("title")
-	if strings.TrimSpace(title) == "" {
+	if strings.TrimSpace(param.Title) == "" {
 		libs.APIWriteBack(ctx, 400, "title cannot be blank", nil)
 		return
 	}
 
-	pro := internal.PRLoad(problem_id)
+	pro := internal.PRLoad(*param.ProbID)
 	length := len(pro.Statements)
 	fix := func(str string) string {
 		if len(str) > length {
@@ -373,7 +422,7 @@ func PRModify(ctx *gin.Context) {
 	}
 
 	var allow_down string
-	err := libs.DBSelectSingleColumn(&allow_down, "select allow_down from problems where problem_id=?", problem_id)
+	err := libs.DBSelectSingleColumn(&allow_down, "select allow_down from problems where problem_id=?", *param.ProbID)
 	if err != nil {
 		libs.APIWriteBack(ctx, 404, "", nil)
 		return
@@ -382,12 +431,12 @@ func PRModify(ctx *gin.Context) {
 	allow_down = fix(allow_down)
 	new_allow = fix(new_allow)
 	if allow_down != new_allow {
-		libs.DBUpdate("update problems set title=?, allow_down=? where problem_id=?", title, new_allow, problem_id)
-		err := internal.PRModifySample(problem_id, new_allow)
+		libs.DBUpdate("update problems set title=?, allow_down=? where problem_id=?", param.Title, new_allow, *param.ProbID)
+		err := internal.PRModifySample(*param.ProbID, new_allow)
 		if err != nil {
 			libs.APIInternalError(ctx, err)
 		}
 	} else {
-		libs.DBUpdate("update problems set title=? where problem_id=?", title, problem_id)
+		libs.DBUpdate("update problems set title=? where problem_id=?", param.Title, *param.ProbID)
 	}
 }
