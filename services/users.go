@@ -11,6 +11,13 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+const (
+	USBanned = 0
+	USNormal = 1
+	USAdmin  = 2
+	USRoot   = 3
+)
+
 func checkPU(ctx *gin.Context, name, password string) bool {
 	if !internal.ValidPassword(password) || !internal.ValidUsername(name) {
 		message := "invalid username"
@@ -40,7 +47,7 @@ func USSignup(ctx *gin.Context) {
 	if remember == "true" {
 		remember_token = libs.RandomString(32)
 	}
-	user_id, err := libs.DBInsertGetId("insert into user_info values (null, ?, ?, \"\", 0, ?, ?, 2, 0, \"\", \"\")", name, password, time.Now(), remember_token)
+	user_id, err := libs.DBInsertGetId("insert into user_info values (null, ?, ?, \"\", 0, ?, ?, ?, 0, \"\", \"\")", name, password, time.Now(), remember_token, USNormal)
 	if err != nil {
 		libs.APIWriteBack(ctx, 400, "username has been used by others", nil)
 		return
@@ -48,7 +55,7 @@ func USSignup(ctx *gin.Context) {
 	sess := sessions.Default(ctx)
 	sess.Set("user_id", int(user_id))
 	sess.Set("user_name", name)
-	sess.Set("user_group", 2)
+	sess.Set("user_group", USNormal)
 	libs.DBUpdate("insert into user_permissions values (?, ?)", user_id, libs.DefaultGroup)
 	libs.DBUpdate("update permissions set count = count + 1 where permission_id=1")
 	sess.Save()
@@ -73,7 +80,7 @@ func USLogin(ctx *gin.Context) {
 		libs.RPCWriteBack(ctx, 400, -32600, "username or password is wrong", nil)
 		return
 	}
-	if user.Usergroup == 3 {
+	if user.Usergroup == USBanned {
 		libs.RPCWriteBack(ctx, 400, -32600, "user is banned", nil)
 		return
 	}
@@ -105,7 +112,8 @@ func USLogout(ctx *gin.Context) {
 func USInit(ctx *gin.Context) {
 	sess := sessions.Default(ctx)
 	var ret func(internal.UserSmall) = func(user internal.UserSmall) {
-		if user.Usergroup == 3 {
+		fmt.Println(user)
+		if user.Usergroup == USBanned {
 			USLogout(ctx)
 			libs.RPCWriteBack(ctx, 400, -32600, "user is banned", nil)
 			return
@@ -114,7 +122,7 @@ func USInit(ctx *gin.Context) {
 	}
 
 	tmp, err := ctx.Cookie("user_id")
-	user := internal.UserSmall{Id: -1, Name: "", Usergroup: 2}
+	user := internal.UserSmall{Id: -1, Name: "", Usergroup: USNormal}
 	if err == nil {
 		id, err := strconv.Atoi(tmp)
 		remember_token, err1 := ctx.Cookie("remember_token")
@@ -142,7 +150,7 @@ func USInit(ctx *gin.Context) {
 func ISAdmin(ctx *gin.Context) bool {
 	sess := sessions.Default(ctx)
 	user_group, err := sess.Get("user_group").(int)
-	return err && user_group <= 1
+	return err && (user_group == USAdmin || user_group == USRoot)
 }
 
 func GetUserId(ctx *gin.Context) int {
@@ -224,12 +232,12 @@ func USGroupEdit(ctx *gin.Context) {
 	if !ok {
 		return
 	}
-	user_group, ok := libs.PostIntRange(ctx, "user_group", 1, 3)
+	user_group, ok := libs.PostIntRange(ctx, "user_group", USBanned, USAdmin)
 	if !ok {
 		return
 	}
 	cur_group, ok := sessions.Default(ctx).Get("user_group").(int)
-	if !ok || cur_group > 1 || cur_group >= user_group {
+	if !ok || !ISAdmin(ctx) || cur_group <= user_group {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
@@ -237,7 +245,7 @@ func USGroupEdit(ctx *gin.Context) {
 	if err != nil {
 		libs.APIWriteBack(ctx, 400, "no such user id", nil)
 		return
-	} else if target.Usergroup <= cur_group {
+	} else if target.Usergroup >= cur_group {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
