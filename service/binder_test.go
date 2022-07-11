@@ -43,8 +43,8 @@ func TestSessionBinder(t *testing.T) {
 	data := Data{}
 	getter := sessionGetter{data: map[string]any{
 		"color": []string{"a", "b", "c"},
-		"sum":   123123,
-		"aaa":   []int{1, 1, 4, 5, 1, 4},
+		// "sum":   123123,
+		"aaa": []int{1, 1, 4, 5, 1, 4},
 	}}
 	_, err := service.SessionBinder{Session: &getter}.Bind(reflect.ValueOf(&data), reflect.StructField{})
 	if err != nil {

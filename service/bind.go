@@ -13,16 +13,20 @@ import (
 )
 
 // Universal Web API Parameter Design
+//
 // 参数可能的来源：query, body, session, （后面三个尚未支持）uri, header, cookie
+//
 // 对于 body，会自动根据 ContentType 来解析字段，目前已支持：
 //
 //   application/x-www-form-urlencoded
 //   multipart/form-data
 //
 // session: github.com/gin-contrib/sessions
+//
 // 注意绑定 session 数据时字段（key）的类型必须为 string，且 session 中存的类型
 // 须与被绑定数据的类型完全一致
 //
+// 请注意用于绑定的数据尽量不要出现指针值（主要指 session）
 // T 为参数类型结构体
 type StdHandlerFunc[T any] func(ctx *gin.Context, param T)
 

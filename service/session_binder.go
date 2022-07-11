@@ -2,6 +2,7 @@ package service
 
 import (
 	"fmt"
+	"log"
 	"reflect"
 )
 
@@ -51,6 +52,7 @@ func (r SessionBinder) Bind(value reflect.Value, field reflect.StructField) (isS
 	if !ok || r.Session.Get(name) == nil {
 		return false, nil
 	}
+	log.Printf("session bind %s %q", value.Type(), field.Name)
 
 	sessVal := reflect.ValueOf(r.Session.Get(name))
 
