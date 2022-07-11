@@ -41,9 +41,13 @@ var Router map[string][]Request = map[string][]Request{
 		{"PUT", service.GinHandler(BlogEdit)},
 		{"DELETE", service.GinHandler(BlogDel)},
 	},
-	"/blogs":         {{"GET", service.GinHandler(BlogList)}},
-	"/likes":         {{"POST", service.GinHandler(ClickLike)}},
-	"/blog_comments": {{"GET", BLGetComments}, {"POST", BLCreateComment}, {"DELETE", BLDeleteComment}},
+	"/blogs": {{"GET", service.GinHandler(BlogList)}},
+	"/likes": {{"POST", service.GinHandler(ClickLike)}},
+	"/blog_comments": {
+		{"GET", service.GinHandler(BlogCmntGet)},
+		{"POST", service.GinHandler(BlogCmntCreate)},
+		{"DELETE", service.GinHandler(BlogCmntDel)},
+	},
 	"/announcements": {
 		{"GET", service.GinHandler(AnceGet)},
 		{"POST", service.GinHandler(AnceCreate)},

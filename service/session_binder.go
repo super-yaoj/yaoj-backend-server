@@ -55,11 +55,12 @@ func (r SessionBinder) Bind(value reflect.Value, field reflect.StructField) (isS
 	sessVal := reflect.ValueOf(r.Session.Get(name))
 
 	if value.Type() != sessVal.Type() {
-		return false, fmt.Errorf("error assign type %q with %q", value.Type().String(), sessVal.Type().String())
+		isSet, err = false, fmt.Errorf("error assign type %q with %q", value.Type().String(), sessVal.Type().String())
+	} else {
+		// ptrSessVal := reflect.New(sessVal.Type())
+		// ptrSessVal.Elem().Set(sessVal)
+		value.Set(sessVal)
+		isSet = true
 	}
-	// ptrSessVal := reflect.New(sessVal.Type())
-	// ptrSessVal.Elem().Set(sessVal)
-
-	value.Set(sessVal)
 	return
 }

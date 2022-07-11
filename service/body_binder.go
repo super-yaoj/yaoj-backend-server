@@ -9,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// 支持 "required"
 type BodyBinder struct {
 	ctx *gin.Context
 }
