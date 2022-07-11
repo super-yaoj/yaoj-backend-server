@@ -71,14 +71,11 @@ type ProbListParam struct {
 	UserID   int  `session:"user_id"`
 	Left     *int `query:"left"`
 	Right    *int `query:"right"`
-	PageSize *int `query:"pagesize"`
+	PageSize int  `query:"pagesize" binding:"required"`
 }
 
 func ProbList(ctx *gin.Context, param ProbListParam) {
-	if param.PageSize == nil {
-		return
-	}
-	if *param.PageSize > 100 || *param.PageSize < 1 {
+	if param.PageSize > 100 || param.PageSize < 1 {
 		libs.APIWriteBack(ctx, 400, fmt.Sprintf("invalid request: parameter pagesize should be in [%d, %d]", 1, 100), nil)
 		return
 	}
@@ -90,7 +87,7 @@ func ProbList(ctx *gin.Context, param ProbListParam) {
 	} else {
 		return
 	}
-	problems, isfull, err := internal.PRList(bound, *param.PageSize, param.UserID, param.Left != nil, ISAdmin(ctx))
+	problems, isfull, err := internal.PRList(bound, param.PageSize, param.UserID, param.Left != nil, ISAdmin(ctx))
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	} else {
@@ -113,25 +110,22 @@ func PRCreate(ctx *gin.Context) {
 
 // 查询问题
 type ProbGetParam struct {
-	ProbID  *int `query:"problem_id"`
-	CtstID  int  `query:"contest_id"`
-	UserID  int  `session:"user_id"`
-	UserGrp int  `session:"user_group"`
+	ProbID  int `query:"problem_id" binding:"required"`
+	CtstID  int `query:"contest_id"`
+	UserID  int `session:"user_id"`
+	UserGrp int `session:"user_group"`
 }
 
 func ProbGet(ctx *gin.Context, param ProbGetParam) {
-	if param.ProbID == nil {
-		return
-	}
-	if !internal.PRExists(*param.ProbID) {
+	if !internal.PRExists(param.ProbID) {
 		libs.APIWriteBack(ctx, 404, "", nil)
 		return
 	}
-	in_contest, ok := PRCanSee(ctx, *param.ProbID, param.CtstID)
+	in_contest, ok := PRCanSee(ctx, param.ProbID, param.CtstID)
 	if !ok {
 		return
 	}
-	prob, err := internal.PRQuery(*param.ProbID, param.UserID)
+	prob, err := internal.PRQuery(param.ProbID, param.UserID)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 		return
@@ -140,7 +134,7 @@ func ProbGet(ctx *gin.Context, param ProbGetParam) {
 		prob.Tutorial_zh = ""
 		prob.Tutorial_en = ""
 	}
-	can_edit := PRCanEdit(ctx, *param.ProbID)
+	can_edit := PRCanEdit(ctx, param.ProbID)
 	if !can_edit {
 		prob.DataInfo = problem.DataInfo{}
 	}
@@ -149,22 +143,19 @@ func ProbGet(ctx *gin.Context, param ProbGetParam) {
 
 // 获取题目权限
 type ProbGetPermParam struct {
-	ProbID *int `query:"problem_id"`
+	ProbID int `query:"problem_id" binding:"required"`
 }
 
 func ProbGetPerm(ctx *gin.Context, param ProbGetPermParam) {
-	if param.ProbID == nil {
-		return
-	}
-	if !internal.PRExists(*param.ProbID) {
+	if !internal.PRExists(param.ProbID) {
 		libs.APIWriteBack(ctx, 404, "", nil)
 		return
 	}
-	if !PRCanEdit(ctx, *param.ProbID) {
+	if !PRCanEdit(ctx, param.ProbID) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
-	pers, err := internal.PRGetPermissions(*param.ProbID)
+	pers, err := internal.PRGetPermissions(param.ProbID)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	} else {
@@ -204,44 +195,35 @@ func ProbAddPerm(ctx *gin.Context, param ProbAddPermParam) {
 }
 
 type ProbDelPermParam struct {
-	ProbID *int `query:"problem_id"`
-	PermID *int `query:"problem_id"`
+	ProbID int `query:"problem_id" binding:"required"`
+	PermID int `query:"permission_id" binding:"required"`
 }
 
 func ProbDelPerm(ctx *gin.Context, param ProbDelPermParam) {
-	if param.ProbID == nil {
-		return
-	}
-	if param.PermID == nil {
-		return
-	}
-	if !PRCanEdit(ctx, *param.ProbID) {
+	if !PRCanEdit(ctx, param.ProbID) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
-	err := internal.PRDeletePermission(*param.ProbID, *param.PermID)
+	err := internal.PRDeletePermission(param.ProbID, param.PermID)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	}
 }
 
 type ProbGetMgrParam struct {
-	ProbID *int `query:"problem_id"`
+	ProbID int `query:"problem_id" binding:"required"`
 }
 
 func ProbGetMgr(ctx *gin.Context, param ProbGetMgrParam) {
-	if param.ProbID == nil {
-		return
-	}
-	if !internal.PRExists(*param.ProbID) {
+	if !internal.PRExists(param.ProbID) {
 		libs.APIWriteBack(ctx, 404, "", nil)
 		return
 	}
-	if !PRCanEdit(ctx, *param.ProbID) {
+	if !PRCanEdit(ctx, param.ProbID) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
-	users, err := internal.PRGetManagers(*param.ProbID)
+	users, err := internal.PRGetManagers(param.ProbID)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	} else {
@@ -280,22 +262,16 @@ func ProbAddMgr(ctx *gin.Context, param ProbAddMgrParam) {
 }
 
 type ProbDelMgrParam struct {
-	ProbID *int `query:"problem_id"`
-	UserID *int `query:"user_id"`
+	ProbID int `query:"problem_id" binding:"required"`
+	UserID int `query:"user_id" binding:"required"`
 }
 
 func ProbDelMgr(ctx *gin.Context, param ProbDelMgrParam) {
-	if param.ProbID == nil {
-		return
-	}
-	if param.UserID == nil {
-		return
-	}
-	if !PRCanEdit(ctx, *param.ProbID) {
+	if !PRCanEdit(ctx, param.ProbID) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
-	err := internal.PRDeletePermission(*param.ProbID, -*param.UserID)
+	err := internal.PRDeletePermission(param.ProbID, -param.UserID)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	}
@@ -343,45 +319,42 @@ func ProbPutData(ctx *gin.Context, param ProbPutDataParam) {
 }
 
 type ProbDownDataParam struct {
-	ProbID *int `query:"problem_id"`
-	CtstID int  `query:"contest_id"`
+	ProbID int `query:"problem_id" binding:"required"`
+	CtstID int `query:"contest_id"`
 }
 
 func ProbDownData(ctx *gin.Context, param ProbDownDataParam) {
-	if param.ProbID == nil {
-		return
-	}
-	if !internal.PRExists(*param.ProbID) {
+	if !internal.PRExists(param.ProbID) {
 		libs.APIWriteBack(ctx, 404, "", nil)
 		return
 	}
 	t := ctx.Query("type")
-	internal.ProblemRWLock.RLock(*param.ProbID)
-	defer internal.ProblemRWLock.RUnlock(*param.ProbID)
+	internal.ProblemRWLock.RLock(param.ProbID)
+	defer internal.ProblemRWLock.RUnlock(param.ProbID)
 	if t == "data" {
-		if !PRCanEdit(ctx, *param.ProbID) {
+		if !PRCanEdit(ctx, param.ProbID) {
 			libs.APIWriteBack(ctx, 403, "", nil)
 			return
 		}
-		path := internal.PRGetDataZip(*param.ProbID)
+		path := internal.PRGetDataZip(param.ProbID)
 		_, err := os.Stat(path)
 		if err != nil {
 			libs.APIWriteBack(ctx, 400, "no data", nil)
 		} else {
-			ctx.FileAttachment(path, fmt.Sprintf("problem_%d.zip", *param.ProbID))
+			ctx.FileAttachment(path, fmt.Sprintf("problem_%d.zip", param.ProbID))
 		}
 	} else {
-		_, ok := PRCanSee(ctx, *param.ProbID, param.CtstID)
+		_, ok := PRCanSee(ctx, param.ProbID, param.CtstID)
 		if !ok {
 			libs.APIWriteBack(ctx, 403, "", nil)
 			return
 		}
-		path := internal.PRGetSampleZip(*param.ProbID)
+		path := internal.PRGetSampleZip(param.ProbID)
 		_, err := os.Stat(path)
 		if err != nil {
 			libs.APIWriteBack(ctx, 400, "no data", nil)
 		} else {
-			ctx.FileAttachment(path, fmt.Sprintf("sample_%d.zip", *param.ProbID))
+			ctx.FileAttachment(path, fmt.Sprintf("sample_%d.zip", param.ProbID))
 		}
 	}
 }

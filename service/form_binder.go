@@ -1,14 +1,17 @@
 package service
 
 import (
+	"fmt"
 	"log"
 	"reflect"
+	"strings"
 )
 
 // https://stackoverflow.com/questions/724526/how-to-pass-multiple-parameters-in-a-querystring
 type FormBinder map[string][]string
 
 // 注意不支持 map, array！
+// 支持 required
 func (r FormBinder) Bind(value reflect.Value, field reflect.StructField) (isSet bool, err error) {
 	log.Printf("form bind %s %q", value.Type(), field.Name)
 	if value.Kind() == reflect.Pointer {
@@ -46,12 +49,12 @@ func (r FormBinder) Bind(value reflect.Value, field reflect.StructField) (isSet 
 			if err != nil {
 				return false, err
 			}
-
 		}
 		return isSet, nil
 	}
 
 	name, ok := field.Tag.Lookup("query")
+	bindOpt, _ := field.Tag.Lookup("binding")
 	if !ok || r[name] == nil || len(r[name]) == 0 {
 		return false, nil
 	}
@@ -65,11 +68,17 @@ func (r FormBinder) Bind(value reflect.Value, field reflect.StructField) (isSet 
 		if err != nil {
 			return false, err
 		}
-		return isSet, nil
+		if strings.Contains(bindOpt, "required") && !isSet {
+			err = fmt.Errorf("field %q of type %q required but not binded", field.Name, value.Type())
+		}
+		return isSet, err
 	}
 	isSet, err = BasicBinder(r[name][0]).Bind(value)
 	if err != nil {
 		return false, err
 	}
-	return isSet, nil
+	if strings.Contains(bindOpt, "required") && !isSet {
+		err = fmt.Errorf("field %q of type %q required but not binded", field.Name, value.Type())
+	}
+	return isSet, err
 }
