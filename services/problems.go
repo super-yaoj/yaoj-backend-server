@@ -83,13 +83,12 @@ func ProbList(ctx *gin.Context, param ProbListParam) {
 		return
 	}
 	var bound int
-	if param.Left == nil {
-		if param.Right == nil {
-			return
-		}
+	if param.Left != nil {
+		bound = *param.Left
+	} else if param.Right != nil {
 		bound = *param.Right
 	} else {
-		bound = *param.Left
+		return
 	}
 	problems, isfull, err := internal.PRList(bound, *param.PageSize, param.UserID, param.Left != nil, ISAdmin(ctx))
 	if err != nil {

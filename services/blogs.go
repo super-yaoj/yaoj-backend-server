@@ -1,6 +1,7 @@
 package services
 
 import (
+	"fmt"
 	"yao/internal"
 	"yao/libs"
 
@@ -27,19 +28,22 @@ func BLCanEdit(ctx *gin.Context, blog_id int) bool {
 	}
 }
 
-func BLCreate(ctx *gin.Context) {
-	user_id := GetUserId(ctx)
-	private, ok := libs.PostIntRange(ctx, "private", 0, 1)
-	if !ok {
+type BlogCreateParam struct {
+	UserID  int    `session:"user_id"`
+	Private *int   `body:"private"`
+	Title   string `body:"title"`
+	Content string `body:"content"`
+}
+
+func BlogCreate(ctx *gin.Context, param BlogCreateParam) {
+	if param.Private == nil {
 		return
 	}
-	title := ctx.PostForm("title")
-	if !internal.BLValidTitle(title) {
+	if !internal.BLValidTitle(param.Title) {
 		libs.APIWriteBack(ctx, 400, "invalid title", nil)
 		return
 	}
-	content := ctx.PostForm("content")
-	id, err := internal.BLCreate(user_id, private, title, content)
+	id, err := internal.BLCreate(param.UserID, *param.Private, param.Title, param.Content)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	} else {
@@ -47,12 +51,15 @@ func BLCreate(ctx *gin.Context) {
 	}
 }
 
-func BLEdit(ctx *gin.Context) {
-	id, ok := libs.PostInt(ctx, "blog_id")
-	if !ok {
+type BlogEditParam struct {
+	BlogID *int `body:"blog_id"`
+}
+
+func BlogEdit(ctx *gin.Context, param BlogEditParam) {
+	if param.BlogID == nil {
 		return
 	}
-	if !internal.BLExists(id) {
+	if !internal.BLExists(*param.BlogID) {
 		libs.APIWriteBack(ctx, 404, "", nil)
 		return
 	}
@@ -60,7 +67,7 @@ func BLEdit(ctx *gin.Context) {
 	if !ok {
 		return
 	}
-	if !BLCanEdit(ctx, id) {
+	if !BLCanEdit(ctx, *param.BlogID) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
@@ -70,41 +77,48 @@ func BLEdit(ctx *gin.Context) {
 		return
 	}
 	content := ctx.PostForm("content")
-	err := internal.BLEdit(id, private, title, content)
+	err := internal.BLEdit(*param.BlogID, private, title, content)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	}
 }
 
-func BLDelete(ctx *gin.Context) {
-	id, ok := libs.GetInt(ctx, "blog_id")
-	if !ok {
+type BlogDelParam struct {
+	BlogID *int `query:"blog_id"`
+}
+
+func BlogDel(ctx *gin.Context, param BlogDelParam) {
+	if param.BlogID == nil {
 		return
 	}
-	if !BLCanEdit(ctx, id) {
+	if !BLCanEdit(ctx, *param.BlogID) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
-	err := internal.BLDelete(id)
+	err := internal.BLDelete(*param.BlogID)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	}
 }
 
-func BLQuery(ctx *gin.Context) {
-	id, ok := libs.GetInt(ctx, "blog_id")
-	if !ok {
+type BlogGetParam struct {
+	BlogID *int `query:"blog_id"`
+	UserID int  `session:"user_id"`
+}
+
+func BlogGet(ctx *gin.Context, param BlogGetParam) {
+	if param.BlogID == nil {
 		return
 	}
-	if !internal.BLExists(id) {
+	if !internal.BLExists(*param.BlogID) {
 		libs.APIWriteBack(ctx, 404, "", nil)
 		return
 	}
-	if !BLCanSee(ctx, id) {
+	if !BLCanSee(ctx, *param.BlogID) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
-	blog, err := internal.BLQuery(id, GetUserId(ctx))
+	blog, err := internal.BLQuery(*param.BlogID, param.UserID)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	} else {
@@ -113,30 +127,35 @@ func BLQuery(ctx *gin.Context) {
 	}
 }
 
-func BLList(ctx *gin.Context) {
-	_, is_user := ctx.GetQuery("user_id")
-	if is_user {
-		user_id, ok := libs.GetInt(ctx, "user_id")
-		if !ok {
-			return
-		}
-		blogs, err := internal.BLListUser(user_id, GetUserId(ctx))
+type BlogListParam struct {
+	UserID   *int `query:"user_id"`
+	Left     *int `query:"left"`
+	Right    *int `query:"right"`
+	PageSize *int `query:"pagesize"`
+}
+
+func BlogList(ctx *gin.Context, param BlogListParam) {
+	if param.UserID != nil {
+		blogs, err := internal.BLListUser(*param.UserID, GetUserId(ctx))
 		if err != nil {
 			libs.APIInternalError(ctx, err)
 		} else {
 			libs.APIWriteBack(ctx, 200, "", map[string]any{"data": blogs})
 		}
 	} else {
-		pagesize, ok := libs.GetIntRange(ctx, "pagesize", 1, 100)
-		if !ok {
+		if param.PageSize == nil || *param.PageSize > 100 || *param.PageSize < 1 {
+			libs.APIWriteBack(ctx, 400, fmt.Sprintf("invalid request: parameter pagesize should be in [%d, %d]", 1, 100), nil)
 			return
 		}
-		_, isleft := ctx.GetQuery("left")
-		bound, ok := libs.GetInt(ctx, libs.If(isleft, "left", "right"))
-		if !ok {
+		var bound int
+		if param.Left != nil {
+			bound = *param.Left
+		} else if param.Right != nil {
+			bound = *param.Right
+		} else {
 			return
 		}
-		blogs, isfull, err := internal.BLListAll(bound, pagesize, GetUserId(ctx), isleft, ISAdmin(ctx))
+		blogs, isfull, err := internal.BLListAll(bound, *param.PageSize, GetUserId(ctx), param.Left != nil, ISAdmin(ctx))
 		if err != nil {
 			libs.APIInternalError(ctx, err)
 			return

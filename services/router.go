@@ -35,8 +35,13 @@ var Router map[string][]Request = map[string][]Request{
 	"/user_permissions": {{"GET", PMQueryUser}, {"POST", PMAddUser}, {"DELETE", PMDeleteUser}},
 	"/users":            {{"GET", USList}},
 
-	"/blog":          {{"GET", BLQuery}, {"POST", BLCreate}, {"PUT", BLEdit}, {"DELETE", BLDelete}},
-	"/blogs":         {{"GET", BLList}},
+	"/blog": {
+		{"GET", service.GinHandler(BlogGet)},
+		{"POST", service.GinHandler(BlogCreate)},
+		{"PUT", service.GinHandler(BlogEdit)},
+		{"DELETE", service.GinHandler(BlogDel)},
+	},
+	"/blogs":         {{"GET", service.GinHandler(BlogList)}},
 	"/likes":         {{"POST", service.GinHandler(ClickLike)}},
 	"/blog_comments": {{"GET", BLGetComments}, {"POST", BLCreateComment}, {"DELETE", BLDeleteComment}},
 	"/announcements": {
