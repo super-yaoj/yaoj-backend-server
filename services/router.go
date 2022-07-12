@@ -23,7 +23,7 @@ var Router map[string][]Request = map[string][]Request{
 	"/Init":       {{"POST", USInit}},
 	"/UserLogin":  {{"POST", service.GinHandler(UserLogin)}},
 	"/UserLogout": {{"POST", USLogout}},
-	"/Rejudge":    {{"POST", Rejudge}},
+	"/Rejudge":    {{"POST", service.GinHandler(Rejudge)}},
 
 	"/user": {
 		{"GET", service.GinHandler(UserGet)},
@@ -115,8 +115,12 @@ var Router map[string][]Request = map[string][]Request{
 		{"DELETE", service.GinHandler(CtstProbDel)},
 	},
 
-	"/submissions": {{"GET", SMList}},
-	"/submission":  {{"GET", SMQuery}, {"POST", SMSubmit}, {"DELETE", SMDelete}},
+	"/submissions": {{"GET", service.GinHandler(SubmList)}},
+	"/submission": {
+		{"GET", service.GinHandler(SubmGet)},
+		{"POST", service.GinHandler(SubmAdd)},
+		{"DELETE", service.GinHandler(SubmDel)},
+	},
 	"/custom_test": {{"POST", SMCustomTest}},
 }
 

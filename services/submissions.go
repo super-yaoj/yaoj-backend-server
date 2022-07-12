@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"strconv"
 	"time"
 	"yao/internal"
 	"yao/libs"
@@ -16,28 +15,35 @@ import (
 	"github.com/super-yaoj/yaoj-core/pkg/workflow"
 )
 
-func SMList(ctx *gin.Context) {
-	pagesize, ok := libs.GetIntRange(ctx, "pagesize", 1, 100)
-	if !ok {
-		return
-	}
-	problem_id := libs.GetIntDefault(ctx, "problem_id", 0)
-	contest_id := libs.GetIntDefault(ctx, "contest_id", 0)
-	submitter := libs.GetIntDefault(ctx, "submitter", 0)
-	user_id := GetUserId(ctx)
+type SubmListParam struct {
+	UserID   int  `session:"user_id"`
+	Left     *int `query:"left"`
+	Right    *int `query:"right"`
+	PageSize int  `query:"pagesize" binding:"required" validate:"gte=1,lte=100"`
+	ProbID   int  `query:"problem_id"`
+	CtstID   int  `query:"contest_id"`
+	Submtter int  `query:"submitter"`
+}
 
-	_, isleft := ctx.GetQuery("left")
-	bound, ok := libs.GetInt(ctx, libs.If(isleft, "left", "right"))
-	if !ok {
+func SubmList(ctx *gin.Context, param SubmListParam) {
+	var bound int
+	if param.Left != nil {
+		bound = *param.Left
+	} else if param.Right != nil {
+		bound = *param.Right
+	} else {
 		return
 	}
-	submissions, isfull, err := internal.SMList(bound, pagesize, user_id, submitter, problem_id, contest_id, isleft, ISAdmin(ctx))
+	submissions, isfull, err := internal.SMList(
+		bound, param.PageSize, param.UserID, param.Submtter, param.ProbID, param.CtstID,
+		param.Left != nil, ISAdmin(ctx),
+	)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 		return
 	}
 	//Modify scores to sample_scores when users are in pretest-only contests
-	contest_pretest, err := libs.DBSelectInts("select a.contest_id from ((select contest_id from contests where start_time<=? and end_time>=? and pretest=1) as a join (select contest_id from contest_participants where user_id=?) as b on a.contest_id=b.contest_id)", time.Now(), time.Now(), user_id)
+	contest_pretest, _ := libs.DBSelectInts("select a.contest_id from ((select contest_id from contests where start_time<=? and end_time>=? and pretest=1) as a join (select contest_id from contest_participants where user_id=?) as b on a.contest_id=b.contest_id)", time.Now(), time.Now(), param.UserID)
 	for key := range submissions {
 		if libs.HasElement(contest_pretest, submissions[key].ContestId) {
 			internal.SMPretestOnly(&submissions[key])
@@ -46,30 +52,28 @@ func SMList(ctx *gin.Context) {
 	libs.APIWriteBack(ctx, 200, "", map[string]any{"data": submissions, "isfull": isfull})
 }
 
-/*
-users can submit from a contest if and only if the contest is running and he takes part in the contest
-(only these submissions are contest submissions)
-*/
-func SMSubmit(ctx *gin.Context) {
-	user_id := GetUserId(ctx)
-	if user_id < 0 {
+type SubmAddParam struct {
+	UserID int `session:"user_id"`
+	ProbID int `body:"problem_id" binding:"required"`
+	CtstID int `body:"contest_id"`
+}
+
+// users can submit from a contest if and only if the contest is running and
+// he takes part in the contest (only these submissions are contest submissions)
+func SubmAdd(ctx *gin.Context, param SubmAddParam) {
+	if param.UserID <= 0 {
 		libs.APIWriteBack(ctx, 401, "", nil)
 		return
 	}
-	problem_id, ok := libs.PostInt(ctx, "problem_id")
-	if !ok {
-		return
-	}
-	contest_id := libs.PostIntDefault(ctx, "contest_id", 0)
-	in_contest, ok := PRCanSee(ctx, problem_id, contest_id)
+	in_contest, ok := PRCanSee(ctx, param.ProbID, param.CtstID)
 	if !ok {
 		return
 	}
 	if !in_contest {
-		contest_id = 0
+		param.CtstID = 0
 	}
 
-	pro := internal.PRLoad(problem_id)
+	pro := internal.PRLoad(param.ProbID)
 	if !internal.PRHasData(pro, "tests") {
 		libs.APIWriteBack(ctx, 400, "problem has no data", nil)
 		return
@@ -86,18 +90,16 @@ func SMSubmit(ctx *gin.Context) {
 	if sub == nil {
 		return
 	}
-	
+
 	w := bytes.NewBuffer(nil)
 	sub.DumpTo(w)
-	err := internal.SMCreate(user_id, problem_id, contest_id, language, w.Bytes(), preview)
+	err := internal.SMCreate(param.UserID, param.ProbID, param.CtstID, language, w.Bytes(), preview)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	}
 }
 
-/*
-When the submitted file is a zip file
-*/
+// When the submitted file is a zip file
 func parseZipFile(ctx *gin.Context, field string, config internal.SubmConfig) (problem.Submission, map[string]internal.ContentPreview, utils.LangTag) {
 	file, header, err := ctx.Request.FormFile(field)
 	if err != nil {
@@ -115,7 +117,7 @@ func parseZipFile(ctx *gin.Context, field string, config internal.SubmConfig) (p
 		libs.APIWriteBack(ctx, 400, "file too large", nil)
 		return nil, nil, 0
 	}
-	
+
 	w := bytes.NewBuffer(nil)
 	_, err = io.Copy(w, file)
 	if err != nil {
@@ -124,20 +126,20 @@ func parseZipFile(ctx *gin.Context, field string, config internal.SubmConfig) (p
 	}
 	ret, err := libs.UnzipMemory(w.Bytes())
 	if err != nil {
-		libs.APIWriteBack(ctx, 400, "invalid zip file: " + err.Error(), nil)
+		libs.APIWriteBack(ctx, 400, "invalid zip file: "+err.Error(), nil)
 		return nil, nil, 0
 	}
 	for name, val := range ret {
 		matched := ""
 		//find corresponding key
 		for key := range config {
-			if key == name || libs.StartsWith(name, key + ".") {
+			if key == name || libs.StartsWith(name, key+".") {
 				matched = key
 				break
 			}
 		}
 		if matched == "" {
-			libs.APIWriteBack(ctx, 400, "no field matches file name: " + name, nil)
+			libs.APIWriteBack(ctx, 400, "no field matches file name: "+name, nil)
 			return nil, nil, 0
 		}
 		//TODO: get language by file suffix
@@ -199,24 +201,22 @@ func parseMultiFiles(ctx *gin.Context, config internal.SubmConfig) (problem.Subm
 	return sub, preview, utils.LangTag(language)
 }
 
-/*
-Get previews of submitted contents
-*/
+// Get previews of submitted contents
 func getPreview(val []byte, mode utils.CtntType, lang utils.LangTag) internal.ContentPreview {
 	const preview_length = 256
-	ret := internal.ContentPreview{ Accepted: mode, Language: lang }
+	ret := internal.ContentPreview{Accepted: mode, Language: lang}
 	switch mode {
 	case utils.Cbinary:
-		if len(val) * 2 <= preview_length {
+		if len(val)*2 <= preview_length {
 			ret.Content = fmt.Sprintf("%X", val)
 		} else {
-			ret.Content = fmt.Sprintf("%X", val[: preview_length / 2]) + "..."
+			ret.Content = fmt.Sprintf("%X", val[:preview_length/2]) + "..."
 		}
 	case utils.Cplain:
 		if len(val) <= preview_length {
 			ret.Content = string(val)
 		} else {
-			ret.Content = string(val[: preview_length]) + "..."
+			ret.Content = string(val[:preview_length]) + "..."
 		}
 	case utils.Csource:
 		ret.Content = string(val)
@@ -224,16 +224,15 @@ func getPreview(val []byte, mode utils.CtntType, lang utils.LangTag) internal.Co
 	return ret
 }
 
-/*
-Query single submission, when user is in contests which score_private=true(i.e. cannot see full result),
-this function will delete extra information.
-*/
-func SMQuery(ctx *gin.Context) {
-	sid, ok := libs.GetInt(ctx, "submission_id")
-	if !ok {
-		return
-	}
-	ret, err := internal.SMQuery(sid)
+type SubmGetParam struct {
+	SubmID int `query:"submission_id" binding:"required"`
+	UserID int `session:"user_id"`
+}
+
+// Query single submission, when user is in contests which score_private=true
+// (i.e. cannot see full result), this function will delete extra information.
+func SubmGet(ctx *gin.Context, param SubmGetParam) {
+	ret, err := internal.SMQuery(param.SubmID)
 	if err != nil {
 		libs.APIWriteBack(ctx, 404, "", nil)
 		return
@@ -241,7 +240,7 @@ func SMQuery(ctx *gin.Context) {
 	//user cannot see submission details inside contests
 	by_problem := PRCanSeeWithoutContest(ctx, ret.ProblemId)
 	can_edit := SMCanEdit(ctx, ret.SubmissionBase)
-	if !can_edit && ret.Submitter != GetUserId(ctx) && !by_problem {
+	if !can_edit && ret.Submitter != param.UserID && !by_problem {
 		libs.APIWriteBack(ctx, 403, "", nil)
 	} else {
 		if !can_edit && !by_problem {
@@ -257,9 +256,9 @@ func SMQuery(ctx *gin.Context) {
 }
 
 func SMCustomTest(ctx *gin.Context) {
-	config := internal.SubmConfig {
+	config := internal.SubmConfig{
 		"source": {Langs: nil, Accepted: utils.Csource, Length: 64 * 1024},
-		"input": {Langs: nil, Accepted: utils.Cplain, Length: 10 * 1024 * 1024},
+		"input":  {Langs: nil, Accepted: utils.Cplain, Length: 10 * 1024 * 1024},
 	}
 	subm, _, _ := parseMultiFiles(ctx, config)
 	if subm == nil {
@@ -271,8 +270,8 @@ func SMCustomTest(ctx *gin.Context) {
 	if len(result) == 0 {
 		result, _ = json.Marshal(map[string]any{
 			"Memory": -1,
-			"Time": -1,
-			"Title": "Internal Error",
+			"Time":   -1,
+			"Title":  "Internal Error",
 		})
 	}
 	libs.APIWriteBack(ctx, 200, "", map[string]any{"result": string(result)})
@@ -282,12 +281,12 @@ func SMCanEdit(ctx *gin.Context, sub internal.SubmissionBase) bool {
 	return PRCanEdit(ctx, sub.ProblemId) || (sub.ContestId > 0 && CTCanEdit(ctx, sub.ContestId))
 }
 
-func SMDelete(ctx *gin.Context) {
-	id, ok := libs.GetInt(ctx, "submission_id")
-	if !ok {
-		return
-	}
-	sub, err := internal.SMGetBaseInfo(id)
+type SubmDelParam struct {
+	SubmID int `query:"submission_id" binding:"required"`
+}
+
+func SubmDel(ctx *gin.Context, param SubmDelParam) {
+	sub, err := internal.SMGetBaseInfo(param.SubmID)
 	if err != nil {
 		libs.APIWriteBack(ctx, 404, "", nil)
 		return
@@ -302,33 +301,27 @@ func SMDelete(ctx *gin.Context) {
 	}
 }
 
-func Rejudge(ctx *gin.Context) {
-	_, isprob := ctx.GetPostForm("problem_id")
-	if isprob {
-		problem_id, err := strconv.Atoi(ctx.PostForm("problem_id"))
-		if err != nil {
-			libs.RPCWriteBack(ctx, 400, -32600, "param problem_id isn't int", nil)
-			return
-		}
-		if !internal.PRExists(problem_id) {
+type RejudgeParam struct {
+	ProbID *int `body:"problem_id"`
+	SubmID int  `body:"submission_id"`
+}
+
+func Rejudge(ctx *gin.Context, param RejudgeParam) {
+	if param.ProbID != nil {
+		if !internal.PRExists(*param.ProbID) {
 			libs.RPCWriteBack(ctx, 404, -32600, "", nil)
 			return
 		}
-		if !PRCanEdit(ctx, problem_id) {
+		if !PRCanEdit(ctx, *param.ProbID) {
 			libs.RPCWriteBack(ctx, 403, -32600, "", nil)
 			return
 		}
-		err = internal.PRRejudge(problem_id)
+		err := internal.PRRejudge(*param.ProbID)
 		if err != nil {
 			libs.RPCInternalError(ctx, err)
 		}
 	} else {
-		submission_id, err := strconv.Atoi(ctx.PostForm("submission_id"))
-		if err != nil {
-			libs.RPCWriteBack(ctx, 400, -32600, "param submission_id isn't int", nil)
-			return
-		}
-		sub, err := internal.SMGetBaseInfo(submission_id)
+		sub, err := internal.SMGetBaseInfo(param.SubmID)
 		if err != nil {
 			libs.RPCWriteBack(ctx, 404, -32600, "", nil)
 			return
@@ -337,7 +330,7 @@ func Rejudge(ctx *gin.Context) {
 			libs.RPCWriteBack(ctx, 403, -32600, "", nil)
 			return
 		}
-		err = internal.SMRejudge(submission_id)
+		err = internal.SMRejudge(param.SubmID)
 		if err != nil {
 			libs.RPCInternalError(ctx, err)
 		}
