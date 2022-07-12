@@ -4,14 +4,15 @@ import (
 	"fmt"
 	"log"
 	"mime/multipart"
+	"net/http"
 	"os"
 	"path"
 	"strings"
 	"time"
 	"yao/internal"
 	"yao/libs"
+	"yao/service"
 
-	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"github.com/super-yaoj/yaoj-core/pkg/problem"
 )
@@ -58,13 +59,10 @@ args: contest_id=0 means not in contest
 
 return: (must see from contest, can see)
 */
-func PRCanSee(ctx *gin.Context, problem_id, contest_id int) (bool, bool) {
-	user_id := GetUserId(ctx)
-	sess := sessions.Default(ctx)
-	user_group, _ := sess.Get("user_group").(int)
+func PRCanSee(ctx Context, user_id, user_group, problem_id, contest_id int) (bool, bool) {
 	if !PRCanSeeWithoutContest(user_id, user_group, problem_id) {
 		if contest_id <= 0 || !PRCanSeeFromContest(user_id, user_group, problem_id, contest_id) {
-			libs.APIWriteBack(ctx, 403, "", nil)
+			ctx.JSONAPI(http.StatusForbidden, "", nil)
 			return false, false
 		}
 		return true, true
@@ -80,7 +78,7 @@ type ProbListParam struct {
 	PageSize int  `query:"pagesize" binding:"required" validate:"gte=1,lte=100"`
 }
 
-func ProbList(ctx *gin.Context, param ProbListParam) {
+func ProbList(ctx Context, param ProbListParam) {
 	var bound int
 	if param.Left != nil {
 		bound = *param.Left
@@ -93,9 +91,9 @@ func ProbList(ctx *gin.Context, param ProbListParam) {
 		bound, param.PageSize, param.UserID, param.Left != nil, libs.IsAdmin(param.UserGrp),
 	)
 	if err != nil {
-		libs.APIInternalError(ctx, err)
+		ctx.ErrorAPI(err)
 	} else {
-		libs.APIWriteBack(ctx, 200, "", map[string]any{"isfull": isfull, "data": problems})
+		ctx.JSONAPI(http.StatusOK, "", gin.H{"isfull": isfull, "data": problems})
 	}
 }
 
@@ -103,12 +101,12 @@ type ProbAddParam struct {
 	UserGrp int `session:"user_group" validate:"admin"`
 }
 
-func ProbAdd(ctx *gin.Context, param ProbAddParam) {
+func ProbAdd(ctx Context, param ProbAddParam) {
 	id, err := libs.DBInsertGetId(`insert into problems values (null, "New Problem", 0, "", "")`)
 	if err != nil {
-		libs.APIInternalError(ctx, err)
+		ctx.ErrorAPI(err)
 	} else {
-		libs.APIWriteBack(ctx, 200, "", gin.H{"id": id})
+		ctx.JSONAPI(http.StatusOK, "", gin.H{"id": id})
 	}
 }
 
@@ -120,18 +118,18 @@ type ProbGetParam struct {
 	UserGrp int `session:"user_group"`
 }
 
-func ProbGet(ctx *gin.Context, param ProbGetParam) {
+func ProbGet(ctx Context, param ProbGetParam) {
 	if !internal.PRExists(param.ProbID) {
-		libs.APIWriteBack(ctx, 404, "", nil)
+		ctx.JSONAPI(http.StatusNotFound, "", nil)
 		return
 	}
-	in_contest, ok := PRCanSee(ctx, param.ProbID, param.CtstID)
+	in_contest, ok := PRCanSee(ctx, param.UserID, param.UserGrp, param.ProbID, param.CtstID)
 	if !ok {
 		return
 	}
 	prob, err := internal.PRQuery(param.ProbID, param.UserID)
 	if err != nil {
-		libs.APIInternalError(ctx, err)
+		ctx.ErrorAPI(err)
 		return
 	}
 	if in_contest {
@@ -142,7 +140,7 @@ func ProbGet(ctx *gin.Context, param ProbGetParam) {
 	if !can_edit {
 		prob.DataInfo = problem.DataInfo{}
 	}
-	libs.APIWriteBack(ctx, 200, "", map[string]any{"problem": *prob, "can_edit": can_edit})
+	ctx.JSONAPI(200, "", map[string]any{"problem": *prob, "can_edit": can_edit})
 }
 
 // 获取题目权限
@@ -152,20 +150,20 @@ type ProbGetPermParam struct {
 	UserGrp int `session:"user_group"`
 }
 
-func ProbGetPerm(ctx *gin.Context, param ProbGetPermParam) {
+func ProbGetPerm(ctx Context, param ProbGetPermParam) {
 	if !internal.PRExists(param.ProbID) {
-		libs.APIWriteBack(ctx, 404, "", nil)
+		ctx.JSONAPI(404, "", nil)
 		return
 	}
 	if !PRCanEdit(param.UserID, param.UserGrp, param.ProbID) {
-		libs.APIWriteBack(ctx, 403, "", nil)
+		ctx.JSONAPI(403, "", nil)
 		return
 	}
 	pers, err := internal.PRGetPermissions(param.ProbID)
 	if err != nil {
-		libs.APIInternalError(ctx, err)
+		ctx.ErrorAPI(err)
 	} else {
-		libs.APIWriteBack(ctx, 200, "", map[string]any{"data": pers})
+		ctx.JSONAPI(200, "", map[string]any{"data": pers})
 	}
 }
 
@@ -176,22 +174,22 @@ type ProbAddPermParam struct {
 	UserGrp int `session:"user_group"`
 }
 
-func ProbAddPerm(ctx *gin.Context, param ProbAddPermParam) {
+func ProbAddPerm(ctx Context, param ProbAddPermParam) {
 	if !internal.PRExists(param.ProbID) {
-		libs.APIWriteBack(ctx, 404, "", nil)
+		ctx.JSONAPI(404, "", nil)
 		return
 	}
 	if !PRCanEdit(param.UserID, param.UserGrp, param.ProbID) {
-		libs.APIWriteBack(ctx, 403, "", nil)
+		ctx.JSONAPI(403, "", nil)
 		return
 	}
 	if !internal.PMExists(param.PermID) {
-		libs.APIWriteBack(ctx, 400, "no such permission id", nil)
+		ctx.JSONAPI(400, "no such permission id", nil)
 		return
 	}
 	err := internal.PRAddPermission(param.ProbID, param.PermID)
 	if err != nil {
-		libs.APIInternalError(ctx, err)
+		ctx.ErrorAPI(err)
 	}
 }
 
@@ -202,14 +200,14 @@ type ProbDelPermParam struct {
 	UserGrp int `session:"user_group"`
 }
 
-func ProbDelPerm(ctx *gin.Context, param ProbDelPermParam) {
+func ProbDelPerm(ctx Context, param ProbDelPermParam) {
 	if !PRCanEdit(param.UserID, param.UserGrp, param.ProbID) {
-		libs.APIWriteBack(ctx, 403, "", nil)
+		ctx.JSONAPI(403, "", nil)
 		return
 	}
 	err := internal.PRDeletePermission(param.ProbID, param.PermID)
 	if err != nil {
-		libs.APIInternalError(ctx, err)
+		ctx.ErrorAPI(err)
 	}
 }
 
@@ -219,20 +217,20 @@ type ProbGetMgrParam struct {
 	UserGrp int `session:"user_group"`
 }
 
-func ProbGetMgr(ctx *gin.Context, param ProbGetMgrParam) {
+func ProbGetMgr(ctx Context, param ProbGetMgrParam) {
 	if !internal.PRExists(param.ProbID) {
-		libs.APIWriteBack(ctx, 404, "", nil)
+		ctx.JSONAPI(404, "", nil)
 		return
 	}
 	if !PRCanEdit(param.UserID, param.UserGrp, param.ProbID) {
-		libs.APIWriteBack(ctx, 403, "", nil)
+		ctx.JSONAPI(403, "", nil)
 		return
 	}
 	users, err := internal.PRGetManagers(param.ProbID)
 	if err != nil {
-		libs.APIInternalError(ctx, err)
+		ctx.ErrorAPI(err)
 	} else {
-		libs.APIWriteBack(ctx, 200, "", map[string]any{"data": users})
+		ctx.JSONAPI(200, "", map[string]any{"data": users})
 	}
 }
 
@@ -243,22 +241,22 @@ type ProbAddMgrParam struct {
 	UserGrp   int `session:"user_group"`
 }
 
-func ProbAddMgr(ctx *gin.Context, param ProbAddMgrParam) {
+func ProbAddMgr(ctx Context, param ProbAddMgrParam) {
 	if !internal.PRExists(param.ProbID) {
-		libs.APIWriteBack(ctx, 404, "", nil)
+		ctx.JSONAPI(404, "", nil)
 		return
 	}
 	if !PRCanEdit(param.CurUserID, param.UserGrp, param.ProbID) {
-		libs.APIWriteBack(ctx, 403, "", nil)
+		ctx.JSONAPI(403, "", nil)
 		return
 	}
 	if !internal.USExists(param.UserID) {
-		libs.APIWriteBack(ctx, 400, "no such user id", nil)
+		ctx.JSONAPI(400, "no such user id", nil)
 		return
 	}
 	err := internal.PRAddPermission(param.ProbID, -param.UserID)
 	if err != nil {
-		libs.APIInternalError(ctx, err)
+		ctx.ErrorAPI(err)
 	}
 }
 
@@ -269,14 +267,14 @@ type ProbDelMgrParam struct {
 	UserGrp   int `session:"user_group"`
 }
 
-func ProbDelMgr(ctx *gin.Context, param ProbDelMgrParam) {
+func ProbDelMgr(ctx Context, param ProbDelMgrParam) {
 	if !PRCanEdit(param.CurUserID, param.UserGrp, param.ProbID) {
-		libs.APIWriteBack(ctx, 403, "", nil)
+		ctx.JSONAPI(403, "", nil)
 		return
 	}
 	err := internal.PRDeletePermission(param.ProbID, -param.UserID)
 	if err != nil {
-		libs.APIInternalError(ctx, err)
+		ctx.ErrorAPI(err)
 	}
 }
 
@@ -287,18 +285,18 @@ type ProbPutDataParam struct {
 	UserGrp int                   `session:"user_group"`
 }
 
-func ProbPutData(ctx *gin.Context, param ProbPutDataParam) {
+func ProbPutData(ctx Context, param ProbPutDataParam) {
 	if !internal.PRExists(param.ProbID) {
-		libs.APIWriteBack(ctx, 404, "", nil)
+		ctx.JSONAPI(404, "", nil)
 		return
 	}
 	if !PRCanEdit(param.UserID, param.UserGrp, param.ProbID) {
-		libs.APIWriteBack(ctx, 403, "", nil)
+		ctx.JSONAPI(403, "", nil)
 		return
 	}
 	ext := path.Ext(param.Data.Filename)
 	if ext != ".zip" {
-		libs.APIWriteBack(ctx, 400, "unsupported file extension "+ext, nil)
+		ctx.JSONAPI(400, "unsupported file extension "+ext, nil)
 		return
 	}
 
@@ -306,13 +304,13 @@ func ProbPutData(ctx *gin.Context, param ProbPutDataParam) {
 	defer os.RemoveAll(tmpdir)
 	err := ctx.SaveUploadedFile(param.Data, path.Join(tmpdir, "1.zip"))
 	if err != nil {
-		libs.APIInternalError(ctx, err)
+		ctx.ErrorAPI(err)
 		return
 	}
 	log.Printf("file uploaded saves at %s", path.Join(tmpdir, "1.zip"))
 	err = internal.PRPutData(param.ProbID, tmpdir)
 	if err != nil {
-		libs.APIWriteBack(ctx, 400, err.Error(), nil)
+		ctx.JSONAPI(400, err.Error(), nil)
 	}
 }
 
@@ -324,40 +322,42 @@ type ProbDownDataParam struct {
 	UserGrp  int    `session:"user_group"`
 }
 
-func ProbDownData(ctx *gin.Context, param ProbDownDataParam) {
+func ProbDownData(ctx Context, param ProbDownDataParam) {
 	if !internal.PRExists(param.ProbID) {
-		libs.APIWriteBack(ctx, 404, "", nil)
+		ctx.JSONAPI(404, "", nil)
 		return
 	}
 	internal.ProblemRWLock.RLock(param.ProbID)
 	defer internal.ProblemRWLock.RUnlock(param.ProbID)
 	if param.DataType == "data" {
 		if !PRCanEdit(param.UserID, param.UserGrp, param.ProbID) {
-			libs.APIWriteBack(ctx, 403, "", nil)
+			ctx.JSONAPI(403, "", nil)
 			return
 		}
 		path := internal.PRGetDataZip(param.ProbID)
 		_, err := os.Stat(path)
 		if err != nil {
-			libs.APIWriteBack(ctx, 400, "no data", nil)
+			ctx.JSONAPI(400, "no data", nil)
 		} else {
 			ctx.FileAttachment(path, fmt.Sprintf("problem_%d.zip", param.ProbID))
 		}
 	} else {
-		_, ok := PRCanSee(ctx, param.ProbID, param.CtstID)
+		_, ok := PRCanSee(ctx, param.UserID, param.UserGrp, param.ProbID, param.CtstID)
 		if !ok {
-			libs.APIWriteBack(ctx, 403, "", nil)
+			ctx.JSONAPI(403, "", nil)
 			return
 		}
 		path := internal.PRGetSampleZip(param.ProbID)
 		_, err := os.Stat(path)
 		if err != nil {
-			libs.APIWriteBack(ctx, 400, "no data", nil)
+			ctx.JSONAPI(400, "no data", nil)
 		} else {
 			ctx.FileAttachment(path, fmt.Sprintf("sample_%d.zip", param.ProbID))
 		}
 	}
 }
+
+type Context = service.Context
 
 type ProbModifyParam struct {
 	ProbID    int    `body:"problem_id" binding:"required"`
@@ -367,17 +367,17 @@ type ProbModifyParam struct {
 	UserGrp   int    `session:"user_group"`
 }
 
-func ProbModify(ctx *gin.Context, param ProbModifyParam) {
+func ProbModify(ctx Context, param ProbModifyParam) {
 	if !internal.PRExists(param.ProbID) {
-		libs.APIWriteBack(ctx, 404, "", nil)
+		ctx.JSONAPI(404, "", nil)
 		return
 	}
 	if !PRCanEdit(param.UserID, param.UserGrp, param.ProbID) {
-		libs.APIWriteBack(ctx, 403, "", nil)
+		ctx.JSONAPI(403, "", nil)
 		return
 	}
 	if strings.TrimSpace(param.Title) == "" {
-		libs.APIWriteBack(ctx, 400, "title cannot be blank", nil)
+		ctx.JSONAPI(400, "title cannot be blank", nil)
 		return
 	}
 
@@ -396,7 +396,7 @@ func ProbModify(ctx *gin.Context, param ProbModifyParam) {
 	var allow_down string
 	err := libs.DBSelectSingleColumn(&allow_down, "select allow_down from problems where problem_id=?", param.ProbID)
 	if err != nil {
-		libs.APIWriteBack(ctx, 404, "", nil)
+		ctx.JSONAPI(404, "", nil)
 		return
 	}
 	allow_down = fix(allow_down)
@@ -405,7 +405,7 @@ func ProbModify(ctx *gin.Context, param ProbModifyParam) {
 		libs.DBUpdate("update problems set title=?, allow_down=? where problem_id=?", param.Title, new_allow, param.ProbID)
 		err := internal.PRModifySample(param.ProbID, new_allow)
 		if err != nil {
-			libs.APIInternalError(ctx, err)
+			ctx.ErrorAPI(err)
 		}
 	} else {
 		libs.DBUpdate("update problems set title=? where problem_id=?", param.Title, param.ProbID)

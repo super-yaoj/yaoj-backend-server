@@ -11,13 +11,13 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func checkPU(ctx *gin.Context, name, password string) bool {
+func checkPU(ctx Context, name, password string) bool {
 	if !internal.ValidPassword(password) || !internal.ValidUsername(name) {
 		message := "invalid username"
 		if !internal.ValidPassword(password) {
 			message = "invalid password"
 		}
-		libs.RPCWriteBack(ctx, 400, -32600, message, nil)
+		ctx.JSONRPC(400, -32600, message, nil)
 		return false
 	}
 	return true
@@ -31,12 +31,12 @@ type UserSignUpParam struct {
 	VerifyCode string `body:"verify_code"`
 }
 
-func UserSignUp(ctx *gin.Context, param UserSignUpParam) {
+func UserSignUp(ctx Context, param UserSignUpParam) {
 	if !checkPU(ctx, param.UserName, param.Passwd) {
 		return
 	}
 	if !VerifyCaptcha(param.VerifyID, param.VerifyCode) {
-		libs.APIWriteBack(ctx, 400, "verify code is wrong", nil)
+		ctx.JSONAPI(400, "verify code is wrong", nil)
 		return
 	}
 	password := internal.SaltPassword(param.Passwd)
@@ -49,10 +49,10 @@ func UserSignUp(ctx *gin.Context, param UserSignUpParam) {
 		param.UserName, password, time.Now(), remember_token, libs.USNormal,
 	)
 	if err != nil {
-		libs.APIWriteBack(ctx, 400, "username has been used by others", nil)
+		ctx.JSONAPI(400, "username has been used by others", nil)
 		return
 	}
-	sess := sessions.Default(ctx)
+	sess := sessions.Default(ctx.Context)
 	sess.Set("user_id", int(user_id))
 	sess.Set("user_name", param.UserName)
 	sess.Set("user_group", libs.USNormal)
@@ -60,10 +60,10 @@ func UserSignUp(ctx *gin.Context, param UserSignUpParam) {
 	libs.DBUpdate("update permissions set count = count + 1 where permission_id=1")
 	sess.Save()
 	if param.Memo == "true" {
-		libs.SetCookie(ctx, "user_id", fmt.Sprint(user_id), true)
-		libs.SetCookie(ctx, "remember_token", remember_token, true)
+		libs.SetCookie(ctx.Context, "user_id", fmt.Sprint(user_id), true)
+		libs.SetCookie(ctx.Context, "remember_token", remember_token, true)
 	}
-	libs.APIWriteBack(ctx, 200, "", nil)
+	ctx.JSONAPI(200, "", nil)
 }
 
 type UserLoginParam struct {
@@ -72,7 +72,7 @@ type UserLoginParam struct {
 	Memo     string `body:"remember"`
 }
 
-func UserLogin(ctx *gin.Context, param UserLoginParam) {
+func UserLogin(ctx Context, param UserLoginParam) {
 	if !checkPU(ctx, param.UserName, param.Passwd) {
 		return
 	}
@@ -83,48 +83,54 @@ func UserLogin(ctx *gin.Context, param UserLoginParam) {
 		param.UserName, password,
 	)
 	if err != nil {
-		libs.RPCWriteBack(ctx, 400, -32600, "username or password is wrong", nil)
+		ctx.JSONRPC(400, -32600, "username or password is wrong", nil)
 		return
 	}
 	if user.Usergroup == libs.USBanned {
-		libs.RPCWriteBack(ctx, 400, -32600, "user is banned", nil)
+		ctx.JSONRPC(400, -32600, "user is banned", nil)
 		return
 	}
-	sess := sessions.Default(ctx)
+	sess := sessions.Default(ctx.Context)
 	sess.Set("user_id", user.Id)
 	sess.Set("user_name", user.Name)
 	sess.Set("user_group", user.Usergroup)
 	sess.Save()
 	if param.Memo == "true" {
 		remember_token := libs.RandomString(32)
-		libs.SetCookie(ctx, "user_id", fmt.Sprint(user.Id), true)
-		libs.SetCookie(ctx, "remember_token", remember_token, true)
+		libs.SetCookie(ctx.Context, "user_id", fmt.Sprint(user.Id), true)
+		libs.SetCookie(ctx.Context, "remember_token", remember_token, true)
 		libs.DBUpdate("update user_info set remember_token=? where user_id=?", remember_token, user.Id)
 	}
-	libs.RPCWriteBack(ctx, 200, 0, "", nil)
+	ctx.JSONRPC(200, 0, "", nil)
 }
 
-func USLogout(ctx *gin.Context) {
-	libs.DeleteCookie(ctx, "user_id")
-	libs.DeleteCookie(ctx, "remember_token")
-	sess := sessions.Default(ctx)
+type UserLogoutParam struct {
+}
+
+func UserLogout(ctx Context, param UserLogoutParam) {
+	libs.DeleteCookie(ctx.Context, "user_id")
+	libs.DeleteCookie(ctx.Context, "remember_token")
+	sess := sessions.Default(ctx.Context)
 	sess.Delete("user_id")
 	sess.Delete("user_name")
 	sess.Delete("user_group")
 	sess.Save()
-	libs.RPCWriteBack(ctx, 200, 0, "", nil)
+	ctx.JSONRPC(200, 0, "", nil)
 }
 
-func USInit(ctx *gin.Context) {
-	sess := sessions.Default(ctx)
+type UserInitParam struct {
+}
+
+func UserInit(ctx Context, param UserInitParam) {
+	sess := sessions.Default(ctx.Context)
 	var ret func(internal.UserSmall) = func(user internal.UserSmall) {
 		fmt.Println(user)
 		if user.Usergroup == libs.USBanned {
-			USLogout(ctx)
-			libs.RPCWriteBack(ctx, 400, -32600, "user is banned", nil)
+			UserLogout(ctx, UserLogoutParam{})
+			ctx.JSONRPC(400, -32600, "user is banned", nil)
 			return
 		}
-		libs.RPCWriteBack(ctx, 200, 0, "", gin.H{
+		ctx.JSONRPC(200, 0, "", gin.H{
 			"user_id":     user.Id,
 			"user_name":   user.Name,
 			"user_group":  user.Usergroup,
@@ -160,38 +166,38 @@ func USInit(ctx *gin.Context) {
 }
 
 // 根据 session 中的 user_group 判断是否是管理
-func ISAdmin(ctx *gin.Context) bool {
-	sess := sessions.Default(ctx)
-	user_group, ok := sess.Get("user_group").(int)
-	return ok && libs.IsAdmin(user_group)
-}
+// func ISAdmin(ctx Context) bool {
+// 	sess := sessions.Default(ctx)
+// 	user_group, ok := sess.Get("user_group").(int)
+// 	return ok && libs.IsAdmin(user_group)
+// }
 
 // 从 session 中获取 userid
-func GetUserId(ctx *gin.Context) int {
-	sess := sessions.Default(ctx)
-	user_id, err := sess.Get("user_id").(int)
-	if !err {
-		return -1
-	}
-	return user_id
-}
+// func GetUserId(ctx Context) int {
+// 	sess := sessions.Default(ctx)
+// 	user_id, err := sess.Get("user_id").(int)
+// 	if !err {
+// 		return -1
+// 	}
+// 	return user_id
+// }
 
 type UserGetParam struct {
 	UserID int `query:"user_id" binding:"required"`
 }
 
-func UserGet(ctx *gin.Context, param UserGetParam) {
+func UserGet(ctx Context, param UserGetParam) {
 	user, err := internal.USQuery(param.UserID)
 	if err != nil {
-		libs.APIWriteBack(ctx, 400, "no such user id", nil)
+		ctx.JSONAPI(400, "no such user id", nil)
 		return
 	}
 	user.Password, user.RememberToken = "", ""
 	data, err := libs.Struct2Map(user)
 	if err != nil {
-		libs.APIInternalError(ctx, err)
+		ctx.ErrorAPI(err)
 	} else {
-		libs.APIWriteBack(ctx, 200, "", data)
+		ctx.JSONAPI(200, "", data)
 	}
 }
 
@@ -206,19 +212,19 @@ type UserEditParam struct {
 	Org       string `body:"organization"`
 }
 
-func UserEdit(ctx *gin.Context, param UserEditParam) {
+func UserEdit(ctx Context, param UserEditParam) {
 	if param.UserID != param.CurUserID {
-		libs.APIWriteBack(ctx, 403, "", nil)
+		ctx.JSONAPI(403, "", nil)
 		return
 	}
 	password := param.Passwd
 	ok, err := internal.CheckPassword(param.UserID, password)
 	if err != nil {
-		libs.APIInternalError(ctx, err)
+		ctx.ErrorAPI(err)
 		return
 	}
 	if !ok {
-		libs.APIWriteBack(ctx, 400, "wrong password", nil)
+		ctx.JSONAPI(400, "wrong password", nil)
 		return
 	}
 	new_password := param.NewPasswd
@@ -231,16 +237,16 @@ func UserEdit(ctx *gin.Context, param UserEditParam) {
 	}
 	motto, email, organization := param.Motto, param.Email, param.Org
 	if len(motto) > 350 || len(organization) > 150 {
-		libs.APIWriteBack(ctx, 400, "length of motto or organization is too long", nil)
+		ctx.JSONAPI(400, "length of motto or organization is too long", nil)
 		return
 	}
 	if !internal.ValidEmail(email) {
-		libs.APIWriteBack(ctx, 400, "invalid email", nil)
+		ctx.JSONAPI(400, "invalid email", nil)
 		return
 	}
 	err = internal.USModify(password, param.Gender, motto, email, organization, param.UserID)
 	if err != nil {
-		libs.APIInternalError(ctx, err)
+		ctx.ErrorAPI(err)
 		return
 	}
 }
@@ -248,27 +254,27 @@ func UserEdit(ctx *gin.Context, param UserEditParam) {
 type UserGrpEditParam struct {
 	UserID  int `body:"user_id" binding:"required"`
 	UserGrp int `body:"user_group" binding:"required"`
-	CurGrp  int `session:"user_group"`
+	CurGrp  int `session:"user_group" validate:"admin"`
 }
 
-func UserGrpEdit(ctx *gin.Context, param UserGrpEditParam) {
-	if !ISAdmin(ctx) || param.CurGrp <= param.UserGrp {
-		libs.APIWriteBack(ctx, 403, "", nil)
+func UserGrpEdit(ctx Context, param UserGrpEditParam) {
+	if param.CurGrp <= param.UserGrp {
+		ctx.JSONAPI(403, "", nil)
 		return
 	}
 	target, err := internal.USQuerySmall(param.UserGrp)
 	if err != nil {
-		libs.APIWriteBack(ctx, 400, "no such user id", nil)
+		ctx.JSONAPI(400, "no such user id", nil)
 		return
 	} else if target.Usergroup >= param.CurGrp {
-		libs.APIWriteBack(ctx, 403, "", nil)
+		ctx.JSONAPI(403, "", nil)
 		return
 	}
 	err = internal.USGroupEdit(param.UserID, param.UserGrp)
 	if err != nil {
-		libs.APIInternalError(ctx, err)
+		ctx.ErrorAPI(err)
 	} else {
-		libs.APIWriteBack(ctx, 200, "", nil)
+		ctx.JSONAPI(200, "", nil)
 	}
 }
 
@@ -283,7 +289,7 @@ type UserListParam struct {
 	RightRating *int    `query:"right_rating"`
 }
 
-func UserList(ctx *gin.Context, param UserListParam) {
+func UserList(ctx Context, param UserListParam) {
 	if param.UserName != nil {
 		var bound int
 		if param.Left != nil {
@@ -295,9 +301,9 @@ func UserList(ctx *gin.Context, param UserListParam) {
 		}
 		users, isfull, err := internal.USListByName(*param.UserName+"%", bound, param.PageSize, param.Left != nil)
 		if err != nil {
-			libs.APIInternalError(ctx, err)
+			ctx.ErrorAPI(err)
 		} else {
-			libs.APIWriteBack(ctx, 200, "", map[string]any{"data": users, "isfull": isfull})
+			ctx.JSONAPI(200, "", map[string]any{"data": users, "isfull": isfull})
 		}
 	} else {
 		var bound_user_id, bound_rating int
@@ -312,9 +318,9 @@ func UserList(ctx *gin.Context, param UserListParam) {
 		}
 		users, isfull, err := internal.USList(bound_user_id, bound_rating, param.PageSize, param.LeftUserID != nil)
 		if err != nil {
-			libs.APIInternalError(ctx, err)
+			ctx.ErrorAPI(err)
 		} else {
-			libs.APIWriteBack(ctx, 200, "", map[string]any{"data": users, "isfull": isfull})
+			ctx.JSONAPI(200, "", map[string]any{"data": users, "isfull": isfull})
 		}
 	}
 }

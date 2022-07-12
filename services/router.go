@@ -20,9 +20,9 @@ urls with first letter upper are rpcs, others are apis.
 */
 var Router map[string][]Request = map[string][]Request{
 	"/GetTime":    {{"POST", GetTime}},
-	"/Init":       {{"POST", USInit}},
+	"/Init":       {{"POST", service.GinHandler(UserInit)}},
 	"/UserLogin":  {{"POST", service.GinHandler(UserLogin)}},
-	"/UserLogout": {{"POST", USLogout}},
+	"/UserLogout": {{"POST", service.GinHandler(UserLogout)}},
 	"/Rejudge":    {{"POST", service.GinHandler(Rejudge)}},
 
 	"/user": {
@@ -91,7 +91,7 @@ var Router map[string][]Request = map[string][]Request{
 	"/contests": {{"GET", service.GinHandler(CtstList)}},
 	"/contest": {
 		{"GET", service.GinHandler(CtstGet)},
-		{"POST", CTCreate},
+		{"POST", service.GinHandler(CtstCreate)},
 		{"PATCH", service.GinHandler(CtstEdit)},
 	},
 	"/contest_permissions": {
@@ -121,7 +121,7 @@ var Router map[string][]Request = map[string][]Request{
 		{"POST", service.GinHandler(SubmAdd)},
 		{"DELETE", service.GinHandler(SubmDel)},
 	},
-	"/custom_test": {{"POST", SMCustomTest}},
+	"/custom_test": {{"POST", service.GinHandler(SubmCustom)}},
 }
 
 func GetTime(ctx *gin.Context) {

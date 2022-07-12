@@ -3,70 +3,72 @@ package services
 import (
 	"yao/internal"
 	"yao/libs"
-
-	"github.com/gin-gonic/gin"
 )
 
 type BlogCmntCreateParam struct {
-	UserID int `session:"user_id"`
-	BlogID int `body:"blog_id" binding:"required"`
+	BlogID  int `body:"blog_id" binding:"required"`
+	UserID  int `session:"user_id"`
+	UserGrp int `session:"user_group"`
 }
 
-func BlogCmntCreate(ctx *gin.Context, param BlogCmntCreateParam) {
+func BlogCmntCreate(ctx Context, param BlogCmntCreateParam) {
 	if param.UserID <= 0 {
-		libs.APIWriteBack(ctx, 401, "", nil)
+		ctx.JSONAPI(401, "", nil)
 		return
 	}
-	if !BLCanSee(ctx, param.BlogID) {
-		libs.APIWriteBack(ctx, 403, "", nil)
+	if !BLCanSee(param.UserID, param.UserGrp, param.BlogID) {
+		ctx.JSONAPI(403, "", nil)
 		return
 	}
 	content := ctx.PostForm("content")
 	id, err := internal.BLCreateComment(param.BlogID, param.UserID, content)
 	if err != nil {
-		libs.APIInternalError(ctx, err)
+		ctx.ErrorAPI(err)
 	} else {
-		libs.APIWriteBack(ctx, 200, "", map[string]any{"id": id})
+		ctx.JSONAPI(200, "", map[string]any{"id": id})
 	}
 }
 
 type BlogCmntGetParam struct {
-	BlogID int `query:"blog_id" binding:"required"`
+	BlogID  int `query:"blog_id" binding:"required"`
+	UserID  int `session:"user_id"`
+	UserGrp int `session:"user_group"`
 }
 
-func BlogCmntGet(ctx *gin.Context, param BlogCmntGetParam) {
+func BlogCmntGet(ctx Context, param BlogCmntGetParam) {
 	if !internal.BLExists(param.BlogID) {
-		libs.APIWriteBack(ctx, 404, "", nil)
+		ctx.JSONAPI(404, "", nil)
 		return
 	}
-	if !BLCanSee(ctx, param.BlogID) {
-		libs.APIWriteBack(ctx, 403, "", nil)
+	if !BLCanSee(param.UserID, param.UserGrp, param.BlogID) {
+		ctx.JSONAPI(403, "", nil)
 		return
 	}
-	comments, err := internal.BLGetComments(param.BlogID, GetUserId(ctx))
+	comments, err := internal.BLGetComments(param.BlogID, param.UserID)
 	if err != nil {
-		libs.APIInternalError(ctx, err)
+		ctx.ErrorAPI(err)
 	} else {
-		libs.APIWriteBack(ctx, 200, "", map[string]any{"data": comments})
+		ctx.JSONAPI(200, "", map[string]any{"data": comments})
 	}
 }
 
 type BlogCmntDelParam struct {
-	CmntID int `query:"comment_id" binding:"required"`
-	UserID int `session:"user_id"`
+	CmntID  int `query:"comment_id" binding:"required"`
+	UserID  int `session:"user_id"`
+	UserGrp int `session:"user_group"`
 }
 
-func BlogCmntDel(ctx *gin.Context, param BlogCmntDelParam) {
+func BlogCmntDel(ctx Context, param BlogCmntDelParam) {
 	var comment internal.Comment
 	err := libs.DBSelectSingle(&comment, "select author, blog_id from blog_comments where comment_id=?", param.CmntID)
 	if err != nil {
-		libs.APIWriteBack(ctx, 404, "", nil)
-	} else if !ISAdmin(ctx) && comment.Author != param.UserID {
-		libs.APIWriteBack(ctx, 403, "", nil)
+		ctx.JSONAPI(404, "", nil)
+	} else if !libs.IsAdmin(param.UserGrp) && comment.Author != param.UserID {
+		ctx.JSONAPI(403, "", nil)
 	} else {
 		err = internal.BLDeleteComment(param.CmntID, comment.BlogId)
 		if err != nil {
-			libs.APIInternalError(ctx, err)
+			ctx.ErrorAPI(err)
 		}
 	}
 }

@@ -8,7 +8,6 @@ import (
 	"yao/internal"
 	"yao/libs"
 
-	"github.com/gin-gonic/gin"
 	"github.com/goccy/go-json"
 	"github.com/super-yaoj/yaoj-core/pkg/problem"
 	"github.com/super-yaoj/yaoj-core/pkg/utils"
@@ -17,6 +16,7 @@ import (
 
 type SubmListParam struct {
 	UserID   int  `session:"user_id"`
+	UserGrp  int  `session:"user_group"`
 	Left     *int `query:"left"`
 	Right    *int `query:"right"`
 	PageSize int  `query:"pagesize" binding:"required" validate:"gte=1,lte=100"`
@@ -25,7 +25,7 @@ type SubmListParam struct {
 	Submtter int  `query:"submitter"`
 }
 
-func SubmList(ctx *gin.Context, param SubmListParam) {
+func SubmList(ctx Context, param SubmListParam) {
 	var bound int
 	if param.Left != nil {
 		bound = *param.Left
@@ -36,10 +36,10 @@ func SubmList(ctx *gin.Context, param SubmListParam) {
 	}
 	submissions, isfull, err := internal.SMList(
 		bound, param.PageSize, param.UserID, param.Submtter, param.ProbID, param.CtstID,
-		param.Left != nil, ISAdmin(ctx),
+		param.Left != nil, libs.IsAdmin(param.UserGrp),
 	)
 	if err != nil {
-		libs.APIInternalError(ctx, err)
+		ctx.ErrorAPI(err)
 		return
 	}
 	//Modify scores to sample_scores when users are in pretest-only contests
@@ -49,23 +49,25 @@ func SubmList(ctx *gin.Context, param SubmListParam) {
 			internal.SMPretestOnly(&submissions[key])
 		}
 	}
-	libs.APIWriteBack(ctx, 200, "", map[string]any{"data": submissions, "isfull": isfull})
+	ctx.JSONAPI(200, "", map[string]any{"data": submissions, "isfull": isfull})
 }
 
 type SubmAddParam struct {
-	UserID int `session:"user_id"`
-	ProbID int `body:"problem_id" binding:"required"`
-	CtstID int `body:"contest_id"`
+	UserID  int     `session:"user_id"`
+	UserGrp int     `session:"user_group"`
+	ProbID  int     `body:"problem_id" binding:"required"`
+	CtstID  int     `body:"contest_id"`
+	SubmAll *string `body:"submit_all"`
 }
 
 // users can submit from a contest if and only if the contest is running and
 // he takes part in the contest (only these submissions are contest submissions)
-func SubmAdd(ctx *gin.Context, param SubmAddParam) {
+func SubmAdd(ctx Context, param SubmAddParam) {
 	if param.UserID <= 0 {
-		libs.APIWriteBack(ctx, 401, "", nil)
+		ctx.JSONAPI(401, "", nil)
 		return
 	}
-	in_contest, ok := PRCanSee(ctx, param.ProbID, param.CtstID)
+	in_contest, ok := PRCanSee(ctx, param.UserID, param.UserGrp, param.ProbID, param.CtstID)
 	if !ok {
 		return
 	}
@@ -75,14 +77,13 @@ func SubmAdd(ctx *gin.Context, param SubmAddParam) {
 
 	pro := internal.PRLoad(param.ProbID)
 	if !internal.PRHasData(pro, "tests") {
-		libs.APIWriteBack(ctx, 400, "problem has no data", nil)
+		ctx.JSONAPI(400, "problem has no data", nil)
 		return
 	}
 	var sub problem.Submission
 	var language utils.LangTag
 	var preview map[string]internal.ContentPreview
-	_, all := ctx.GetPostForm("submit_all")
-	if all {
+	if param.SubmAll != nil {
 		sub, preview, language = parseZipFile(ctx, "all.zip", pro.SubmConfig)
 	} else {
 		sub, preview, language = parseMultiFiles(ctx, pro.SubmConfig)
@@ -95,12 +96,12 @@ func SubmAdd(ctx *gin.Context, param SubmAddParam) {
 	sub.DumpTo(w)
 	err := internal.SMCreate(param.UserID, param.ProbID, param.CtstID, language, w.Bytes(), preview)
 	if err != nil {
-		libs.APIInternalError(ctx, err)
+		ctx.ErrorAPI(err)
 	}
 }
 
 // When the submitted file is a zip file
-func parseZipFile(ctx *gin.Context, field string, config internal.SubmConfig) (problem.Submission, map[string]internal.ContentPreview, utils.LangTag) {
+func parseZipFile(ctx Context, field string, config internal.SubmConfig) (problem.Submission, map[string]internal.ContentPreview, utils.LangTag) {
 	file, header, err := ctx.Request.FormFile(field)
 	if err != nil {
 		return nil, nil, 0
@@ -114,19 +115,19 @@ func parseZipFile(ctx *gin.Context, field string, config internal.SubmConfig) (p
 		tot_size += int64(val.Length)
 	}
 	if header.Size > tot_size {
-		libs.APIWriteBack(ctx, 400, "file too large", nil)
+		ctx.JSONAPI(400, "file too large", nil)
 		return nil, nil, 0
 	}
 
 	w := bytes.NewBuffer(nil)
 	_, err = io.Copy(w, file)
 	if err != nil {
-		libs.APIInternalError(ctx, err)
+		ctx.ErrorAPI(err)
 		return nil, nil, 0
 	}
 	ret, err := libs.UnzipMemory(w.Bytes())
 	if err != nil {
-		libs.APIWriteBack(ctx, 400, "invalid zip file: "+err.Error(), nil)
+		ctx.JSONAPI(400, "invalid zip file: "+err.Error(), nil)
 		return nil, nil, 0
 	}
 	for name, val := range ret {
@@ -139,7 +140,7 @@ func parseZipFile(ctx *gin.Context, field string, config internal.SubmConfig) (p
 			}
 		}
 		if matched == "" {
-			libs.APIWriteBack(ctx, 400, "no field matches file name: "+name, nil)
+			ctx.JSONAPI(400, "no field matches file name: "+name, nil)
 			return nil, nil, 0
 		}
 		//TODO: get language by file suffix
@@ -152,7 +153,7 @@ func parseZipFile(ctx *gin.Context, field string, config internal.SubmConfig) (p
 /*
 When user submits files one by one
 */
-func parseMultiFiles(ctx *gin.Context, config internal.SubmConfig) (problem.Submission, map[string]internal.ContentPreview, utils.LangTag) {
+func parseMultiFiles(ctx Context, config internal.SubmConfig) (problem.Submission, map[string]internal.ContentPreview, utils.LangTag) {
 	sub := make(problem.Submission)
 	preview := make(map[string]internal.ContentPreview)
 	language := -1
@@ -161,7 +162,7 @@ func parseMultiFiles(ctx *gin.Context, config internal.SubmConfig) (problem.Subm
 		name, lang := key, -1
 		//get language
 		if val.Accepted == utils.Csource {
-			lang, ok = libs.PostIntRange(ctx, key+"_lang", 0, len(libs.LangSuf)-1)
+			lang, ok = libs.PostIntRange(ctx.Context, key+"_lang", 0, len(libs.LangSuf)-1)
 			if !ok || (val.Langs != nil && !libs.HasElement(val.Langs, utils.LangTag(lang))) {
 				return nil, nil, 0
 			}
@@ -171,7 +172,7 @@ func parseMultiFiles(ctx *gin.Context, config internal.SubmConfig) (problem.Subm
 		if ok {
 			//text
 			if len(str) > int(val.Length) {
-				libs.APIWriteBack(ctx, 400, "file "+key+" too large", nil)
+				ctx.JSONAPI(400, "file "+key+" too large", nil)
 				return nil, nil, 0
 			}
 			byt := []byte(str)
@@ -181,17 +182,17 @@ func parseMultiFiles(ctx *gin.Context, config internal.SubmConfig) (problem.Subm
 			//file
 			file, header, err := ctx.Request.FormFile(key + "_file")
 			if err != nil {
-				libs.APIInternalError(ctx, err)
+				ctx.ErrorAPI(err)
 				return nil, nil, 0
 			}
 			if header.Size > int64(val.Length) {
-				libs.APIWriteBack(ctx, 400, "file "+key+" too large", nil)
+				ctx.JSONAPI(400, "file "+key+" too large", nil)
 				return nil, nil, 0
 			}
 			w := bytes.NewBuffer(nil)
 			_, err = io.Copy(w, file)
 			if err != nil {
-				libs.APIInternalError(ctx, err)
+				ctx.ErrorAPI(err)
 				return nil, nil, 0
 			}
 			preview[key] = getPreview(w.Bytes(), val.Accepted, utils.LangTag(lang))
@@ -232,17 +233,17 @@ type SubmGetParam struct {
 
 // Query single submission, when user is in contests which score_private=true
 // (i.e. cannot see full result), this function will delete extra information.
-func SubmGet(ctx *gin.Context, param SubmGetParam) {
+func SubmGet(ctx Context, param SubmGetParam) {
 	ret, err := internal.SMQuery(param.SubmID)
 	if err != nil {
-		libs.APIWriteBack(ctx, 404, "", nil)
+		ctx.JSONAPI(404, "", nil)
 		return
 	}
 	//user cannot see submission details inside contests
 	by_problem := PRCanSeeWithoutContest(param.UserID, param.UserGrp, ret.ProblemId)
 	can_edit := SMCanEdit(param.UserID, param.UserGrp, ret.SubmissionBase)
 	if !can_edit && ret.Submitter != param.UserID && !by_problem {
-		libs.APIWriteBack(ctx, 403, "", nil)
+		ctx.JSONAPI(403, "", nil)
 	} else {
 		if !can_edit && !by_problem {
 			if internal.CTPretestOnly(ret.ContestId) {
@@ -252,11 +253,14 @@ func SubmGet(ctx *gin.Context, param SubmGetParam) {
 				ret.Details.ExtraResult = internal.SMRemoveTestDetails(ret.Details.ExtraResult)
 			}
 		}
-		libs.APIWriteBack(ctx, 200, "", map[string]any{"submission": ret, "can_edit": can_edit})
+		ctx.JSONAPI(200, "", map[string]any{"submission": ret, "can_edit": can_edit})
 	}
 }
 
-func SMCustomTest(ctx *gin.Context) {
+type SubmCustomParam struct {
+}
+
+func SubmCustom(ctx Context, param SubmCustomParam) {
 	config := internal.SubmConfig{
 		"source": {Langs: nil, Accepted: utils.Csource, Length: 64 * 1024},
 		"input":  {Langs: nil, Accepted: utils.Cplain, Length: 10 * 1024 * 1024},
@@ -275,7 +279,7 @@ func SMCustomTest(ctx *gin.Context) {
 			"Title":  "Internal Error",
 		})
 	}
-	libs.APIWriteBack(ctx, 200, "", map[string]any{"result": string(result)})
+	ctx.JSONAPI(200, "", map[string]any{"result": string(result)})
 }
 
 func SMCanEdit(user_id, user_group int, sub internal.SubmissionBase) bool {
@@ -289,19 +293,19 @@ type SubmDelParam struct {
 	UserGrp int `session:"user_group"`
 }
 
-func SubmDel(ctx *gin.Context, param SubmDelParam) {
+func SubmDel(ctx Context, param SubmDelParam) {
 	sub, err := internal.SMGetBaseInfo(param.SubmID)
 	if err != nil {
-		libs.APIWriteBack(ctx, 404, "", nil)
+		ctx.JSONAPI(404, "", nil)
 		return
 	}
 	if !SMCanEdit(param.UserID, param.UserGrp, sub) {
-		libs.APIWriteBack(ctx, 403, "", nil)
+		ctx.JSONAPI(403, "", nil)
 		return
 	}
 	err = internal.SMDelete(sub)
 	if err != nil {
-		libs.APIInternalError(ctx, err)
+		ctx.ErrorAPI(err)
 	}
 }
 
@@ -312,33 +316,33 @@ type RejudgeParam struct {
 	UserGrp int  `session:"user_group"`
 }
 
-func Rejudge(ctx *gin.Context, param RejudgeParam) {
+func Rejudge(ctx Context, param RejudgeParam) {
 	if param.ProbID != nil {
 		if !internal.PRExists(*param.ProbID) {
-			libs.RPCWriteBack(ctx, 404, -32600, "", nil)
+			ctx.JSONRPC(404, -32600, "", nil)
 			return
 		}
 		if !PRCanEdit(param.UserID, param.UserGrp, *param.ProbID) {
-			libs.RPCWriteBack(ctx, 403, -32600, "", nil)
+			ctx.JSONRPC(403, -32600, "", nil)
 			return
 		}
 		err := internal.PRRejudge(*param.ProbID)
 		if err != nil {
-			libs.RPCInternalError(ctx, err)
+			ctx.ErrorRPC(err)
 		}
 	} else {
 		sub, err := internal.SMGetBaseInfo(param.SubmID)
 		if err != nil {
-			libs.RPCWriteBack(ctx, 404, -32600, "", nil)
+			ctx.JSONRPC(404, -32600, "", nil)
 			return
 		}
 		if !SMCanEdit(param.UserID, param.UserGrp, sub) {
-			libs.RPCWriteBack(ctx, 403, -32600, "", nil)
+			ctx.JSONRPC(403, -32600, "", nil)
 			return
 		}
 		err = internal.SMRejudge(param.SubmID)
 		if err != nil {
-			libs.RPCInternalError(ctx, err)
+			ctx.ErrorRPC(err)
 		}
 	}
 }

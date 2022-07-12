@@ -16,16 +16,16 @@ type PermCreateParam struct {
 	UserGrp  int    `session:"user_group" validate:"admin"`
 }
 
-func PermCreate(ctx *gin.Context, param PermCreateParam) {
+func PermCreate(ctx Context, param PermCreateParam) {
 	if len(param.PermName) > 190 {
-		libs.APIWriteBack(ctx, 400, "permission name is too long", nil)
+		ctx.JSONAPI(400, "permission name is too long", nil)
 		return
 	}
 	id, err := internal.PMCreate(param.PermName)
 	if err != nil {
-		libs.APIInternalError(ctx, err)
+		ctx.ErrorAPI(err)
 	} else {
-		libs.APIWriteBack(ctx, 200, "", gin.H{"permission_id": id})
+		ctx.JSONAPI(200, "", gin.H{"permission_id": id})
 	}
 }
 
@@ -35,18 +35,18 @@ type PermRenameParam struct {
 	UserGrp  int    `session:"user_group" validate:"admin"`
 }
 
-func PermRename(ctx *gin.Context, param PermRenameParam) {
+func PermRename(ctx Context, param PermRenameParam) {
 	if len(param.PermName) > 190 {
-		libs.APIWriteBack(ctx, 400, "permission name is too long", nil)
+		ctx.JSONAPI(400, "permission name is too long", nil)
 		return
 	}
 	if !internal.PMExists(param.PermID) {
-		libs.APIWriteBack(ctx, 400, "no such permission id", nil)
+		ctx.JSONAPI(400, "no such permission id", nil)
 		return
 	}
 	err := internal.PMChangeName(param.PermID, param.PermName)
 	if err != nil {
-		libs.APIInternalError(ctx, err)
+		ctx.ErrorAPI(err)
 	}
 }
 
@@ -55,18 +55,18 @@ type PermDelParam struct {
 	UserGrp int `session:"user_group" validate:"admin"`
 }
 
-func PermDel(ctx *gin.Context, param PermDelParam) {
+func PermDel(ctx Context, param PermDelParam) {
 	if param.PermID == libs.DefaultGroup {
-		libs.APIWriteBack(ctx, 400, "you cannot modify the default group", nil)
+		ctx.JSONAPI(400, "you cannot modify the default group", nil)
 		return
 	}
 	num, err := internal.PMDelete(param.PermID)
 	if err != nil {
-		libs.APIInternalError(ctx, err)
+		ctx.ErrorAPI(err)
 	} else if num != 1 {
-		libs.APIWriteBack(ctx, 400, "no such permission id", nil)
+		ctx.JSONAPI(400, "no such permission id", nil)
 	} else {
-		libs.APIWriteBack(ctx, 200, "", nil)
+		ctx.JSONAPI(200, "", nil)
 	}
 }
 
@@ -77,7 +77,7 @@ type PermGetParam struct {
 	UserGrp  int  `session:"user_group" validate:"admin"`
 }
 
-func PermGet(ctx *gin.Context, param PermGetParam) {
+func PermGet(ctx Context, param PermGetParam) {
 	var bound int
 	if param.Left != nil {
 		bound = *param.Left
@@ -88,9 +88,9 @@ func PermGet(ctx *gin.Context, param PermGetParam) {
 	}
 	p, isfull, err := internal.PMQuery(bound, param.PageSize, param.Left != nil)
 	if err != nil {
-		libs.APIInternalError(ctx, err)
+		ctx.ErrorAPI(err)
 	} else {
-		libs.APIWriteBack(ctx, 200, "", gin.H{"isfull": isfull, "data": p})
+		ctx.JSONAPI(200, "", gin.H{"isfull": isfull, "data": p})
 	}
 }
 
@@ -98,30 +98,31 @@ type PermGetUserParam struct {
 	PermID    *int `query:"permission_id"`
 	UserID    int  `query:"user_id"`
 	CurUserID int  `session:"user_id"`
+	UserGrp   int  `session:"user_group"`
 }
 
-func PermGetUser(ctx *gin.Context, param PermGetUserParam) {
+func PermGetUser(ctx Context, param PermGetUserParam) {
 	if param.PermID != nil {
-		if !ISAdmin(ctx) {
-			libs.APIWriteBack(ctx, 403, "", nil)
+		if !libs.IsAdmin(param.UserGrp) {
+			ctx.JSONAPI(403, "", nil)
 			return
 		}
 		users, err := internal.PMQueryUser(*param.PermID)
 		if err != nil {
-			libs.APIInternalError(ctx, err)
+			ctx.ErrorAPI(err)
 		} else {
-			libs.APIWriteBack(ctx, 200, "", map[string]any{"data": users})
+			ctx.JSONAPI(200, "", map[string]any{"data": users})
 		}
 	} else {
-		if !ISAdmin(ctx) && param.UserID != param.CurUserID {
-			libs.APIWriteBack(ctx, 403, "", nil)
+		if !libs.IsAdmin(param.UserGrp) && param.UserID != param.CurUserID {
+			ctx.JSONAPI(403, "", nil)
 			return
 		}
 		permissions, err := internal.USQueryPermission(param.UserID)
 		if err != nil {
-			libs.APIInternalError(ctx, err)
+			ctx.ErrorAPI(err)
 		} else {
-			libs.APIWriteBack(ctx, 200, "", map[string]any{"data": permissions})
+			ctx.JSONAPI(200, "", map[string]any{"data": permissions})
 		}
 	}
 }
@@ -132,18 +133,18 @@ type PermAddUserParam struct {
 	UserGrp int    `session:"user_group" validate:"admin"`
 }
 
-func PermAddUser(ctx *gin.Context, param PermAddUserParam) {
+func PermAddUser(ctx Context, param PermAddUserParam) {
 	user_ids := strings.Split(param.UserIDs, ",")
 	if len(user_ids) == 0 {
-		libs.APIWriteBack(ctx, 400, "there's no user", nil)
+		ctx.JSONAPI(400, "there's no user", nil)
 		return
 	}
 	if param.PermID == libs.DefaultGroup {
-		libs.APIWriteBack(ctx, 400, "you cannot modify the default group", nil)
+		ctx.JSONAPI(400, "you cannot modify the default group", nil)
 		return
 	}
 	if !internal.PMExists(param.PermID) {
-		libs.APIWriteBack(ctx, 400, "invalid request: permission id is wrong", nil)
+		ctx.JSONAPI(400, "invalid request: permission id is wrong", nil)
 		return
 	}
 
@@ -152,13 +153,13 @@ func PermAddUser(ctx *gin.Context, param PermAddUserParam) {
 	for i, j := range user_ids {
 		num_ids[i], err = strconv.Atoi(j)
 		if err != nil {
-			libs.APIWriteBack(ctx, 400, "invalid request: meet user id \""+j+"\"", nil)
+			ctx.JSONAPI(400, "invalid request: meet user id \""+j+"\"", nil)
 			return
 		}
 	}
 	real_ids, err := libs.DBSelectInts(fmt.Sprintf("select user_id from user_info where user_id in (%s) order by user_id", param.UserIDs))
 	if err != nil {
-		libs.APIInternalError(ctx, err)
+		ctx.ErrorAPI(err)
 		return
 	}
 	var invalid_ids []int
@@ -169,14 +170,14 @@ func PermAddUser(ctx *gin.Context, param PermAddUserParam) {
 		}
 	}
 	if len(invalid_ids) != 0 {
-		libs.APIWriteBack(ctx, 400, "invalid ids exist", gin.H{"invalid_ids": invalid_ids})
+		ctx.JSONAPI(400, "invalid ids exist", gin.H{"invalid_ids": invalid_ids})
 		return
 	}
 	res, err := internal.PMAddUser(real_ids, param.PermID)
 	if err != nil {
-		libs.APIInternalError(ctx, err)
+		ctx.ErrorAPI(err)
 	} else {
-		libs.APIWriteBack(ctx, 200, "", gin.H{"affected": res})
+		ctx.JSONAPI(200, "", gin.H{"affected": res})
 	}
 }
 
@@ -186,15 +187,15 @@ type PermDelUserParam struct {
 	UserGrp int `session:"user_group" validate:"admin"`
 }
 
-func PermDelUser(ctx *gin.Context, param PermDelUserParam) {
+func PermDelUser(ctx Context, param PermDelUserParam) {
 	if param.PermID == libs.DefaultGroup {
-		libs.APIWriteBack(ctx, 400, "you cannot modify the default group", nil)
+		ctx.JSONAPI(400, "you cannot modify the default group", nil)
 		return
 	}
 	res, err := internal.PMDeleteUser(param.PermID, param.UserID)
 	if err != nil {
-		libs.APIInternalError(ctx, err)
+		ctx.ErrorAPI(err)
 	} else if res != 1 {
-		libs.APIWriteBack(ctx, 400, "doesn't exist", nil)
+		ctx.JSONAPI(400, "doesn't exist", nil)
 	}
 }

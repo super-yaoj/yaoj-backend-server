@@ -5,8 +5,6 @@ import (
 	"time"
 	"yao/internal"
 	"yao/libs"
-
-	"github.com/gin-gonic/gin"
 )
 
 func CTCanEdit(user_id int, user_group int, contest_id int) bool {
@@ -60,9 +58,10 @@ type CtstListParam struct {
 	Left     *int `query:"left"`
 	Right    *int `query:"right"`
 	UserID   int  `session:"user_id"`
+	UserGrp  int  `session:"user_group"`
 }
 
-func CtstList(ctx *gin.Context, param CtstListParam) {
+func CtstList(ctx Context, param CtstListParam) {
 	var bound int
 	if param.Left != nil {
 		bound = *param.Left
@@ -71,11 +70,11 @@ func CtstList(ctx *gin.Context, param CtstListParam) {
 	} else {
 		return
 	}
-	contests, isfull, err := internal.CTList(bound, param.PageSize, param.UserID, param.Left != nil, ISAdmin(ctx))
+	contests, isfull, err := internal.CTList(bound, param.PageSize, param.UserID, param.Left != nil, libs.IsAdmin(param.UserGrp))
 	if err != nil {
-		libs.APIInternalError(ctx, err)
+		ctx.ErrorAPI(err)
 	} else {
-		libs.APIWriteBack(ctx, 200, "", map[string]any{"isfull": isfull, "data": contests})
+		ctx.JSONAPI(200, "", map[string]any{"isfull": isfull, "data": contests})
 	}
 }
 
@@ -85,18 +84,18 @@ type CtstGetParam struct {
 	UserGrp int `session:"user_group"`
 }
 
-func CtstGet(ctx *gin.Context, param CtstGetParam) {
-	contest, err := internal.CTQuery(param.CtstID, GetUserId(ctx))
+func CtstGet(ctx Context, param CtstGetParam) {
+	contest, err := internal.CTQuery(param.CtstID, param.UserID)
 	if err != nil {
-		libs.APIWriteBack(ctx, 404, "", nil)
+		ctx.JSONAPI(404, "", nil)
 		return
 	}
 	can_edit := CTCanEdit(param.UserID, param.UserGrp, param.CtstID)
 	if !CTCanEnter(param.UserID, contest, can_edit) {
-		libs.APIWriteBack(ctx, 403, "", nil)
+		ctx.JSONAPI(403, "", nil)
 		return
 	}
-	libs.APIWriteBack(ctx, 200, "", map[string]any{"contest": contest, "can_edit": can_edit})
+	ctx.JSONAPI(200, "", map[string]any{"contest": contest, "can_edit": can_edit})
 }
 
 type CtstProbGetParam struct {
@@ -105,21 +104,21 @@ type CtstProbGetParam struct {
 	UserGrp int `session:"user_group"`
 }
 
-func CtstProbGet(ctx *gin.Context, param CtstProbGetParam) {
-	contest, err := internal.CTQuery(param.CtstID, GetUserId(ctx))
+func CtstProbGet(ctx Context, param CtstProbGetParam) {
+	contest, err := internal.CTQuery(param.CtstID, param.UserID)
 	if err != nil {
-		libs.APIWriteBack(ctx, 404, "", nil)
+		ctx.JSONAPI(404, "", nil)
 		return
 	}
 	if !CTCanEnter(param.UserID, contest, CTCanEdit(param.UserID, param.UserGrp, param.CtstID)) {
-		libs.APIWriteBack(ctx, 403, "", nil)
+		ctx.JSONAPI(403, "", nil)
 		return
 	}
 	problems, err := internal.CTGetProblems(param.CtstID)
 	if err != nil {
-		libs.APIInternalError(ctx, err)
+		ctx.ErrorAPI(err)
 	} else {
-		libs.APIWriteBack(ctx, 200, "", map[string]any{"data": problems})
+		ctx.JSONAPI(200, "", map[string]any{"data": problems})
 	}
 }
 
@@ -130,22 +129,22 @@ type CtstProbAddParam struct {
 	UserGrp int `session:"user_group"`
 }
 
-func CtstProbAdd(ctx *gin.Context, param CtstProbAddParam) {
+func CtstProbAdd(ctx Context, param CtstProbAddParam) {
 	if !internal.CTExists(param.CtstID) {
-		libs.APIWriteBack(ctx, 404, "", nil)
+		ctx.JSONAPI(404, "", nil)
 		return
 	}
 	if !CTCanEdit(param.UserID, param.UserGrp, param.CtstID) {
-		libs.APIWriteBack(ctx, 403, "", nil)
+		ctx.JSONAPI(403, "", nil)
 		return
 	}
 	if !internal.PRExists(param.ProbID) {
-		libs.APIWriteBack(ctx, 400, "no such problem id", nil)
+		ctx.JSONAPI(400, "no such problem id", nil)
 		return
 	}
 	err := internal.CTAddProblem(param.CtstID, param.ProbID)
 	if err != nil {
-		libs.APIInternalError(ctx, err)
+		ctx.ErrorAPI(err)
 	}
 }
 
@@ -156,27 +155,27 @@ type CtstProbDelParam struct {
 	UserGrp int `session:"user_group"`
 }
 
-func CtstProbDel(ctx *gin.Context, param CtstProbDelParam) {
+func CtstProbDel(ctx Context, param CtstProbDelParam) {
 	if !CTCanEdit(param.UserID, param.UserGrp, param.CtstID) {
-		libs.APIWriteBack(ctx, 403, "", nil)
+		ctx.JSONAPI(403, "", nil)
 		return
 	}
 	err := internal.CTDeleteProblem(param.CtstID, param.ProbID)
 	if err != nil {
-		libs.APIInternalError(ctx, err)
+		ctx.ErrorAPI(err)
 	}
 }
 
-func CTCreate(ctx *gin.Context) {
-	if !ISAdmin(ctx) {
-		libs.APIWriteBack(ctx, 403, "", nil)
-		return
-	}
+type CtstCreateParam struct {
+	UserGrp int `session:"user_group" validate:"admin"`
+}
+
+func CtstCreate(ctx Context, param CtstCreateParam) {
 	id, err := internal.CTCreate()
 	if err != nil {
-		libs.APIInternalError(ctx, err)
+		ctx.ErrorAPI(err)
 	} else {
-		libs.APIWriteBack(ctx, 200, "", map[string]any{"id": id})
+		ctx.JSONAPI(200, "", map[string]any{"id": id})
 	}
 }
 
@@ -193,24 +192,24 @@ type CtstEditParam struct {
 	UserGrp      int    `session:"user_group"`
 }
 
-func CtstEdit(ctx *gin.Context, param CtstEditParam) {
+func CtstEdit(ctx Context, param CtstEditParam) {
 	if !internal.CTExists(param.CtstID) {
-		libs.APIWriteBack(ctx, 404, "", nil)
+		ctx.JSONAPI(404, "", nil)
 		return
 	}
 	if !CTCanEdit(param.UserID, param.UserGrp, param.CtstID) {
-		libs.APIWriteBack(ctx, 403, "", nil)
+		ctx.JSONAPI(403, "", nil)
 		return
 	}
 	title := strings.TrimSpace(param.Title)
 	start, err := time.Parse("2006-01-02 15:04:05", param.StartTime)
 	if err != nil {
-		libs.APIWriteBack(ctx, 400, "time format error", nil)
+		ctx.JSONAPI(400, "time format error", nil)
 		return
 	}
 	err = internal.CTModify(param.CtstID, title, start, param.Duration, param.PrtstOnly, param.ScorePrivate)
 	if err != nil {
-		libs.APIInternalError(ctx, err)
+		ctx.ErrorAPI(err)
 	}
 }
 
@@ -220,20 +219,20 @@ type CtstPermGetParam struct {
 	UserGrp int `session:"user_group"`
 }
 
-func CtstPermGet(ctx *gin.Context, param CtstPermGetParam) {
+func CtstPermGet(ctx Context, param CtstPermGetParam) {
 	if !internal.CTExists(param.CtstID) {
-		libs.APIWriteBack(ctx, 404, "", nil)
+		ctx.JSONAPI(404, "", nil)
 		return
 	}
 	if !CTCanEdit(param.UserID, param.UserGrp, param.CtstID) {
-		libs.APIWriteBack(ctx, 403, "", nil)
+		ctx.JSONAPI(403, "", nil)
 		return
 	}
 	perms, err := internal.CTGetPermissions(param.CtstID)
 	if err != nil {
-		libs.APIInternalError(ctx, err)
+		ctx.ErrorAPI(err)
 	} else {
-		libs.APIWriteBack(ctx, 200, "", map[string]any{"data": perms})
+		ctx.JSONAPI(200, "", map[string]any{"data": perms})
 	}
 }
 
@@ -243,20 +242,20 @@ type CtstMgrGetParam struct {
 	UserGrp int `session:"user_group"`
 }
 
-func CtstMgrGet(ctx *gin.Context, param CtstMgrGetParam) {
+func CtstMgrGet(ctx Context, param CtstMgrGetParam) {
 	if !internal.CTExists(param.CtstID) {
-		libs.APIWriteBack(ctx, 404, "", nil)
+		ctx.JSONAPI(404, "", nil)
 		return
 	}
 	if !CTCanEdit(param.UserID, param.UserGrp, param.CtstID) {
-		libs.APIWriteBack(ctx, 403, "", nil)
+		ctx.JSONAPI(403, "", nil)
 		return
 	}
 	users, err := internal.CTGetManagers(param.CtstID)
 	if err != nil {
-		libs.APIInternalError(ctx, err)
+		ctx.ErrorAPI(err)
 	} else {
-		libs.APIWriteBack(ctx, 200, "", map[string]any{"data": users})
+		ctx.JSONAPI(200, "", map[string]any{"data": users})
 	}
 }
 
@@ -267,22 +266,22 @@ type CtstPermAddParam struct {
 	UserGrp int `session:"user_group"`
 }
 
-func CtstPermAdd(ctx *gin.Context, param CtstPermAddParam) {
+func CtstPermAdd(ctx Context, param CtstPermAddParam) {
 	if !internal.CTExists(param.CtstID) {
-		libs.APIWriteBack(ctx, 404, "", nil)
+		ctx.JSONAPI(404, "", nil)
 		return
 	}
 	if !CTCanEdit(param.UserID, param.UserGrp, param.CtstID) {
-		libs.APIWriteBack(ctx, 403, "", nil)
+		ctx.JSONAPI(403, "", nil)
 		return
 	}
 	if !internal.PMExists(param.PermID) {
-		libs.APIWriteBack(ctx, 400, "no such permission id", nil)
+		ctx.JSONAPI(400, "no such permission id", nil)
 		return
 	}
 	err := internal.CTAddPermission(param.CtstID, param.PermID)
 	if err != nil {
-		libs.APIInternalError(ctx, err)
+		ctx.ErrorAPI(err)
 	}
 }
 
@@ -293,26 +292,26 @@ type CtstMgrAddParam struct {
 	UserGrp   int `session:"user_group"`
 }
 
-func CtstMgrAdd(ctx *gin.Context, param CtstMgrAddParam) {
+func CtstMgrAdd(ctx Context, param CtstMgrAddParam) {
 	if !internal.CTExists(param.CtstID) {
-		libs.APIWriteBack(ctx, 404, "", nil)
+		ctx.JSONAPI(404, "", nil)
 		return
 	}
 	if !CTCanEdit(param.CurUserID, param.UserGrp, param.CtstID) {
-		libs.APIWriteBack(ctx, 403, "", nil)
+		ctx.JSONAPI(403, "", nil)
 		return
 	}
 	if !internal.USExists(param.UserID) {
-		libs.APIWriteBack(ctx, 400, "no such user id", nil)
+		ctx.JSONAPI(400, "no such user id", nil)
 		return
 	}
 	if internal.CTRegistered(param.CtstID, param.UserID) {
-		libs.APIWriteBack(ctx, 400, "user has registered this contest", nil)
+		ctx.JSONAPI(400, "user has registered this contest", nil)
 		return
 	}
 	err := internal.CTAddPermission(param.CtstID, -param.UserID)
 	if err != nil {
-		libs.APIInternalError(ctx, err)
+		ctx.ErrorAPI(err)
 	}
 }
 
@@ -323,14 +322,14 @@ type CtstPermDelParam struct {
 	UserGrp int `session:"user_group"`
 }
 
-func CtstPermDel(ctx *gin.Context, param CtstPermDelParam) {
+func CtstPermDel(ctx Context, param CtstPermDelParam) {
 	if !CTCanEdit(param.UserID, param.UserGrp, param.CtstID) {
-		libs.APIWriteBack(ctx, 403, "", nil)
+		ctx.JSONAPI(403, "", nil)
 		return
 	}
 	err := internal.CTDeletePermission(param.CtstID, param.PermID)
 	if err != nil {
-		libs.APIInternalError(ctx, err)
+		ctx.ErrorAPI(err)
 	}
 }
 
@@ -341,14 +340,14 @@ type CtstMgrDelParam struct {
 	UserGrp   int `session:"user_group"`
 }
 
-func CtstMgrDel(ctx *gin.Context, param CtstMgrDelParam) {
+func CtstMgrDel(ctx Context, param CtstMgrDelParam) {
 	if !CTCanEdit(param.CurUserID, param.UserGrp, param.CtstID) {
-		libs.APIWriteBack(ctx, 403, "", nil)
+		ctx.JSONAPI(403, "", nil)
 		return
 	}
 	err := internal.CTDeletePermission(param.CtstID, -param.UserID)
 	if err != nil {
-		libs.APIInternalError(ctx, err)
+		ctx.ErrorAPI(err)
 	}
 }
 
@@ -358,20 +357,20 @@ type CtstPtcpGetParam struct {
 	UserGrp int `session:"user_group"`
 }
 
-func CtstPtcpGet(ctx *gin.Context, param CtstPtcpGetParam) {
+func CtstPtcpGet(ctx Context, param CtstPtcpGetParam) {
 	if !internal.CTExists(param.CtstID) {
-		libs.APIWriteBack(ctx, 404, "", nil)
+		ctx.JSONAPI(404, "", nil)
 		return
 	}
 	if !CTCanSee(param.UserID, param.CtstID, CTCanEdit(param.UserID, param.UserGrp, param.CtstID)) {
-		libs.APIWriteBack(ctx, 403, "", nil)
+		ctx.JSONAPI(403, "", nil)
 		return
 	}
 	parts, err := internal.CTGetParticipants(param.CtstID)
 	if err != nil {
-		libs.APIInternalError(ctx, err)
+		ctx.ErrorAPI(err)
 	} else {
-		libs.APIWriteBack(ctx, 200, "", map[string]any{"data": parts})
+		ctx.JSONAPI(200, "", map[string]any{"data": parts})
 	}
 }
 
@@ -381,19 +380,19 @@ type CtstSignupParam struct {
 	UserGrp int `session:"user_group"`
 }
 
-func CtstSignup(ctx *gin.Context, param CtstSignupParam) {
+func CtstSignup(ctx Context, param CtstSignupParam) {
 	contest, err := internal.CTQuery(param.CtstID, param.UserID)
 	if err != nil {
-		libs.APIWriteBack(ctx, 404, "", nil)
+		ctx.JSONAPI(404, "", nil)
 		return
 	}
 	if !CTCanTake(param.UserID, contest, CTCanEdit(param.UserID, param.UserGrp, param.CtstID)) {
-		libs.APIWriteBack(ctx, 403, "", nil)
+		ctx.JSONAPI(403, "", nil)
 		return
 	}
 	err = internal.CTAddParticipant(param.CtstID, param.UserID)
 	if err != nil {
-		libs.APIInternalError(ctx, err)
+		ctx.ErrorAPI(err)
 	}
 }
 
@@ -402,9 +401,9 @@ type CtstSignoutParam struct {
 	UserID int `session:"user_id"`
 }
 
-func CtstSignout(ctx *gin.Context, param CtstSignoutParam) {
+func CtstSignout(ctx Context, param CtstSignoutParam) {
 	err := internal.CTDeleteParticipant(param.CtstID, param.UserID)
 	if err != nil {
-		libs.APIInternalError(ctx, err)
+		ctx.ErrorAPI(err)
 	}
 }

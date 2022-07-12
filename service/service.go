@@ -58,7 +58,7 @@ func (ctx Context) ErrorRPC(err error) {
 //
 // 请注意用于绑定的数据尽量不要出现指针值（主要指 session）
 // T 为参数类型结构体
-type StdHandlerFunc[T any] func(ctx *gin.Context, param T)
+type StdHandlerFunc[T any] func(ctx Context, param T)
 
 var defaultValidator = validator.New()
 
@@ -80,7 +80,7 @@ func GinHandler[T any](handler StdHandlerFunc[T]) gin.HandlerFunc {
 			log.Printf("[validate]: %s", err)
 			return
 		}
-		handler(ctx, data)
+		handler(Context{Context: ctx}, data)
 	}
 }
 

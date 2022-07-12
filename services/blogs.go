@@ -4,27 +4,25 @@ import (
 	"fmt"
 	"yao/internal"
 	"yao/libs"
-
-	"github.com/gin-gonic/gin"
 )
 
-func BLCanSee(ctx *gin.Context, blog_id int) bool {
+func BLCanSee(user_id, user_group, blog_id int) bool {
 	var blog internal.Blog
 	err := libs.DBSelectSingle(&blog, "select blog_id, author, private from blogs where blog_id=?", blog_id)
 	if err != nil {
 		return false
 	} else {
-		return ISAdmin(ctx) || GetUserId(ctx) == blog.Author || !blog.Private
+		return libs.IsAdmin(user_group) || user_id == blog.Author || !blog.Private
 	}
 }
 
-func BLCanEdit(ctx *gin.Context, blog_id int) bool {
+func BLCanEdit(user_id, user_group, blog_id int) bool {
 	var blog internal.Blog
 	err := libs.DBSelectSingle(&blog, "select blog_id, author from blogs where blog_id=?", blog_id)
 	if err != nil {
 		return false
 	} else {
-		return ISAdmin(ctx) || GetUserId(ctx) == blog.Author
+		return libs.IsAdmin(user_group) || user_id == blog.Author
 	}
 }
 
@@ -35,104 +33,108 @@ type BlogCreateParam struct {
 	Content string `body:"content"`
 }
 
-func BlogCreate(ctx *gin.Context, param BlogCreateParam) {
+func BlogCreate(ctx Context, param BlogCreateParam) {
 	if !internal.BLValidTitle(param.Title) {
-		libs.APIWriteBack(ctx, 400, "invalid title", nil)
+		ctx.JSONAPI(400, "invalid title", nil)
 		return
 	}
 	id, err := internal.BLCreate(param.UserID, param.Private, param.Title, param.Content)
 	if err != nil {
-		libs.APIInternalError(ctx, err)
+		ctx.ErrorAPI(err)
 	} else {
-		libs.APIWriteBack(ctx, 200, "", map[string]any{"id": id})
+		ctx.JSONAPI(200, "", map[string]any{"id": id})
 	}
 }
 
 type BlogEditParam struct {
-	BlogID int `body:"blog_id" binding:"required"`
+	BlogID  int    `body:"blog_id" binding:"required"`
+	Private int    `body:"private" binding:"required" validate:"gte=0,lte=1"`
+	Title   string `body:"title"`
+	Content string `body:"content"`
+	UserID  int    `session:"user_id"`
+	UserGrp int    `session:"user_group"`
 }
 
-func BlogEdit(ctx *gin.Context, param BlogEditParam) {
+func BlogEdit(ctx Context, param BlogEditParam) {
 	if !internal.BLExists(param.BlogID) {
-		libs.APIWriteBack(ctx, 404, "", nil)
+		ctx.JSONAPI(404, "", nil)
 		return
 	}
-	private, ok := libs.PostIntRange(ctx, "private", 0, 1)
-	if !ok {
+	if !BLCanEdit(param.UserID, param.UserGrp, param.BlogID) {
+		ctx.JSONAPI(403, "", nil)
 		return
 	}
-	if !BLCanEdit(ctx, param.BlogID) {
-		libs.APIWriteBack(ctx, 403, "", nil)
+	if !internal.BLValidTitle(param.Title) {
+		ctx.JSONAPI(400, "invalid title", nil)
 		return
 	}
-	title := ctx.PostForm("title")
-	if !internal.BLValidTitle(title) {
-		libs.APIWriteBack(ctx, 400, "invalid title", nil)
-		return
-	}
-	content := ctx.PostForm("content")
-	err := internal.BLEdit(param.BlogID, private, title, content)
+	err := internal.BLEdit(param.BlogID, param.Private, param.Title, param.Content)
 	if err != nil {
-		libs.APIInternalError(ctx, err)
+		ctx.ErrorAPI(err)
 	}
 }
 
 type BlogDelParam struct {
-	BlogID int `query:"blog_id" binding:"required"`
+	BlogID  int `query:"blog_id" binding:"required"`
+	UserID  int `session:"user_id"`
+	UserGrp int `session:"user_group"`
 }
 
-func BlogDel(ctx *gin.Context, param BlogDelParam) {
-	if !BLCanEdit(ctx, param.BlogID) {
-		libs.APIWriteBack(ctx, 403, "", nil)
+func BlogDel(ctx Context, param BlogDelParam) {
+	if !BLCanEdit(param.UserID, param.UserGrp, param.BlogID) {
+		ctx.JSONAPI(403, "", nil)
 		return
 	}
 	err := internal.BLDelete(param.BlogID)
 	if err != nil {
-		libs.APIInternalError(ctx, err)
+		ctx.ErrorAPI(err)
 	}
 }
 
 type BlogGetParam struct {
-	BlogID int `query:"blog_id" binding:"required"`
-	UserID int `session:"user_id"`
+	BlogID  int `query:"blog_id" binding:"required"`
+	UserID  int `session:"user_id"`
+	UserGrp int `session:"user_group"`
 }
 
-func BlogGet(ctx *gin.Context, param BlogGetParam) {
+func BlogGet(ctx Context, param BlogGetParam) {
 	if !internal.BLExists(param.BlogID) {
-		libs.APIWriteBack(ctx, 404, "", nil)
+		ctx.JSONAPI(404, "", nil)
 		return
 	}
-	if !BLCanSee(ctx, param.BlogID) {
-		libs.APIWriteBack(ctx, 403, "", nil)
+	if !BLCanSee(param.UserID, param.UserGrp, param.BlogID) {
+		ctx.JSONAPI(403, "", nil)
 		return
 	}
 	blog, err := internal.BLQuery(param.BlogID, param.UserID)
 	if err != nil {
-		libs.APIInternalError(ctx, err)
+		ctx.ErrorAPI(err)
 	} else {
 		ret, _ := libs.Struct2Map(blog)
-		libs.APIWriteBack(ctx, 200, "", ret)
+		ctx.JSONAPI(200, "", ret)
 	}
 }
 
 type BlogListParam struct {
-	UserID   *int `query:"user_id"`
-	Left     *int `query:"left"`
-	Right    *int `query:"right"`
-	PageSize *int `query:"pagesize"`
+	UserID    *int `query:"user_id"`
+	Left      *int `query:"left"`
+	Right     *int `query:"right"`
+	PageSize  *int `query:"pagesize"`
+	CurUserID int  `session:"user_id"`
+	UserGrp   int  `session:"user_group"`
 }
 
-func BlogList(ctx *gin.Context, param BlogListParam) {
+func BlogList(ctx Context, param BlogListParam) {
 	if param.UserID != nil {
-		blogs, err := internal.BLListUser(*param.UserID, GetUserId(ctx))
+		blogs, err := internal.BLListUser(*param.UserID, param.CurUserID)
 		if err != nil {
-			libs.APIInternalError(ctx, err)
+			ctx.ErrorAPI(err)
 		} else {
-			libs.APIWriteBack(ctx, 200, "", map[string]any{"data": blogs})
+			ctx.JSONAPI(200, "", map[string]any{"data": blogs})
 		}
 	} else {
 		if param.PageSize == nil || *param.PageSize > 100 || *param.PageSize < 1 {
-			libs.APIWriteBack(ctx, 400, fmt.Sprintf("invalid request: parameter pagesize should be in [%d, %d]", 1, 100), nil)
+			ctx.JSONAPI(400, fmt.Sprintf("invalid request: parameter pagesize should be in [%d, %d]", 1, 100), nil)
 			return
 		}
 		var bound int
@@ -143,11 +145,13 @@ func BlogList(ctx *gin.Context, param BlogListParam) {
 		} else {
 			return
 		}
-		blogs, isfull, err := internal.BLListAll(bound, *param.PageSize, GetUserId(ctx), param.Left != nil, ISAdmin(ctx))
+		blogs, isfull, err := internal.BLListAll(
+			bound, *param.PageSize, param.CurUserID, param.Left != nil, libs.IsAdmin(param.UserGrp),
+		)
 		if err != nil {
-			libs.APIInternalError(ctx, err)
+			ctx.ErrorAPI(err)
 			return
 		}
-		libs.APIWriteBack(ctx, 200, "", map[string]any{"isfull": isfull, "data": blogs})
+		ctx.JSONAPI(200, "", map[string]any{"isfull": isfull, "data": blogs})
 	}
 }
