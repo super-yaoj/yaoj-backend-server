@@ -9,20 +9,18 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func CTCanEdit(ctx *gin.Context, contest_id int) bool {
-	user_id := GetUserId(ctx)
+func CTCanEdit(user_id int, user_group int, contest_id int) bool {
 	if user_id < 0 {
 		return false
 	}
-	if ISAdmin(ctx) {
+	if libs.IsAdmin(user_group) {
 		return true
 	}
 	count, _ := libs.DBSelectSingleInt("select count(*) from contest_permissions where contest_id=? and permission_id=?", contest_id, -user_id)
 	return count > 0
 }
 
-func CTCanSee(ctx *gin.Context, contest_id int, can_edit bool) bool {
-	user_id := GetUserId(ctx)
+func CTCanSee(user_id int, contest_id int, can_edit bool) bool {
 	if user_id < 0 {
 		count, _ := libs.DBSelectSingleInt("select count(*) from contest_permissions where contest_id=? and permission_id=?", contest_id, libs.DefaultGroup)
 		return count > 0
@@ -34,19 +32,17 @@ func CTCanSee(ctx *gin.Context, contest_id int, can_edit bool) bool {
 	return count > 0
 }
 
-func CTCanTake(ctx *gin.Context, contest internal.Contest, can_edit bool) bool {
-	user_id := GetUserId(ctx)
+func CTCanTake(user_id int, contest internal.Contest, can_edit bool) bool {
 	if user_id < 0 {
 		return false
 	}
 	if contest.EndTime.After(time.Now()) {
-		return !can_edit && CTCanSee(ctx, contest.Id, can_edit)
+		return !can_edit && CTCanSee(user_id, contest.Id, can_edit)
 	}
 	return false
 }
 
-func CTCanEnter(ctx *gin.Context, contest internal.Contest, can_edit bool) bool {
-	user_id := GetUserId(ctx)
+func CTCanEnter(user_id int, contest internal.Contest, can_edit bool) bool {
 	if can_edit {
 		return true
 	}
@@ -55,7 +51,7 @@ func CTCanEnter(ctx *gin.Context, contest internal.Contest, can_edit bool) bool 
 	} else if contest.EndTime.After(time.Now()) {
 		return internal.CTRegistered(contest.Id, user_id)
 	} else {
-		return CTCanSee(ctx, contest.Id, can_edit)
+		return CTCanSee(user_id, contest.Id, can_edit)
 	}
 }
 
@@ -84,7 +80,9 @@ func CtstList(ctx *gin.Context, param CtstListParam) {
 }
 
 type CtstGetParam struct {
-	CtstID int `query:"contest_id" binding:"required"`
+	CtstID  int `query:"contest_id" binding:"required"`
+	UserID  int `session:"user_id"`
+	UserGrp int `session:"user_group"`
 }
 
 func CtstGet(ctx *gin.Context, param CtstGetParam) {
@@ -93,8 +91,8 @@ func CtstGet(ctx *gin.Context, param CtstGetParam) {
 		libs.APIWriteBack(ctx, 404, "", nil)
 		return
 	}
-	can_edit := CTCanEdit(ctx, param.CtstID)
-	if !CTCanEnter(ctx, contest, can_edit) {
+	can_edit := CTCanEdit(param.UserID, param.UserGrp, param.CtstID)
+	if !CTCanEnter(param.UserID, contest, can_edit) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
@@ -102,7 +100,9 @@ func CtstGet(ctx *gin.Context, param CtstGetParam) {
 }
 
 type CtstProbGetParam struct {
-	CtstID int `query:"contest_id" binding:"required"`
+	CtstID  int `query:"contest_id" binding:"required"`
+	UserID  int `session:"user_id"`
+	UserGrp int `session:"user_group"`
 }
 
 func CtstProbGet(ctx *gin.Context, param CtstProbGetParam) {
@@ -111,7 +111,7 @@ func CtstProbGet(ctx *gin.Context, param CtstProbGetParam) {
 		libs.APIWriteBack(ctx, 404, "", nil)
 		return
 	}
-	if !CTCanEnter(ctx, contest, CTCanEdit(ctx, param.CtstID)) {
+	if !CTCanEnter(param.UserID, contest, CTCanEdit(param.UserID, param.UserGrp, param.CtstID)) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
@@ -124,8 +124,10 @@ func CtstProbGet(ctx *gin.Context, param CtstProbGetParam) {
 }
 
 type CtstProbAddParam struct {
-	CtstID int `body:"contest_id" binding:"required"`
-	ProbID int `body:"problem_id" binding:"required"`
+	CtstID  int `body:"contest_id" binding:"required"`
+	ProbID  int `body:"problem_id" binding:"required"`
+	UserID  int `session:"user_id"`
+	UserGrp int `session:"user_group"`
 }
 
 func CtstProbAdd(ctx *gin.Context, param CtstProbAddParam) {
@@ -133,7 +135,7 @@ func CtstProbAdd(ctx *gin.Context, param CtstProbAddParam) {
 		libs.APIWriteBack(ctx, 404, "", nil)
 		return
 	}
-	if !CTCanEdit(ctx, param.CtstID) {
+	if !CTCanEdit(param.UserID, param.UserGrp, param.CtstID) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
@@ -148,12 +150,14 @@ func CtstProbAdd(ctx *gin.Context, param CtstProbAddParam) {
 }
 
 type CtstProbDelParam struct {
-	CtstID int `query:"contest_id" binding:"required"`
-	ProbID int `query:"problem_id" binding:"required"`
+	CtstID  int `query:"contest_id" binding:"required"`
+	ProbID  int `query:"problem_id" binding:"required"`
+	UserID  int `session:"user_id"`
+	UserGrp int `session:"user_group"`
 }
 
 func CtstProbDel(ctx *gin.Context, param CtstProbDelParam) {
-	if !CTCanEdit(ctx, param.CtstID) {
+	if !CTCanEdit(param.UserID, param.UserGrp, param.CtstID) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
@@ -185,6 +189,8 @@ type CtstEditParam struct {
 	Duration     int    `body:"last" binding:"required" validate:"gte=1,lte=1000000"`
 	PrtstOnly    int    `body:"pretest" binding:"required" validate:"gte=0,lte=1"`
 	ScorePrivate int    `body:"score_private" binding:"required" validate:"gte=0,lte=1"`
+	UserID       int    `session:"user_id"`
+	UserGrp      int    `session:"user_group"`
 }
 
 func CtstEdit(ctx *gin.Context, param CtstEditParam) {
@@ -192,7 +198,7 @@ func CtstEdit(ctx *gin.Context, param CtstEditParam) {
 		libs.APIWriteBack(ctx, 404, "", nil)
 		return
 	}
-	if !CTCanEdit(ctx, param.CtstID) {
+	if !CTCanEdit(param.UserID, param.UserGrp, param.CtstID) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
@@ -209,7 +215,9 @@ func CtstEdit(ctx *gin.Context, param CtstEditParam) {
 }
 
 type CtstPermGetParam struct {
-	CtstID int `query:"contest_id" binding:"required"`
+	CtstID  int `query:"contest_id" binding:"required"`
+	UserID  int `session:"user_id"`
+	UserGrp int `session:"user_group"`
 }
 
 func CtstPermGet(ctx *gin.Context, param CtstPermGetParam) {
@@ -217,7 +225,7 @@ func CtstPermGet(ctx *gin.Context, param CtstPermGetParam) {
 		libs.APIWriteBack(ctx, 404, "", nil)
 		return
 	}
-	if !CTCanEdit(ctx, param.CtstID) {
+	if !CTCanEdit(param.UserID, param.UserGrp, param.CtstID) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
@@ -230,7 +238,9 @@ func CtstPermGet(ctx *gin.Context, param CtstPermGetParam) {
 }
 
 type CtstMgrGetParam struct {
-	CtstID int `query:"contest_id" binding:"required"`
+	CtstID  int `query:"contest_id" binding:"required"`
+	UserID  int `session:"user_id"`
+	UserGrp int `session:"user_group"`
 }
 
 func CtstMgrGet(ctx *gin.Context, param CtstMgrGetParam) {
@@ -238,7 +248,7 @@ func CtstMgrGet(ctx *gin.Context, param CtstMgrGetParam) {
 		libs.APIWriteBack(ctx, 404, "", nil)
 		return
 	}
-	if !CTCanEdit(ctx, param.CtstID) {
+	if !CTCanEdit(param.UserID, param.UserGrp, param.CtstID) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
@@ -251,8 +261,10 @@ func CtstMgrGet(ctx *gin.Context, param CtstMgrGetParam) {
 }
 
 type CtstPermAddParam struct {
-	CtstID int `body:"contest_id" binding:"required"`
-	PermID int `body:"permission_id" binding:"required"`
+	CtstID  int `body:"contest_id" binding:"required"`
+	PermID  int `body:"permission_id" binding:"required"`
+	UserID  int `session:"user_id"`
+	UserGrp int `session:"user_group"`
 }
 
 func CtstPermAdd(ctx *gin.Context, param CtstPermAddParam) {
@@ -260,7 +272,7 @@ func CtstPermAdd(ctx *gin.Context, param CtstPermAddParam) {
 		libs.APIWriteBack(ctx, 404, "", nil)
 		return
 	}
-	if !CTCanEdit(ctx, param.CtstID) {
+	if !CTCanEdit(param.UserID, param.UserGrp, param.CtstID) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
@@ -275,8 +287,10 @@ func CtstPermAdd(ctx *gin.Context, param CtstPermAddParam) {
 }
 
 type CtstMgrAddParam struct {
-	CtstID int `body:"contest_id" binding:"required"`
-	UserID int `body:"user_id" binding:"required"`
+	CtstID    int `body:"contest_id" binding:"required"`
+	UserID    int `body:"user_id" binding:"required"`
+	CurUserID int `session:"user_id"`
+	UserGrp   int `session:"user_group"`
 }
 
 func CtstMgrAdd(ctx *gin.Context, param CtstMgrAddParam) {
@@ -284,7 +298,7 @@ func CtstMgrAdd(ctx *gin.Context, param CtstMgrAddParam) {
 		libs.APIWriteBack(ctx, 404, "", nil)
 		return
 	}
-	if !CTCanEdit(ctx, param.CtstID) {
+	if !CTCanEdit(param.CurUserID, param.UserGrp, param.CtstID) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
@@ -303,12 +317,14 @@ func CtstMgrAdd(ctx *gin.Context, param CtstMgrAddParam) {
 }
 
 type CtstPermDelParam struct {
-	CtstID int `query:"contest_id" binding:"required"`
-	PermID int `query:"permission_id" binding:"required"`
+	CtstID  int `query:"contest_id" binding:"required"`
+	PermID  int `query:"permission_id" binding:"required"`
+	UserID  int `session:"user_id"`
+	UserGrp int `session:"user_group"`
 }
 
 func CtstPermDel(ctx *gin.Context, param CtstPermDelParam) {
-	if !CTCanEdit(ctx, param.CtstID) {
+	if !CTCanEdit(param.UserID, param.UserGrp, param.CtstID) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
@@ -319,12 +335,14 @@ func CtstPermDel(ctx *gin.Context, param CtstPermDelParam) {
 }
 
 type CtstMgrDelParam struct {
-	CtstID int `query:"contest_id" binding:"required"`
-	UserID int `query:"user_id" binding:"required"`
+	CtstID    int `query:"contest_id" binding:"required"`
+	UserID    int `query:"user_id" binding:"required"`
+	CurUserID int `session:"user_id"`
+	UserGrp   int `session:"user_group"`
 }
 
 func CtstMgrDel(ctx *gin.Context, param CtstMgrDelParam) {
-	if !CTCanEdit(ctx, param.CtstID) {
+	if !CTCanEdit(param.CurUserID, param.UserGrp, param.CtstID) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
@@ -335,7 +353,9 @@ func CtstMgrDel(ctx *gin.Context, param CtstMgrDelParam) {
 }
 
 type CtstPtcpGetParam struct {
-	CtstID int `query:"contest_id" binding:"required"`
+	CtstID  int `query:"contest_id" binding:"required"`
+	UserID  int `session:"user_id"`
+	UserGrp int `session:"user_group"`
 }
 
 func CtstPtcpGet(ctx *gin.Context, param CtstPtcpGetParam) {
@@ -343,7 +363,7 @@ func CtstPtcpGet(ctx *gin.Context, param CtstPtcpGetParam) {
 		libs.APIWriteBack(ctx, 404, "", nil)
 		return
 	}
-	if !CTCanSee(ctx, param.CtstID, CTCanEdit(ctx, param.CtstID)) {
+	if !CTCanSee(param.UserID, param.CtstID, CTCanEdit(param.UserID, param.UserGrp, param.CtstID)) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
@@ -356,8 +376,9 @@ func CtstPtcpGet(ctx *gin.Context, param CtstPtcpGetParam) {
 }
 
 type CtstSignupParam struct {
-	CtstID int `body:"contest_id" binding:"required"`
-	UserID int `session:"user_id"`
+	CtstID  int `body:"contest_id" binding:"required"`
+	UserID  int `session:"user_id"`
+	UserGrp int `session:"user_group"`
 }
 
 func CtstSignup(ctx *gin.Context, param CtstSignupParam) {
@@ -366,7 +387,7 @@ func CtstSignup(ctx *gin.Context, param CtstSignupParam) {
 		libs.APIWriteBack(ctx, 404, "", nil)
 		return
 	}
-	if !CTCanTake(ctx, contest, CTCanEdit(ctx, param.CtstID)) {
+	if !CTCanTake(param.UserID, contest, CTCanEdit(param.UserID, param.UserGrp, param.CtstID)) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}

@@ -70,7 +70,7 @@ var Router map[string][]Request = map[string][]Request{
 	"/problems": {{"GET", service.GinHandler(ProbList)}},
 	"/problem": {
 		{"GET", service.GinHandler(ProbGet)},
-		{"POST", PRCreate},
+		{"POST", service.GinHandler(ProbAdd)},
 		{"PATCH", service.GinHandler(ProbModify)},
 	},
 	"/problem_permissions": {

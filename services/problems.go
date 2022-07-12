@@ -11,29 +11,28 @@ import (
 	"yao/internal"
 	"yao/libs"
 
+	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"github.com/super-yaoj/yaoj-core/pkg/problem"
 )
 
-func PRCanEdit(ctx *gin.Context, problem_id int) bool {
-	user_id := GetUserId(ctx)
+func PRCanEdit(user_id int, user_group int, problem_id int) bool {
 	if user_id < 0 {
 		return false
 	}
-	if ISAdmin(ctx) {
+	if libs.IsAdmin(user_group) {
 		return true
 	}
 	count, _ := libs.DBSelectSingleInt("select count(*) from problem_permissions where problem_id=? and permission_id=?", problem_id, -user_id)
 	return count > 0
 }
 
-func PRCanSeeWithoutContest(ctx *gin.Context, problem_id int) bool {
-	user_id := GetUserId(ctx)
+func PRCanSeeWithoutContest(user_id int, user_group int, problem_id int) bool {
 	if user_id < 0 {
 		count, _ := libs.DBSelectSingleInt("select count(*) from problem_permissions where problem_id=? and permission_id=?", problem_id, libs.DefaultGroup)
 		return count > 0
 	}
-	if PRCanEdit(ctx, problem_id) {
+	if PRCanEdit(user_id, user_group, problem_id) {
 		return true
 	}
 	count, _ := libs.DBSelectSingleInt("select count(*) from ((select * from problem_permissions where problem_id=?) as a join (select * from user_permissions where user_id=?) as b on a.permission_id=b.permission_id)", problem_id, user_id)
@@ -42,9 +41,9 @@ func PRCanSeeWithoutContest(ctx *gin.Context, problem_id int) bool {
 
 /*
  */
-func PRCanSeeFromContest(ctx *gin.Context, problem_id, contest_id int) bool {
-	contest, _ := internal.CTQuery(contest_id, GetUserId(ctx))
-	if CTCanEnter(ctx, contest, CTCanEdit(ctx, contest_id)) &&
+func PRCanSeeFromContest(user_id, user_group, problem_id, contest_id int) bool {
+	contest, _ := internal.CTQuery(contest_id, user_id)
+	if CTCanEnter(user_id, contest, CTCanEdit(user_id, user_group, contest_id)) &&
 		contest.StartTime.Before(time.Now()) && contest.EndTime.After(time.Now()) {
 		return internal.CTHasProblem(contest_id, problem_id)
 	}
@@ -57,8 +56,11 @@ args: contest_id=0 means not in contest
 return: (must see from contest, can see)
 */
 func PRCanSee(ctx *gin.Context, problem_id, contest_id int) (bool, bool) {
-	if !PRCanSeeWithoutContest(ctx, problem_id) {
-		if contest_id <= 0 || !PRCanSeeFromContest(ctx, problem_id, contest_id) {
+	user_id := GetUserId(ctx)
+	sess := sessions.Default(ctx)
+	user_group, _ := sess.Get("user_group").(int)
+	if !PRCanSeeWithoutContest(user_id, user_group, problem_id) {
+		if contest_id <= 0 || !PRCanSeeFromContest(user_id, user_group, problem_id, contest_id) {
 			libs.APIWriteBack(ctx, 403, "", nil)
 			return false, false
 		}
@@ -69,6 +71,7 @@ func PRCanSee(ctx *gin.Context, problem_id, contest_id int) (bool, bool) {
 
 type ProbListParam struct {
 	UserID   int  `session:"user_id"`
+	UserGrp  int  `session:"user_group"`
 	Left     *int `query:"left"`
 	Right    *int `query:"right"`
 	PageSize int  `query:"pagesize" binding:"required" validate:"gte=1,lte=100"`
@@ -83,7 +86,9 @@ func ProbList(ctx *gin.Context, param ProbListParam) {
 	} else {
 		return
 	}
-	problems, isfull, err := internal.PRList(bound, param.PageSize, param.UserID, param.Left != nil, ISAdmin(ctx))
+	problems, isfull, err := internal.PRList(
+		bound, param.PageSize, param.UserID, param.Left != nil, libs.IsAdmin(param.UserGrp),
+	)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	} else {
@@ -91,16 +96,16 @@ func ProbList(ctx *gin.Context, param ProbListParam) {
 	}
 }
 
-func PRCreate(ctx *gin.Context) {
-	if !ISAdmin(ctx) {
-		libs.APIWriteBack(ctx, 403, "", nil)
-		return
-	}
-	id, err := libs.DBInsertGetId("insert into problems values (null, \"New Problem\", 0, \"\", \"\")")
+type ProbAddParam struct {
+	UserGrp int `session:"user_group" validate:"admin"`
+}
+
+func ProbAdd(ctx *gin.Context, param ProbAddParam) {
+	id, err := libs.DBInsertGetId(`insert into problems values (null, "New Problem", 0, "", "")`)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	} else {
-		libs.APIWriteBack(ctx, 200, "", map[string]any{"id": id})
+		libs.APIWriteBack(ctx, 200, "", gin.H{"id": id})
 	}
 }
 
@@ -130,7 +135,7 @@ func ProbGet(ctx *gin.Context, param ProbGetParam) {
 		prob.Tutorial_zh = ""
 		prob.Tutorial_en = ""
 	}
-	can_edit := PRCanEdit(ctx, param.ProbID)
+	can_edit := PRCanEdit(param.UserID, param.UserGrp, param.ProbID)
 	if !can_edit {
 		prob.DataInfo = problem.DataInfo{}
 	}
@@ -139,7 +144,9 @@ func ProbGet(ctx *gin.Context, param ProbGetParam) {
 
 // 获取题目权限
 type ProbGetPermParam struct {
-	ProbID int `query:"problem_id" binding:"required"`
+	ProbID  int `query:"problem_id" binding:"required"`
+	UserID  int `session:"user_id"`
+	UserGrp int `session:"user_group"`
 }
 
 func ProbGetPerm(ctx *gin.Context, param ProbGetPermParam) {
@@ -147,7 +154,7 @@ func ProbGetPerm(ctx *gin.Context, param ProbGetPermParam) {
 		libs.APIWriteBack(ctx, 404, "", nil)
 		return
 	}
-	if !PRCanEdit(ctx, param.ProbID) {
+	if !PRCanEdit(param.UserID, param.UserGrp, param.ProbID) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
@@ -160,8 +167,10 @@ func ProbGetPerm(ctx *gin.Context, param ProbGetPermParam) {
 }
 
 type ProbAddPermParam struct {
-	ProbID int `body:"problem_id" binding:"required"`
-	PermID int `body:"permission_id" binding:"required"`
+	ProbID  int `body:"problem_id" binding:"required"`
+	PermID  int `body:"permission_id" binding:"required"`
+	UserID  int `session:"user_id"`
+	UserGrp int `session:"user_group"`
 }
 
 func ProbAddPerm(ctx *gin.Context, param ProbAddPermParam) {
@@ -169,7 +178,7 @@ func ProbAddPerm(ctx *gin.Context, param ProbAddPermParam) {
 		libs.APIWriteBack(ctx, 404, "", nil)
 		return
 	}
-	if !PRCanEdit(ctx, param.ProbID) {
+	if !PRCanEdit(param.UserID, param.UserGrp, param.ProbID) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
@@ -184,12 +193,14 @@ func ProbAddPerm(ctx *gin.Context, param ProbAddPermParam) {
 }
 
 type ProbDelPermParam struct {
-	ProbID int `query:"problem_id" binding:"required"`
-	PermID int `query:"permission_id" binding:"required"`
+	ProbID  int `query:"problem_id" binding:"required"`
+	PermID  int `query:"permission_id" binding:"required"`
+	UserID  int `session:"user_id"`
+	UserGrp int `session:"user_group"`
 }
 
 func ProbDelPerm(ctx *gin.Context, param ProbDelPermParam) {
-	if !PRCanEdit(ctx, param.ProbID) {
+	if !PRCanEdit(param.UserID, param.UserGrp, param.ProbID) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
@@ -200,7 +211,9 @@ func ProbDelPerm(ctx *gin.Context, param ProbDelPermParam) {
 }
 
 type ProbGetMgrParam struct {
-	ProbID int `query:"problem_id" binding:"required"`
+	ProbID  int `query:"problem_id" binding:"required"`
+	UserID  int `session:"user_id"`
+	UserGrp int `session:"user_group"`
 }
 
 func ProbGetMgr(ctx *gin.Context, param ProbGetMgrParam) {
@@ -208,7 +221,7 @@ func ProbGetMgr(ctx *gin.Context, param ProbGetMgrParam) {
 		libs.APIWriteBack(ctx, 404, "", nil)
 		return
 	}
-	if !PRCanEdit(ctx, param.ProbID) {
+	if !PRCanEdit(param.UserID, param.UserGrp, param.ProbID) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
@@ -221,8 +234,10 @@ func ProbGetMgr(ctx *gin.Context, param ProbGetMgrParam) {
 }
 
 type ProbAddMgrParam struct {
-	ProbID int `body:"problem_id" binding:"required"`
-	UserID int `body:"user_id" binding:"required"`
+	ProbID    int `body:"problem_id" binding:"required"`
+	UserID    int `body:"user_id" binding:"required"`
+	CurUserID int `session:"user_id"`
+	UserGrp   int `session:"user_group"`
 }
 
 func ProbAddMgr(ctx *gin.Context, param ProbAddMgrParam) {
@@ -230,7 +245,7 @@ func ProbAddMgr(ctx *gin.Context, param ProbAddMgrParam) {
 		libs.APIWriteBack(ctx, 404, "", nil)
 		return
 	}
-	if !PRCanEdit(ctx, param.ProbID) {
+	if !PRCanEdit(param.CurUserID, param.UserGrp, param.ProbID) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
@@ -245,12 +260,14 @@ func ProbAddMgr(ctx *gin.Context, param ProbAddMgrParam) {
 }
 
 type ProbDelMgrParam struct {
-	ProbID int `query:"problem_id" binding:"required"`
-	UserID int `query:"user_id" binding:"required"`
+	ProbID    int `query:"problem_id" binding:"required"`
+	UserID    int `query:"user_id" binding:"required"`
+	CurUserID int `session:"user_id"`
+	UserGrp   int `session:"user_group"`
 }
 
 func ProbDelMgr(ctx *gin.Context, param ProbDelMgrParam) {
-	if !PRCanEdit(ctx, param.ProbID) {
+	if !PRCanEdit(param.CurUserID, param.UserGrp, param.ProbID) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
@@ -261,8 +278,10 @@ func ProbDelMgr(ctx *gin.Context, param ProbDelMgrParam) {
 }
 
 type ProbPutDataParam struct {
-	ProbID int                   `body:"problem_id" binding:"required"`
-	Data   *multipart.FileHeader `body:"data" binding:"required"`
+	ProbID  int                   `body:"problem_id" binding:"required"`
+	Data    *multipart.FileHeader `body:"data" binding:"required"`
+	UserID  int                   `session:"user_id"`
+	UserGrp int                   `session:"user_group"`
 }
 
 func ProbPutData(ctx *gin.Context, param ProbPutDataParam) {
@@ -270,7 +289,7 @@ func ProbPutData(ctx *gin.Context, param ProbPutDataParam) {
 		libs.APIWriteBack(ctx, 404, "", nil)
 		return
 	}
-	if !PRCanEdit(ctx, param.ProbID) {
+	if !PRCanEdit(param.UserID, param.UserGrp, param.ProbID) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
@@ -298,6 +317,8 @@ type ProbDownDataParam struct {
 	ProbID   int    `query:"problem_id" binding:"required"`
 	CtstID   int    `query:"contest_id"`
 	DataType string `query:"type"`
+	UserID   int    `session:"user_id"`
+	UserGrp  int    `session:"user_group"`
 }
 
 func ProbDownData(ctx *gin.Context, param ProbDownDataParam) {
@@ -308,7 +329,7 @@ func ProbDownData(ctx *gin.Context, param ProbDownDataParam) {
 	internal.ProblemRWLock.RLock(param.ProbID)
 	defer internal.ProblemRWLock.RUnlock(param.ProbID)
 	if param.DataType == "data" {
-		if !PRCanEdit(ctx, param.ProbID) {
+		if !PRCanEdit(param.UserID, param.UserGrp, param.ProbID) {
 			libs.APIWriteBack(ctx, 403, "", nil)
 			return
 		}
@@ -339,6 +360,8 @@ type ProbModifyParam struct {
 	ProbID    int    `body:"problem_id" binding:"required"`
 	Title     string `body:"title"`
 	AllowDown string `body:"allow_down"`
+	UserID    int    `session:"user_id"`
+	UserGrp   int    `session:"user_group"`
 }
 
 func ProbModify(ctx *gin.Context, param ProbModifyParam) {
@@ -346,7 +369,7 @@ func ProbModify(ctx *gin.Context, param ProbModifyParam) {
 		libs.APIWriteBack(ctx, 404, "", nil)
 		return
 	}
-	if !PRCanEdit(ctx, param.ProbID) {
+	if !PRCanEdit(param.UserID, param.UserGrp, param.ProbID) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}

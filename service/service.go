@@ -3,6 +3,7 @@ package service
 import (
 	"log"
 	"net/http"
+	"yao/libs"
 
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
@@ -81,4 +82,17 @@ func GinHandler[T any](handler StdHandlerFunc[T]) gin.HandlerFunc {
 		}
 		handler(ctx, data)
 	}
+}
+
+func init() {
+	// check whether the user_group belongs to admin
+	defaultValidator.RegisterValidation("admin", func(fl validator.FieldLevel) bool {
+		if !fl.Field().CanInt() {
+			return false
+		}
+		if !libs.IsAdmin(int(fl.Field().Int())) {
+			return false
+		}
+		return true
+	})
 }

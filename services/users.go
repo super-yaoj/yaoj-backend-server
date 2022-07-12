@@ -11,13 +11,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-const (
-	USBanned = 0
-	USNormal = 1
-	USAdmin  = 2
-	USRoot   = 3
-)
-
 func checkPU(ctx *gin.Context, name, password string) bool {
 	if !internal.ValidPassword(password) || !internal.ValidUsername(name) {
 		message := "invalid username"
@@ -53,7 +46,7 @@ func UserSignUp(ctx *gin.Context, param UserSignUpParam) {
 	}
 	user_id, err := libs.DBInsertGetId(
 		"insert into user_info values (null, ?, ?, \"\", 0, ?, ?, ?, 0, \"\", \"\")",
-		param.UserName, password, time.Now(), remember_token, USNormal,
+		param.UserName, password, time.Now(), remember_token, libs.USNormal,
 	)
 	if err != nil {
 		libs.APIWriteBack(ctx, 400, "username has been used by others", nil)
@@ -62,7 +55,7 @@ func UserSignUp(ctx *gin.Context, param UserSignUpParam) {
 	sess := sessions.Default(ctx)
 	sess.Set("user_id", int(user_id))
 	sess.Set("user_name", param.UserName)
-	sess.Set("user_group", USNormal)
+	sess.Set("user_group", libs.USNormal)
 	libs.DBUpdate("insert into user_permissions values (?, ?)", user_id, libs.DefaultGroup)
 	libs.DBUpdate("update permissions set count = count + 1 where permission_id=1")
 	sess.Save()
@@ -93,7 +86,7 @@ func UserLogin(ctx *gin.Context, param UserLoginParam) {
 		libs.RPCWriteBack(ctx, 400, -32600, "username or password is wrong", nil)
 		return
 	}
-	if user.Usergroup == USBanned {
+	if user.Usergroup == libs.USBanned {
 		libs.RPCWriteBack(ctx, 400, -32600, "user is banned", nil)
 		return
 	}
@@ -126,7 +119,7 @@ func USInit(ctx *gin.Context) {
 	sess := sessions.Default(ctx)
 	var ret func(internal.UserSmall) = func(user internal.UserSmall) {
 		fmt.Println(user)
-		if user.Usergroup == USBanned {
+		if user.Usergroup == libs.USBanned {
 			USLogout(ctx)
 			libs.RPCWriteBack(ctx, 400, -32600, "user is banned", nil)
 			return
@@ -136,12 +129,12 @@ func USInit(ctx *gin.Context) {
 			"user_name":   user.Name,
 			"user_group":  user.Usergroup,
 			"server_time": time.Now(),
-			"is_admin":    IsAdmin(user.Usergroup),
+			"is_admin":    libs.IsAdmin(user.Usergroup),
 		})
 	}
 
 	tmp, err := ctx.Cookie("user_id")
-	user := internal.UserSmall{Id: -1, Name: "", Usergroup: USNormal}
+	user := internal.UserSmall{Id: -1, Name: "", Usergroup: libs.USNormal}
 	if err == nil {
 		id, err := strconv.Atoi(tmp)
 		remember_token, err1 := ctx.Cookie("remember_token")
@@ -166,15 +159,11 @@ func USInit(ctx *gin.Context) {
 	ret(user)
 }
 
-func IsAdmin(user_group int) bool {
-	return (user_group == USAdmin || user_group == USRoot)
-}
-
 // 根据 session 中的 user_group 判断是否是管理
 func ISAdmin(ctx *gin.Context) bool {
 	sess := sessions.Default(ctx)
 	user_group, ok := sess.Get("user_group").(int)
-	return ok && IsAdmin(user_group)
+	return ok && libs.IsAdmin(user_group)
 }
 
 // 从 session 中获取 userid

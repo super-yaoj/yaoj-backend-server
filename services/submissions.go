@@ -225,8 +225,9 @@ func getPreview(val []byte, mode utils.CtntType, lang utils.LangTag) internal.Co
 }
 
 type SubmGetParam struct {
-	SubmID int `query:"submission_id" binding:"required"`
-	UserID int `session:"user_id"`
+	SubmID  int `query:"submission_id" binding:"required"`
+	UserID  int `session:"user_id"`
+	UserGrp int `session:"user_group"`
 }
 
 // Query single submission, when user is in contests which score_private=true
@@ -238,8 +239,8 @@ func SubmGet(ctx *gin.Context, param SubmGetParam) {
 		return
 	}
 	//user cannot see submission details inside contests
-	by_problem := PRCanSeeWithoutContest(ctx, ret.ProblemId)
-	can_edit := SMCanEdit(ctx, ret.SubmissionBase)
+	by_problem := PRCanSeeWithoutContest(param.UserID, param.UserGrp, ret.ProblemId)
+	can_edit := SMCanEdit(param.UserID, param.UserGrp, ret.SubmissionBase)
 	if !can_edit && ret.Submitter != param.UserID && !by_problem {
 		libs.APIWriteBack(ctx, 403, "", nil)
 	} else {
@@ -277,12 +278,15 @@ func SMCustomTest(ctx *gin.Context) {
 	libs.APIWriteBack(ctx, 200, "", map[string]any{"result": string(result)})
 }
 
-func SMCanEdit(ctx *gin.Context, sub internal.SubmissionBase) bool {
-	return PRCanEdit(ctx, sub.ProblemId) || (sub.ContestId > 0 && CTCanEdit(ctx, sub.ContestId))
+func SMCanEdit(user_id, user_group int, sub internal.SubmissionBase) bool {
+	return PRCanEdit(user_id, user_group, sub.ProblemId) ||
+		(sub.ContestId > 0 && CTCanEdit(user_id, user_group, sub.ContestId))
 }
 
 type SubmDelParam struct {
-	SubmID int `query:"submission_id" binding:"required"`
+	SubmID  int `query:"submission_id" binding:"required"`
+	UserID  int `session:"user_id"`
+	UserGrp int `session:"user_group"`
 }
 
 func SubmDel(ctx *gin.Context, param SubmDelParam) {
@@ -291,7 +295,7 @@ func SubmDel(ctx *gin.Context, param SubmDelParam) {
 		libs.APIWriteBack(ctx, 404, "", nil)
 		return
 	}
-	if !SMCanEdit(ctx, sub) {
+	if !SMCanEdit(param.UserID, param.UserGrp, sub) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
@@ -302,8 +306,10 @@ func SubmDel(ctx *gin.Context, param SubmDelParam) {
 }
 
 type RejudgeParam struct {
-	ProbID *int `body:"problem_id"`
-	SubmID int  `body:"submission_id"`
+	ProbID  *int `body:"problem_id"`
+	SubmID  int  `body:"submission_id"`
+	UserID  int  `session:"user_id"`
+	UserGrp int  `session:"user_group"`
 }
 
 func Rejudge(ctx *gin.Context, param RejudgeParam) {
@@ -312,7 +318,7 @@ func Rejudge(ctx *gin.Context, param RejudgeParam) {
 			libs.RPCWriteBack(ctx, 404, -32600, "", nil)
 			return
 		}
-		if !PRCanEdit(ctx, *param.ProbID) {
+		if !PRCanEdit(param.UserID, param.UserGrp, *param.ProbID) {
 			libs.RPCWriteBack(ctx, 403, -32600, "", nil)
 			return
 		}
@@ -326,7 +332,7 @@ func Rejudge(ctx *gin.Context, param RejudgeParam) {
 			libs.RPCWriteBack(ctx, 404, -32600, "", nil)
 			return
 		}
-		if !SMCanEdit(ctx, sub) {
+		if !SMCanEdit(param.UserID, param.UserGrp, sub) {
 			libs.RPCWriteBack(ctx, 403, -32600, "", nil)
 			return
 		}
