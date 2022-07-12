@@ -16,6 +16,9 @@ import (
 	"github.com/super-yaoj/yaoj-core/pkg/problem"
 )
 
+// i. e. valid user_id with either:
+// 1. admin user_group
+// 2. problem permission
 func PRCanEdit(user_id int, user_group int, problem_id int) bool {
 	if user_id < 0 {
 		return false

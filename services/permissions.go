@@ -13,13 +13,10 @@ import (
 
 type PermCreateParam struct {
 	PermName string `body:"permission_name"`
+	UserGrp  int    `session:"user_group" validate:"admin"`
 }
 
 func PermCreate(ctx *gin.Context, param PermCreateParam) {
-	if !ISAdmin(ctx) {
-		libs.APIWriteBack(ctx, 403, "", nil)
-		return
-	}
 	if len(param.PermName) > 190 {
 		libs.APIWriteBack(ctx, 400, "permission name is too long", nil)
 		return
@@ -35,13 +32,10 @@ func PermCreate(ctx *gin.Context, param PermCreateParam) {
 type PermRenameParam struct {
 	PermID   int    `body:"permission_id" binding:"required"`
 	PermName string `body:"permission_name"`
+	UserGrp  int    `session:"user_group" validate:"admin"`
 }
 
 func PermRename(ctx *gin.Context, param PermRenameParam) {
-	if !ISAdmin(ctx) {
-		libs.APIWriteBack(ctx, 403, "", nil)
-		return
-	}
 	if len(param.PermName) > 190 {
 		libs.APIWriteBack(ctx, 400, "permission name is too long", nil)
 		return
@@ -57,14 +51,11 @@ func PermRename(ctx *gin.Context, param PermRenameParam) {
 }
 
 type PermDelParam struct {
-	PermID int `query:"permission_id" binding:"required"`
+	PermID  int `query:"permission_id" binding:"required"`
+	UserGrp int `session:"user_group" validate:"admin"`
 }
 
 func PermDel(ctx *gin.Context, param PermDelParam) {
-	if !ISAdmin(ctx) {
-		libs.APIWriteBack(ctx, 403, "", nil)
-		return
-	}
 	if param.PermID == libs.DefaultGroup {
 		libs.APIWriteBack(ctx, 400, "you cannot modify the default group", nil)
 		return
@@ -83,13 +74,10 @@ type PermGetParam struct {
 	PageSize int  `query:"pagesize" binding:"required" validate:"gte=1,lte=100"`
 	Left     *int `query:"left"`
 	Right    *int `query:"right"`
+	UserGrp  int  `session:"user_group" validate:"admin"`
 }
 
 func PermGet(ctx *gin.Context, param PermGetParam) {
-	if !ISAdmin(ctx) {
-		libs.APIWriteBack(ctx, 403, "", nil)
-		return
-	}
 	var bound int
 	if param.Left != nil {
 		bound = *param.Left
@@ -141,13 +129,10 @@ func PermGetUser(ctx *gin.Context, param PermGetUserParam) {
 type PermAddUserParam struct {
 	PermID  int    `body:"permission_id" binding:"required"`
 	UserIDs string `body:"user_ids"`
+	UserGrp int    `session:"user_group" validate:"admin"`
 }
 
 func PermAddUser(ctx *gin.Context, param PermAddUserParam) {
-	if !ISAdmin(ctx) {
-		libs.APIWriteBack(ctx, 403, "", nil)
-		return
-	}
 	user_ids := strings.Split(param.UserIDs, ",")
 	if len(user_ids) == 0 {
 		libs.APIWriteBack(ctx, 400, "there's no user", nil)
@@ -196,15 +181,12 @@ func PermAddUser(ctx *gin.Context, param PermAddUserParam) {
 }
 
 type PermDelUserParam struct {
-	PermID int `query:"permission_id" binding:"required"`
-	UserID int `query:"user_id" binding:"required"`
+	PermID  int `query:"permission_id" binding:"required"`
+	UserID  int `query:"user_id" binding:"required"`
+	UserGrp int `session:"user_group" validate:"admin"`
 }
 
 func PermDelUser(ctx *gin.Context, param PermDelUserParam) {
-	if !ISAdmin(ctx) {
-		libs.APIWriteBack(ctx, 403, "", nil)
-		return
-	}
 	if param.PermID == libs.DefaultGroup {
 		libs.APIWriteBack(ctx, 400, "you cannot modify the default group", nil)
 		return
