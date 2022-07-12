@@ -359,7 +359,7 @@ func ProbDownData(ctx Context, param ProbDownDataParam) {
 
 type Context = service.Context
 
-type ProbModifyParam struct {
+type ProbEditParam struct {
 	ProbID    int    `body:"problem_id" binding:"required"`
 	Title     string `body:"title"`
 	AllowDown string `body:"allow_down"`
@@ -367,7 +367,7 @@ type ProbModifyParam struct {
 	UserGrp   int    `session:"user_group"`
 }
 
-func ProbModify(ctx Context, param ProbModifyParam) {
+func ProbEdit(ctx Context, param ProbEditParam) {
 	if !internal.PRExists(param.ProbID) {
 		ctx.JSONAPI(404, "", nil)
 		return

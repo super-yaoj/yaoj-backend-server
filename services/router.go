@@ -71,7 +71,7 @@ var Router map[string][]Request = map[string][]Request{
 	"/problem": {
 		{"GET", service.GinHandler(ProbGet)},
 		{"POST", service.GinHandler(ProbAdd)},
-		{"PATCH", service.GinHandler(ProbModify)},
+		{"PATCH", service.GinHandler(ProbEdit)},
 	},
 	"/problem_permissions": {
 		{"GET", service.GinHandler(ProbGetPerm)},

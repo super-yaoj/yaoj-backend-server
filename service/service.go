@@ -58,6 +58,10 @@ func (ctx Context) ErrorRPC(err error) {
 //
 // 请注意用于绑定的数据尽量不要出现指针值（主要指 session）
 // T 为参数类型结构体
+//
+// 注意 binding:"required" 并非适用于所有来源的绑定，目前只适用于 query 和 body
+//
+// validate 的用法见 https://pkg.go.dev/github.com/go-playground/validator/v10
 type StdHandlerFunc[T any] func(ctx Context, param T)
 
 var defaultValidator = validator.New()

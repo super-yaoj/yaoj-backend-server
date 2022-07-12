@@ -11,16 +11,14 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func checkPU(ctx Context, name, password string) bool {
-	if !internal.ValidPassword(password) || !internal.ValidUsername(name) {
-		message := "invalid username"
-		if !internal.ValidPassword(password) {
-			message = "invalid password"
-		}
-		ctx.JSONRPC(400, -32600, message, nil)
-		return false
+func validSign(username, password string) error {
+	if !internal.ValidPassword(password) {
+		return fmt.Errorf("invalid password")
 	}
-	return true
+	if !internal.ValidUsername(username) {
+		return fmt.Errorf("invalid username")
+	}
+	return nil
 }
 
 type UserSignUpParam struct {
@@ -32,7 +30,8 @@ type UserSignUpParam struct {
 }
 
 func UserSignUp(ctx Context, param UserSignUpParam) {
-	if !checkPU(ctx, param.UserName, param.Passwd) {
+	if err := validSign(param.UserName, param.Passwd); err != nil {
+		ctx.JSONRPC(400, -32600, err.Error(), nil)
 		return
 	}
 	if !VerifyCaptcha(param.VerifyID, param.VerifyCode) {
@@ -73,7 +72,8 @@ type UserLoginParam struct {
 }
 
 func UserLogin(ctx Context, param UserLoginParam) {
-	if !checkPU(ctx, param.UserName, param.Passwd) {
+	if err := validSign(param.UserName, param.Passwd); err != nil {
+		ctx.JSONRPC(400, -32600, err.Error(), nil)
 		return
 	}
 	password := internal.SaltPassword(param.Passwd)
