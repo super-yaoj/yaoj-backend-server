@@ -59,18 +59,23 @@ func CTCanEnter(ctx *gin.Context, contest internal.Contest, can_edit bool) bool 
 	}
 }
 
-func CTList(ctx *gin.Context) {
-	pagesize, ok := libs.GetIntRange(ctx, "pagesize", 1, 100)
-	if !ok {
+type CtstListParam struct {
+	PageSize int  `query:"pagesize" binding:"required" validate:"gte=1,lte=100"`
+	Left     *int `query:"left"`
+	Right    *int `query:"right"`
+	UserID   int  `session:"user_id"`
+}
+
+func CtstList(ctx *gin.Context, param CtstListParam) {
+	var bound int
+	if param.Left != nil {
+		bound = *param.Left
+	} else if param.Right != nil {
+		bound = *param.Right
+	} else {
 		return
 	}
-	user_id := GetUserId(ctx)
-	_, isleft := ctx.GetQuery("left")
-	bound, ok := libs.GetInt(ctx, libs.If(isleft, "left", "right"))
-	if !ok {
-		return
-	}
-	contests, isfull, err := internal.CTList(bound, pagesize, user_id, isleft, ISAdmin(ctx))
+	contests, isfull, err := internal.CTList(bound, param.PageSize, param.UserID, param.Left != nil, ISAdmin(ctx))
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	} else {
@@ -78,17 +83,17 @@ func CTList(ctx *gin.Context) {
 	}
 }
 
-func CTQuery(ctx *gin.Context) {
-	contest_id, ok := libs.GetInt(ctx, "contest_id")
-	if !ok {
-		return
-	}
-	contest, err := internal.CTQuery(contest_id, GetUserId(ctx))
+type CtstGetParam struct {
+	CtstID int `query:"contest_id" binding:"required"`
+}
+
+func CtstGet(ctx *gin.Context, param CtstGetParam) {
+	contest, err := internal.CTQuery(param.CtstID, GetUserId(ctx))
 	if err != nil {
 		libs.APIWriteBack(ctx, 404, "", nil)
 		return
 	}
-	can_edit := CTCanEdit(ctx, contest_id)
+	can_edit := CTCanEdit(ctx, param.CtstID)
 	if !CTCanEnter(ctx, contest, can_edit) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
@@ -96,21 +101,21 @@ func CTQuery(ctx *gin.Context) {
 	libs.APIWriteBack(ctx, 200, "", map[string]any{"contest": contest, "can_edit": can_edit})
 }
 
-func CTGetProblems(ctx *gin.Context) {
-	contest_id, ok := libs.GetInt(ctx, "contest_id")
-	if !ok {
-		return
-	}
-	contest, err := internal.CTQuery(contest_id, GetUserId(ctx))
+type CtstProbGetParam struct {
+	CtstID int `query:"contest_id" binding:"required"`
+}
+
+func CtstProbGet(ctx *gin.Context, param CtstProbGetParam) {
+	contest, err := internal.CTQuery(param.CtstID, GetUserId(ctx))
 	if err != nil {
 		libs.APIWriteBack(ctx, 404, "", nil)
 		return
 	}
-	if !CTCanEnter(ctx, contest, CTCanEdit(ctx, contest_id)) {
+	if !CTCanEnter(ctx, contest, CTCanEdit(ctx, param.CtstID)) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
-	problems, err := internal.CTGetProblems(contest_id)
+	problems, err := internal.CTGetProblems(param.CtstID)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	} else {
@@ -118,47 +123,41 @@ func CTGetProblems(ctx *gin.Context) {
 	}
 }
 
-func CTAddProblem(ctx *gin.Context) {
-	contest_id, ok := libs.PostInt(ctx, "contest_id")
-	if !ok {
-		return
-	}
-	problem_id, ok := libs.PostInt(ctx, "problem_id")
-	if !ok {
-		return
-	}
-	if !internal.CTExists(contest_id) {
+type CtstProbAddParam struct {
+	CtstID int `body:"contest_id" binding:"required"`
+	ProbID int `body:"problem_id" binding:"required"`
+}
+
+func CtstProbAdd(ctx *gin.Context, param CtstProbAddParam) {
+	if !internal.CTExists(param.CtstID) {
 		libs.APIWriteBack(ctx, 404, "", nil)
 		return
 	}
-	if !CTCanEdit(ctx, contest_id) {
+	if !CTCanEdit(ctx, param.CtstID) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
-	if !internal.PRExists(problem_id) {
+	if !internal.PRExists(param.ProbID) {
 		libs.APIWriteBack(ctx, 400, "no such problem id", nil)
 		return
 	}
-	err := internal.CTAddProblem(contest_id, problem_id)
+	err := internal.CTAddProblem(param.CtstID, param.ProbID)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	}
 }
 
-func CTDeleteProblem(ctx *gin.Context) {
-	contest_id, ok := libs.GetInt(ctx, "contest_id")
-	if !ok {
-		return
-	}
-	problem_id, ok := libs.GetInt(ctx, "problem_id")
-	if !ok {
-		return
-	}
-	if !CTCanEdit(ctx, contest_id) {
+type CtstProbDelParam struct {
+	CtstID int `query:"contest_id" binding:"required"`
+	ProbID int `query:"problem_id" binding:"required"`
+}
+
+func CtstProbDel(ctx *gin.Context, param CtstProbDelParam) {
+	if !CTCanEdit(ctx, param.CtstID) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
-	err := internal.CTDeleteProblem(contest_id, problem_id)
+	err := internal.CTDeleteProblem(param.CtstID, param.ProbID)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	}
@@ -177,61 +176,52 @@ func CTCreate(ctx *gin.Context) {
 	}
 }
 
-func CTModify(ctx *gin.Context) {
-	contest_id, ok := libs.PostInt(ctx, "contest_id")
-	if !ok {
-		return
-	}
-	if !internal.CTExists(contest_id) {
+// https://pkg.go.dev/github.com/go-playground/validator/v10#hdr-Greater_Than
+// gte,lte 用在 string 上表示长度限制
+type CtstEditParam struct {
+	CtstID       int    `body:"contest_id" binding:"required"`
+	Title        string `body:"title" validate:"gte=0,lte=190"`
+	StartTime    string `body:"start_time"`
+	Duration     int    `body:"last" binding:"required" validate:"gte=1,lte=1000000"`
+	PrtstOnly    int    `body:"pretest" binding:"required" validate:"gte=0,lte=1"`
+	ScorePrivate int    `body:"score_private" binding:"required" validate:"gte=0,lte=1"`
+}
+
+func CtstEdit(ctx *gin.Context, param CtstEditParam) {
+	if !internal.CTExists(param.CtstID) {
 		libs.APIWriteBack(ctx, 404, "", nil)
 		return
 	}
-	if !CTCanEdit(ctx, contest_id) {
+	if !CTCanEdit(ctx, param.CtstID) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
-	title := strings.TrimSpace(ctx.PostForm("title"))
-	if len(title) == 0 || len(title) > 190 {
-		libs.APIWriteBack(ctx, 400, "title too long", nil)
-		return
-	}
-	start, err := time.Parse("2006-01-02 15:04:05", ctx.PostForm("start_time"))
+	title := strings.TrimSpace(param.Title)
+	start, err := time.Parse("2006-01-02 15:04:05", param.StartTime)
 	if err != nil {
 		libs.APIWriteBack(ctx, 400, "time format error", nil)
 		return
 	}
-	last, ok := libs.PostIntRange(ctx, "last", 1, 1000000)
-	if !ok {
-		return
-	}
-	pretest, ok := libs.PostIntRange(ctx, "pretest", 0, 1)
-	if !ok {
-		return
-	}
-	score_private, ok := libs.PostIntRange(ctx, "score_private", 0, 1)
-	if !ok {
-		return
-	}
-	err = internal.CTModify(contest_id, title, start, last, pretest, score_private)
+	err = internal.CTModify(param.CtstID, title, start, param.Duration, param.PrtstOnly, param.ScorePrivate)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	}
 }
 
-func CTGetPermissions(ctx *gin.Context) {
-	contest_id, ok := libs.GetInt(ctx, "contest_id")
-	if !ok {
-		return
-	}
-	if !internal.CTExists(contest_id) {
+type CtstPermGetParam struct {
+	CtstID int `query:"contest_id" binding:"required"`
+}
+
+func CtstPermGet(ctx *gin.Context, param CtstPermGetParam) {
+	if !internal.CTExists(param.CtstID) {
 		libs.APIWriteBack(ctx, 404, "", nil)
 		return
 	}
-	if !CTCanEdit(ctx, contest_id) {
+	if !CTCanEdit(ctx, param.CtstID) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
-	perms, err := internal.CTGetPermissions(contest_id)
+	perms, err := internal.CTGetPermissions(param.CtstID)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	} else {
@@ -239,20 +229,20 @@ func CTGetPermissions(ctx *gin.Context) {
 	}
 }
 
-func CTGetManagers(ctx *gin.Context) {
-	contest_id, ok := libs.GetInt(ctx, "contest_id")
-	if !ok {
-		return
-	}
-	if !internal.CTExists(contest_id) {
+type CtstMgrGetParam struct {
+	CtstID int `query:"contest_id" binding:"required"`
+}
+
+func CtstMgrGet(ctx *gin.Context, param CtstMgrGetParam) {
+	if !internal.CTExists(param.CtstID) {
 		libs.APIWriteBack(ctx, 404, "", nil)
 		return
 	}
-	if !CTCanEdit(ctx, contest_id) {
+	if !CTCanEdit(ctx, param.CtstID) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
-	users, err := internal.CTGetManagers(contest_id)
+	users, err := internal.CTGetManagers(param.CtstID)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	} else {
@@ -260,116 +250,104 @@ func CTGetManagers(ctx *gin.Context) {
 	}
 }
 
-func CTAddPermission(ctx *gin.Context) {
-	contest_id, ok := libs.PostInt(ctx, "contest_id")
-	if !ok {
-		return
-	}
-	permission_id, ok := libs.PostInt(ctx, "permission_id")
-	if !ok {
-		return
-	}
-	if !internal.CTExists(contest_id) {
+type CtstPermAddParam struct {
+	CtstID int `body:"contest_id" binding:"required"`
+	PermID int `body:"permission_id" binding:"required"`
+}
+
+func CtstPermAdd(ctx *gin.Context, param CtstPermAddParam) {
+	if !internal.CTExists(param.CtstID) {
 		libs.APIWriteBack(ctx, 404, "", nil)
 		return
 	}
-	if !CTCanEdit(ctx, contest_id) {
+	if !CTCanEdit(ctx, param.CtstID) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
-	if !internal.PMExists(permission_id) {
+	if !internal.PMExists(param.PermID) {
 		libs.APIWriteBack(ctx, 400, "no such permission id", nil)
 		return
 	}
-	err := internal.CTAddPermission(contest_id, permission_id)
+	err := internal.CTAddPermission(param.CtstID, param.PermID)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	}
 }
 
-func CTAddManager(ctx *gin.Context) {
-	contest_id, ok := libs.PostInt(ctx, "contest_id")
-	if !ok {
-		return
-	}
-	user_id, ok := libs.PostInt(ctx, "user_id")
-	if !ok {
-		return
-	}
-	if !internal.CTExists(contest_id) {
+type CtstMgrAddParam struct {
+	CtstID int `body:"contest_id" binding:"required"`
+	UserID int `body:"user_id" binding:"required"`
+}
+
+func CtstMgrAdd(ctx *gin.Context, param CtstMgrAddParam) {
+	if !internal.CTExists(param.CtstID) {
 		libs.APIWriteBack(ctx, 404, "", nil)
 		return
 	}
-	if !CTCanEdit(ctx, contest_id) {
+	if !CTCanEdit(ctx, param.CtstID) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
-	if !internal.USExists(user_id) {
+	if !internal.USExists(param.UserID) {
 		libs.APIWriteBack(ctx, 400, "no such user id", nil)
 		return
 	}
-	if internal.CTRegistered(contest_id, user_id) {
+	if internal.CTRegistered(param.CtstID, param.UserID) {
 		libs.APIWriteBack(ctx, 400, "user has registered this contest", nil)
 		return
 	}
-	err := internal.CTAddPermission(contest_id, -user_id)
+	err := internal.CTAddPermission(param.CtstID, -param.UserID)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	}
 }
 
-func CTDeletePermission(ctx *gin.Context) {
-	contest_id, ok := libs.GetInt(ctx, "contest_id")
-	if !ok {
-		return
-	}
-	permission_id, ok := libs.GetInt(ctx, "permission_id")
-	if !ok {
-		return
-	}
-	if !CTCanEdit(ctx, contest_id) {
+type CtstPermDelParam struct {
+	CtstID int `query:"contest_id" binding:"required"`
+	PermID int `query:"permission_id" binding:"required"`
+}
+
+func CtstPermDel(ctx *gin.Context, param CtstPermDelParam) {
+	if !CTCanEdit(ctx, param.CtstID) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
-	err := internal.CTDeletePermission(contest_id, permission_id)
+	err := internal.CTDeletePermission(param.CtstID, param.PermID)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	}
 }
 
-func CTDeleteManager(ctx *gin.Context) {
-	contest_id, ok := libs.GetInt(ctx, "contest_id")
-	if !ok {
-		return
-	}
-	user_id, ok := libs.GetInt(ctx, "user_id")
-	if !ok {
-		return
-	}
-	if !CTCanEdit(ctx, contest_id) {
+type CtstMgrDelParam struct {
+	CtstID int `query:"contest_id" binding:"required"`
+	UserID int `query:"user_id" binding:"required"`
+}
+
+func CtstMgrDel(ctx *gin.Context, param CtstMgrDelParam) {
+	if !CTCanEdit(ctx, param.CtstID) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
-	err := internal.CTDeletePermission(contest_id, -user_id)
+	err := internal.CTDeletePermission(param.CtstID, -param.UserID)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	}
 }
 
-func CTGetParticipants(ctx *gin.Context) {
-	contest_id, ok := libs.GetInt(ctx, "contest_id")
-	if !ok {
-		return
-	}
-	if !internal.CTExists(contest_id) {
+type CtstPtcpGetParam struct {
+	CtstID int `query:"contest_id" binding:"required"`
+}
+
+func CtstPtcpGet(ctx *gin.Context, param CtstPtcpGetParam) {
+	if !internal.CTExists(param.CtstID) {
 		libs.APIWriteBack(ctx, 404, "", nil)
 		return
 	}
-	if !CTCanSee(ctx, contest_id, CTCanEdit(ctx, contest_id)) {
+	if !CTCanSee(ctx, param.CtstID, CTCanEdit(ctx, param.CtstID)) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
-	parts, err := internal.CTGetParticipants(contest_id)
+	parts, err := internal.CTGetParticipants(param.CtstID)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	} else {
@@ -377,37 +355,34 @@ func CTGetParticipants(ctx *gin.Context) {
 	}
 }
 
-func CTSignup(ctx *gin.Context) {
-	contest_id, ok := libs.PostInt(ctx, "contest_id")
-	if !ok {
-		return
-	}
-	user_id := GetUserId(ctx)
-	contest, err := internal.CTQuery(contest_id, user_id)
+type CtstSignupParam struct {
+	CtstID int `body:"contest_id" binding:"required"`
+	UserID int `session:"user_id"`
+}
+
+func CtstSignup(ctx *gin.Context, param CtstSignupParam) {
+	contest, err := internal.CTQuery(param.CtstID, param.UserID)
 	if err != nil {
 		libs.APIWriteBack(ctx, 404, "", nil)
 		return
 	}
-	if !CTCanTake(ctx, contest, CTCanEdit(ctx, contest_id)) {
+	if !CTCanTake(ctx, contest, CTCanEdit(ctx, param.CtstID)) {
 		libs.APIWriteBack(ctx, 403, "", nil)
 		return
 	}
-	err = internal.CTAddParticipant(contest_id, user_id)
+	err = internal.CTAddParticipant(param.CtstID, param.UserID)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	}
 }
 
-func CTSignout(ctx *gin.Context) {
-	contest_id, ok := libs.GetInt(ctx, "contest_id")
-	if !ok {
-		return
-	}
-	user_id := GetUserId(ctx)
-	if !ok {
-		return
-	}
-	err := internal.CTDeleteParticipant(contest_id, user_id)
+type CtstSignoutParam struct {
+	CtstID int `query:"contest_id" binding:"required"`
+	UserID int `session:"user_id"`
+}
+
+func CtstSignout(ctx *gin.Context, param CtstSignoutParam) {
+	err := internal.CTDeleteParticipant(param.CtstID, param.UserID)
 	if err != nil {
 		libs.APIInternalError(ctx, err)
 	}

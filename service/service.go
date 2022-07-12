@@ -72,13 +72,13 @@ func GinHandler[T any](handler StdHandlerFunc[T]) gin.HandlerFunc {
 			log.Printf("[bind]: %s", err)
 			return
 		}
+		pp.Println(data)
 		err = defaultValidator.Struct(data)
 		if err != nil {
 			ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			log.Printf("[validate]: %s", err)
 			return
 		}
-		pp.Println(data)
 		handler(ctx, data)
 	}
 }

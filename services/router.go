@@ -88,12 +88,32 @@ var Router map[string][]Request = map[string][]Request{
 		{"PUT", service.GinHandler(ProbPutData)},
 	},
 
-	"/contests":             {{"GET", CTList}},
-	"/contest":              {{"GET", CTQuery}, {"POST", CTCreate}, {"PATCH", CTModify}},
-	"/contest_permissions":  {{"GET", CTGetPermissions}, {"POST", CTAddPermission}, {"DELETE", CTDeletePermission}},
-	"/contest_managers":     {{"GET", CTGetManagers}, {"POST", CTAddManager}, {"DELETE", CTDeleteManager}},
-	"/contest_participants": {{"GET", CTGetParticipants}, {"POST", CTSignup}, {"DELETE", CTSignout}},
-	"/contest_problems":     {{"GET", CTGetProblems}, {"POST", CTAddProblem}, {"DELETE", CTDeleteProblem}},
+	"/contests": {{"GET", service.GinHandler(CtstList)}},
+	"/contest": {
+		{"GET", service.GinHandler(CtstGet)},
+		{"POST", CTCreate},
+		{"PATCH", service.GinHandler(CtstEdit)},
+	},
+	"/contest_permissions": {
+		{"GET", service.GinHandler(CtstPermGet)},
+		{"POST", service.GinHandler(CtstPermAdd)},
+		{"DELETE", service.GinHandler(CtstPermDel)},
+	},
+	"/contest_managers": {
+		{"GET", service.GinHandler(CtstMgrGet)},
+		{"POST", service.GinHandler(CtstMgrAdd)},
+		{"DELETE", service.GinHandler(CtstMgrDel)},
+	},
+	"/contest_participants": {
+		{"GET", service.GinHandler(CtstPtcpGet)},
+		{"POST", service.GinHandler(CtstSignup)},
+		{"DELETE", service.GinHandler(CtstSignout)},
+	},
+	"/contest_problems": {
+		{"GET", service.GinHandler(CtstProbGet)},
+		{"POST", service.GinHandler(CtstProbAdd)},
+		{"DELETE", service.GinHandler(CtstProbDel)},
+	},
 
 	"/submissions": {{"GET", SMList}},
 	"/submission":  {{"GET", SMQuery}, {"POST", SMSubmit}, {"DELETE", SMDelete}},
