@@ -112,17 +112,13 @@ func ProbAdd(ctx Context, param ProbAddParam) {
 
 // 查询问题
 type ProbGetParam struct {
-	ProbID  int `query:"problem_id" binding:"required"`
+	ProbID  int `query:"problem_id" binding:"required" validate:"probid"`
 	CtstID  int `query:"contest_id"`
 	UserID  int `session:"user_id"`
 	UserGrp int `session:"user_group"`
 }
 
 func ProbGet(ctx Context, param ProbGetParam) {
-	if !internal.PRExists(param.ProbID) {
-		ctx.JSONAPI(http.StatusNotFound, "", nil)
-		return
-	}
 	in_contest, ok := PRCanSee(ctx, param.UserID, param.UserGrp, param.ProbID, param.CtstID)
 	if !ok {
 		return
@@ -145,16 +141,12 @@ func ProbGet(ctx Context, param ProbGetParam) {
 
 // 获取题目权限
 type ProbGetPermParam struct {
-	ProbID  int `query:"problem_id" binding:"required"`
+	ProbID  int `query:"problem_id" binding:"required" validate:"probid"`
 	UserID  int `session:"user_id"`
 	UserGrp int `session:"user_group"`
 }
 
 func ProbGetPerm(ctx Context, param ProbGetPermParam) {
-	if !internal.PRExists(param.ProbID) {
-		ctx.JSONAPI(404, "", nil)
-		return
-	}
 	if !PRCanEdit(param.UserID, param.UserGrp, param.ProbID) {
 		ctx.JSONAPI(403, "", nil)
 		return
@@ -168,17 +160,13 @@ func ProbGetPerm(ctx Context, param ProbGetPermParam) {
 }
 
 type ProbAddPermParam struct {
-	ProbID  int `body:"problem_id" binding:"required"`
+	ProbID  int `body:"problem_id" binding:"required" validate:"probid"`
 	PermID  int `body:"permission_id" binding:"required"`
 	UserID  int `session:"user_id"`
 	UserGrp int `session:"user_group"`
 }
 
 func ProbAddPerm(ctx Context, param ProbAddPermParam) {
-	if !internal.PRExists(param.ProbID) {
-		ctx.JSONAPI(404, "", nil)
-		return
-	}
 	if !PRCanEdit(param.UserID, param.UserGrp, param.ProbID) {
 		ctx.JSONAPI(403, "", nil)
 		return
@@ -212,16 +200,12 @@ func ProbDelPerm(ctx Context, param ProbDelPermParam) {
 }
 
 type ProbGetMgrParam struct {
-	ProbID  int `query:"problem_id" binding:"required"`
+	ProbID  int `query:"problem_id" binding:"required" validate:"probid"`
 	UserID  int `session:"user_id"`
 	UserGrp int `session:"user_group"`
 }
 
 func ProbGetMgr(ctx Context, param ProbGetMgrParam) {
-	if !internal.PRExists(param.ProbID) {
-		ctx.JSONAPI(404, "", nil)
-		return
-	}
 	if !PRCanEdit(param.UserID, param.UserGrp, param.ProbID) {
 		ctx.JSONAPI(403, "", nil)
 		return
@@ -235,17 +219,13 @@ func ProbGetMgr(ctx Context, param ProbGetMgrParam) {
 }
 
 type ProbAddMgrParam struct {
-	ProbID    int `body:"problem_id" binding:"required"`
+	ProbID    int `body:"problem_id" binding:"required" validate:"probid"`
 	UserID    int `body:"user_id" binding:"required"`
 	CurUserID int `session:"user_id"`
 	UserGrp   int `session:"user_group"`
 }
 
 func ProbAddMgr(ctx Context, param ProbAddMgrParam) {
-	if !internal.PRExists(param.ProbID) {
-		ctx.JSONAPI(404, "", nil)
-		return
-	}
 	if !PRCanEdit(param.CurUserID, param.UserGrp, param.ProbID) {
 		ctx.JSONAPI(403, "", nil)
 		return
@@ -279,17 +259,13 @@ func ProbDelMgr(ctx Context, param ProbDelMgrParam) {
 }
 
 type ProbPutDataParam struct {
-	ProbID  int                   `body:"problem_id" binding:"required"`
+	ProbID  int                   `body:"problem_id" binding:"required" validate:"probid"`
 	Data    *multipart.FileHeader `body:"data" binding:"required"`
 	UserID  int                   `session:"user_id"`
 	UserGrp int                   `session:"user_group"`
 }
 
 func ProbPutData(ctx Context, param ProbPutDataParam) {
-	if !internal.PRExists(param.ProbID) {
-		ctx.JSONAPI(404, "", nil)
-		return
-	}
 	if !PRCanEdit(param.UserID, param.UserGrp, param.ProbID) {
 		ctx.JSONAPI(403, "", nil)
 		return
@@ -315,7 +291,7 @@ func ProbPutData(ctx Context, param ProbPutDataParam) {
 }
 
 type ProbDownDataParam struct {
-	ProbID   int    `query:"problem_id" binding:"required"`
+	ProbID   int    `query:"problem_id" binding:"required" validate:"probid"`
 	CtstID   int    `query:"contest_id"`
 	DataType string `query:"type"`
 	UserID   int    `session:"user_id"`
@@ -323,10 +299,6 @@ type ProbDownDataParam struct {
 }
 
 func ProbDownData(ctx Context, param ProbDownDataParam) {
-	if !internal.PRExists(param.ProbID) {
-		ctx.JSONAPI(404, "", nil)
-		return
-	}
 	internal.ProblemRWLock.RLock(param.ProbID)
 	defer internal.ProblemRWLock.RUnlock(param.ProbID)
 	if param.DataType == "data" {
@@ -360,7 +332,7 @@ func ProbDownData(ctx Context, param ProbDownDataParam) {
 type Context = service.Context
 
 type ProbEditParam struct {
-	ProbID    int    `body:"problem_id" binding:"required"`
+	ProbID    int    `body:"problem_id" binding:"required" validate:"probid"`
 	Title     string `body:"title"`
 	AllowDown string `body:"allow_down"`
 	UserID    int    `session:"user_id"`
@@ -368,10 +340,6 @@ type ProbEditParam struct {
 }
 
 func ProbEdit(ctx Context, param ProbEditParam) {
-	if !internal.PRExists(param.ProbID) {
-		ctx.JSONAPI(404, "", nil)
-		return
-	}
 	if !PRCanEdit(param.UserID, param.UserGrp, param.ProbID) {
 		ctx.JSONAPI(403, "", nil)
 		return

@@ -124,7 +124,7 @@ func CtstProbGet(ctx Context, param CtstProbGetParam) {
 
 type CtstProbAddParam struct {
 	CtstID  int `body:"contest_id" binding:"required"`
-	ProbID  int `body:"problem_id" binding:"required"`
+	ProbID  int `body:"problem_id" binding:"required" validate:"probid"`
 	UserID  int `session:"user_id"`
 	UserGrp int `session:"user_group"`
 }
@@ -136,10 +136,6 @@ func CtstProbAdd(ctx Context, param CtstProbAddParam) {
 	}
 	if !CTCanEdit(param.UserID, param.UserGrp, param.CtstID) {
 		ctx.JSONAPI(403, "", nil)
-		return
-	}
-	if !internal.PRExists(param.ProbID) {
-		ctx.JSONAPI(400, "no such problem id", nil)
 		return
 	}
 	err := internal.CTAddProblem(param.CtstID, param.ProbID)
