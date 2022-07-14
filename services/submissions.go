@@ -15,8 +15,7 @@ import (
 )
 
 type SubmListParam struct {
-	UserID   int  `session:"user_id"`
-	UserGrp  int  `session:"user_group"`
+	Auth
 	Left     *int `query:"left"`
 	Right    *int `query:"right"`
 	PageSize int  `query:"pagesize" binding:"required" validate:"gte=1,lte=100"`
@@ -53,8 +52,7 @@ func SubmList(ctx Context, param SubmListParam) {
 }
 
 type SubmAddParam struct {
-	UserID  int     `session:"user_id"`
-	UserGrp int     `session:"user_group"`
+	Auth
 	ProbID  int     `body:"problem_id" binding:"required"`
 	CtstID  int     `body:"contest_id"`
 	SubmAll *string `body:"submit_all"`
@@ -226,9 +224,8 @@ func getPreview(val []byte, mode utils.CtntType, lang utils.LangTag) internal.Co
 }
 
 type SubmGetParam struct {
-	SubmID  int `query:"submission_id" binding:"required"`
-	UserID  int `session:"user_id"`
-	UserGrp int `session:"user_group"`
+	SubmID int `query:"submission_id" binding:"required"`
+	Auth
 }
 
 // Query single submission, when user is in contests which score_private=true
@@ -288,9 +285,8 @@ func SMCanEdit(user_id, user_group int, sub internal.SubmissionBase) bool {
 }
 
 type SubmDelParam struct {
-	SubmID  int `query:"submission_id" binding:"required"`
-	UserID  int `session:"user_id"`
-	UserGrp int `session:"user_group"`
+	SubmID int `query:"submission_id" binding:"required"`
+	Auth
 }
 
 func SubmDel(ctx Context, param SubmDelParam) {
@@ -310,10 +306,9 @@ func SubmDel(ctx Context, param SubmDelParam) {
 }
 
 type RejudgeParam struct {
-	ProbID  *int `body:"problem_id"`
-	SubmID  int  `body:"submission_id"`
-	UserID  int  `session:"user_id"`
-	UserGrp int  `session:"user_group"`
+	ProbID *int `body:"problem_id"`
+	SubmID int  `body:"submission_id"`
+	Auth
 }
 
 func Rejudge(ctx Context, param RejudgeParam) {

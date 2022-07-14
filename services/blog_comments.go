@@ -6,9 +6,8 @@ import (
 )
 
 type BlogCmntCreateParam struct {
-	BlogID  int `body:"blog_id" binding:"required"`
-	UserID  int `session:"user_id"`
-	UserGrp int `session:"user_group"`
+	BlogID int `body:"blog_id" binding:"required"`
+	Auth
 }
 
 func BlogCmntCreate(ctx Context, param BlogCmntCreateParam) {
@@ -30,9 +29,8 @@ func BlogCmntCreate(ctx Context, param BlogCmntCreateParam) {
 }
 
 type BlogCmntGetParam struct {
-	BlogID  int `query:"blog_id" binding:"required"`
-	UserID  int `session:"user_id"`
-	UserGrp int `session:"user_group"`
+	BlogID int `query:"blog_id" binding:"required"`
+	Auth
 }
 
 func BlogCmntGet(ctx Context, param BlogCmntGetParam) {
@@ -53,9 +51,8 @@ func BlogCmntGet(ctx Context, param BlogCmntGetParam) {
 }
 
 type BlogCmntDelParam struct {
-	CmntID  int `query:"comment_id" binding:"required"`
-	UserID  int `session:"user_id"`
-	UserGrp int `session:"user_group"`
+	CmntID int `query:"comment_id" binding:"required"`
+	Auth
 }
 
 func BlogCmntDel(ctx Context, param BlogCmntDelParam) {

@@ -57,8 +57,7 @@ type CtstListParam struct {
 	PageSize int  `query:"pagesize" binding:"required" validate:"gte=1,lte=100"`
 	Left     *int `query:"left"`
 	Right    *int `query:"right"`
-	UserID   int  `session:"user_id"`
-	UserGrp  int  `session:"user_group"`
+	Auth
 }
 
 func CtstList(ctx Context, param CtstListParam) {
@@ -79,9 +78,8 @@ func CtstList(ctx Context, param CtstListParam) {
 }
 
 type CtstGetParam struct {
-	CtstID  int `query:"contest_id" binding:"required"`
-	UserID  int `session:"user_id"`
-	UserGrp int `session:"user_group"`
+	CtstID int `query:"contest_id" binding:"required"`
+	Auth
 }
 
 func CtstGet(ctx Context, param CtstGetParam) {
@@ -99,9 +97,8 @@ func CtstGet(ctx Context, param CtstGetParam) {
 }
 
 type CtstProbGetParam struct {
-	CtstID  int `query:"contest_id" binding:"required"`
-	UserID  int `session:"user_id"`
-	UserGrp int `session:"user_group"`
+	CtstID int `query:"contest_id" binding:"required"`
+	Auth
 }
 
 func CtstProbGet(ctx Context, param CtstProbGetParam) {
@@ -123,10 +120,9 @@ func CtstProbGet(ctx Context, param CtstProbGetParam) {
 }
 
 type CtstProbAddParam struct {
-	CtstID  int `body:"contest_id" binding:"required"`
-	ProbID  int `body:"problem_id" binding:"required" validate:"probid"`
-	UserID  int `session:"user_id"`
-	UserGrp int `session:"user_group"`
+	CtstID int `body:"contest_id" binding:"required"`
+	ProbID int `body:"problem_id" binding:"required" validate:"probid"`
+	Auth
 }
 
 func CtstProbAdd(ctx Context, param CtstProbAddParam) {
@@ -145,10 +141,9 @@ func CtstProbAdd(ctx Context, param CtstProbAddParam) {
 }
 
 type CtstProbDelParam struct {
-	CtstID  int `query:"contest_id" binding:"required"`
-	ProbID  int `query:"problem_id" binding:"required"`
-	UserID  int `session:"user_id"`
-	UserGrp int `session:"user_group"`
+	CtstID int `query:"contest_id" binding:"required"`
+	ProbID int `query:"problem_id" binding:"required"`
+	Auth
 }
 
 func CtstProbDel(ctx Context, param CtstProbDelParam) {
@@ -184,8 +179,7 @@ type CtstEditParam struct {
 	Duration     int    `body:"last" binding:"required" validate:"gte=1,lte=1000000"`
 	PrtstOnly    int    `body:"pretest" binding:"required" validate:"gte=0,lte=1"`
 	ScorePrivate int    `body:"score_private" binding:"required" validate:"gte=0,lte=1"`
-	UserID       int    `session:"user_id"`
-	UserGrp      int    `session:"user_group"`
+	Auth
 }
 
 func CtstEdit(ctx Context, param CtstEditParam) {
@@ -210,9 +204,8 @@ func CtstEdit(ctx Context, param CtstEditParam) {
 }
 
 type CtstPermGetParam struct {
-	CtstID  int `query:"contest_id" binding:"required"`
-	UserID  int `session:"user_id"`
-	UserGrp int `session:"user_group"`
+	CtstID int `query:"contest_id" binding:"required"`
+	Auth
 }
 
 func CtstPermGet(ctx Context, param CtstPermGetParam) {
@@ -233,9 +226,8 @@ func CtstPermGet(ctx Context, param CtstPermGetParam) {
 }
 
 type CtstMgrGetParam struct {
-	CtstID  int `query:"contest_id" binding:"required"`
-	UserID  int `session:"user_id"`
-	UserGrp int `session:"user_group"`
+	CtstID int `query:"contest_id" binding:"required"`
+	Auth
 }
 
 func CtstMgrGet(ctx Context, param CtstMgrGetParam) {
@@ -256,10 +248,9 @@ func CtstMgrGet(ctx Context, param CtstMgrGetParam) {
 }
 
 type CtstPermAddParam struct {
-	CtstID  int `body:"contest_id" binding:"required"`
-	PermID  int `body:"permission_id" binding:"required"`
-	UserID  int `session:"user_id"`
-	UserGrp int `session:"user_group"`
+	CtstID int `body:"contest_id" binding:"required"`
+	PermID int `body:"permission_id" binding:"required"`
+	Auth
 }
 
 func CtstPermAdd(ctx Context, param CtstPermAddParam) {
@@ -283,9 +274,8 @@ func CtstPermAdd(ctx Context, param CtstPermAddParam) {
 
 type CtstMgrAddParam struct {
 	CtstID    int `body:"contest_id" binding:"required"`
-	UserID    int `body:"user_id" binding:"required"`
-	CurUserID int `session:"user_id"`
-	UserGrp   int `session:"user_group"`
+	MgrUserID int `body:"user_id" binding:"required"`
+	Auth
 }
 
 func CtstMgrAdd(ctx Context, param CtstMgrAddParam) {
@@ -293,29 +283,28 @@ func CtstMgrAdd(ctx Context, param CtstMgrAddParam) {
 		ctx.JSONAPI(404, "", nil)
 		return
 	}
-	if !CTCanEdit(param.CurUserID, param.UserGrp, param.CtstID) {
+	if !CTCanEdit(param.UserID, param.UserGrp, param.CtstID) {
 		ctx.JSONAPI(403, "", nil)
 		return
 	}
-	if !internal.USExists(param.UserID) {
+	if !internal.USExists(param.MgrUserID) {
 		ctx.JSONAPI(400, "no such user id", nil)
 		return
 	}
-	if internal.CTRegistered(param.CtstID, param.UserID) {
+	if internal.CTRegistered(param.CtstID, param.MgrUserID) {
 		ctx.JSONAPI(400, "user has registered this contest", nil)
 		return
 	}
-	err := internal.CTAddPermission(param.CtstID, -param.UserID)
+	err := internal.CTAddPermission(param.CtstID, -param.MgrUserID)
 	if err != nil {
 		ctx.ErrorAPI(err)
 	}
 }
 
 type CtstPermDelParam struct {
-	CtstID  int `query:"contest_id" binding:"required"`
-	PermID  int `query:"permission_id" binding:"required"`
-	UserID  int `session:"user_id"`
-	UserGrp int `session:"user_group"`
+	CtstID int `query:"contest_id" binding:"required"`
+	PermID int `query:"permission_id" binding:"required"`
+	Auth
 }
 
 func CtstPermDel(ctx Context, param CtstPermDelParam) {
@@ -331,26 +320,24 @@ func CtstPermDel(ctx Context, param CtstPermDelParam) {
 
 type CtstMgrDelParam struct {
 	CtstID    int `query:"contest_id" binding:"required"`
-	UserID    int `query:"user_id" binding:"required"`
-	CurUserID int `session:"user_id"`
-	UserGrp   int `session:"user_group"`
+	MgrUserID int `query:"user_id" binding:"required"`
+	Auth
 }
 
 func CtstMgrDel(ctx Context, param CtstMgrDelParam) {
-	if !CTCanEdit(param.CurUserID, param.UserGrp, param.CtstID) {
+	if !CTCanEdit(param.UserID, param.UserGrp, param.CtstID) {
 		ctx.JSONAPI(403, "", nil)
 		return
 	}
-	err := internal.CTDeletePermission(param.CtstID, -param.UserID)
+	err := internal.CTDeletePermission(param.CtstID, -param.MgrUserID)
 	if err != nil {
 		ctx.ErrorAPI(err)
 	}
 }
 
 type CtstPtcpGetParam struct {
-	CtstID  int `query:"contest_id" binding:"required"`
-	UserID  int `session:"user_id"`
-	UserGrp int `session:"user_group"`
+	CtstID int `query:"contest_id" binding:"required"`
+	Auth
 }
 
 func CtstPtcpGet(ctx Context, param CtstPtcpGetParam) {
@@ -371,9 +358,8 @@ func CtstPtcpGet(ctx Context, param CtstPtcpGetParam) {
 }
 
 type CtstSignupParam struct {
-	CtstID  int `body:"contest_id" binding:"required"`
-	UserID  int `session:"user_id"`
-	UserGrp int `session:"user_group"`
+	CtstID int `body:"contest_id" binding:"required"`
+	Auth
 }
 
 func CtstSignup(ctx Context, param CtstSignupParam) {

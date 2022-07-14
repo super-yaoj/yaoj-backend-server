@@ -51,8 +51,7 @@ type BlogEditParam struct {
 	Private int    `body:"private" binding:"required" validate:"gte=0,lte=1"`
 	Title   string `body:"title"`
 	Content string `body:"content"`
-	UserID  int    `session:"user_id"`
-	UserGrp int    `session:"user_group"`
+	Auth
 }
 
 func BlogEdit(ctx Context, param BlogEditParam) {
@@ -75,9 +74,8 @@ func BlogEdit(ctx Context, param BlogEditParam) {
 }
 
 type BlogDelParam struct {
-	BlogID  int `query:"blog_id" binding:"required"`
-	UserID  int `session:"user_id"`
-	UserGrp int `session:"user_group"`
+	BlogID int `query:"blog_id" binding:"required"`
+	Auth
 }
 
 func BlogDel(ctx Context, param BlogDelParam) {
@@ -92,9 +90,8 @@ func BlogDel(ctx Context, param BlogDelParam) {
 }
 
 type BlogGetParam struct {
-	BlogID  int `query:"blog_id" binding:"required"`
-	UserID  int `session:"user_id"`
-	UserGrp int `session:"user_group"`
+	BlogID int `query:"blog_id" binding:"required"`
+	Auth
 }
 
 func BlogGet(ctx Context, param BlogGetParam) {
@@ -116,17 +113,16 @@ func BlogGet(ctx Context, param BlogGetParam) {
 }
 
 type BlogListParam struct {
-	UserID    *int `query:"user_id"`
-	Left      *int `query:"left"`
-	Right     *int `query:"right"`
-	PageSize  *int `query:"pagesize"`
-	CurUserID int  `session:"user_id"`
-	UserGrp   int  `session:"user_group"`
+	BlogUserID *int `query:"user_id"`
+	Left       *int `query:"left"`
+	Right      *int `query:"right"`
+	PageSize   *int `query:"pagesize"`
+	Auth
 }
 
 func BlogList(ctx Context, param BlogListParam) {
-	if param.UserID != nil {
-		blogs, err := internal.BLListUser(*param.UserID, param.CurUserID)
+	if param.BlogUserID != nil {
+		blogs, err := internal.BLListUser(*param.BlogUserID, param.UserID)
 		if err != nil {
 			ctx.ErrorAPI(err)
 		} else {
@@ -146,7 +142,7 @@ func BlogList(ctx Context, param BlogListParam) {
 			return
 		}
 		blogs, isfull, err := internal.BLListAll(
-			bound, *param.PageSize, param.CurUserID, param.Left != nil, libs.IsAdmin(param.UserGrp),
+			bound, *param.PageSize, param.UserID, param.Left != nil, libs.IsAdmin(param.UserGrp),
 		)
 		if err != nil {
 			ctx.ErrorAPI(err)

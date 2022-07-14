@@ -70,9 +70,14 @@ func PRCanSee(ctx Context, user_id, user_group, problem_id, contest_id int) (boo
 	return false, true
 }
 
+// authorization stored in session
+type Auth struct {
+	UserID  int `session:"user_id"`
+	UserGrp int `session:"user_group"`
+}
+
 type ProbListParam struct {
-	UserID   int  `session:"user_id"`
-	UserGrp  int  `session:"user_group"`
+	Auth
 	Left     *int `query:"left"`
 	Right    *int `query:"right"`
 	PageSize int  `query:"pagesize" binding:"required" validate:"gte=1,lte=100"`
@@ -112,10 +117,9 @@ func ProbAdd(ctx Context, param ProbAddParam) {
 
 // 查询问题
 type ProbGetParam struct {
-	ProbID  int `query:"problem_id" binding:"required" validate:"probid"`
-	CtstID  int `query:"contest_id"`
-	UserID  int `session:"user_id"`
-	UserGrp int `session:"user_group"`
+	Auth
+	ProbID int `query:"problem_id" binding:"required" validate:"probid"`
+	CtstID int `query:"contest_id"`
 }
 
 func ProbGet(ctx Context, param ProbGetParam) {
@@ -141,9 +145,8 @@ func ProbGet(ctx Context, param ProbGetParam) {
 
 // 获取题目权限
 type ProbGetPermParam struct {
-	ProbID  int `query:"problem_id" binding:"required" validate:"probid"`
-	UserID  int `session:"user_id"`
-	UserGrp int `session:"user_group"`
+	Auth
+	ProbID int `query:"problem_id" binding:"required" validate:"probid"`
 }
 
 func ProbGetPerm(ctx Context, param ProbGetPermParam) {
@@ -160,10 +163,9 @@ func ProbGetPerm(ctx Context, param ProbGetPermParam) {
 }
 
 type ProbAddPermParam struct {
-	ProbID  int `body:"problem_id" binding:"required" validate:"probid"`
-	PermID  int `body:"permission_id" binding:"required"`
-	UserID  int `session:"user_id"`
-	UserGrp int `session:"user_group"`
+	ProbID int `body:"problem_id" binding:"required" validate:"probid"`
+	PermID int `body:"permission_id" binding:"required"`
+	Auth
 }
 
 func ProbAddPerm(ctx Context, param ProbAddPermParam) {
@@ -182,10 +184,9 @@ func ProbAddPerm(ctx Context, param ProbAddPermParam) {
 }
 
 type ProbDelPermParam struct {
-	ProbID  int `query:"problem_id" binding:"required"`
-	PermID  int `query:"permission_id" binding:"required"`
-	UserID  int `session:"user_id"`
-	UserGrp int `session:"user_group"`
+	ProbID int `query:"problem_id" binding:"required"`
+	PermID int `query:"permission_id" binding:"required"`
+	Auth
 }
 
 func ProbDelPerm(ctx Context, param ProbDelPermParam) {
@@ -200,9 +201,8 @@ func ProbDelPerm(ctx Context, param ProbDelPermParam) {
 }
 
 type ProbGetMgrParam struct {
-	ProbID  int `query:"problem_id" binding:"required" validate:"probid"`
-	UserID  int `session:"user_id"`
-	UserGrp int `session:"user_group"`
+	ProbID int `query:"problem_id" binding:"required" validate:"probid"`
+	Auth
 }
 
 func ProbGetMgr(ctx Context, param ProbGetMgrParam) {
@@ -220,21 +220,20 @@ func ProbGetMgr(ctx Context, param ProbGetMgrParam) {
 
 type ProbAddMgrParam struct {
 	ProbID    int `body:"problem_id" binding:"required" validate:"probid"`
-	UserID    int `body:"user_id" binding:"required"`
-	CurUserID int `session:"user_id"`
-	UserGrp   int `session:"user_group"`
+	MgrUserID int `body:"user_id" binding:"required"`
+	Auth
 }
 
 func ProbAddMgr(ctx Context, param ProbAddMgrParam) {
-	if !PRCanEdit(param.CurUserID, param.UserGrp, param.ProbID) {
+	if !PRCanEdit(param.UserID, param.UserGrp, param.ProbID) {
 		ctx.JSONAPI(403, "", nil)
 		return
 	}
-	if !internal.USExists(param.UserID) {
+	if !internal.USExists(param.MgrUserID) {
 		ctx.JSONAPI(400, "no such user id", nil)
 		return
 	}
-	err := internal.PRAddPermission(param.ProbID, -param.UserID)
+	err := internal.PRAddPermission(param.ProbID, -param.MgrUserID)
 	if err != nil {
 		ctx.ErrorAPI(err)
 	}
@@ -242,27 +241,25 @@ func ProbAddMgr(ctx Context, param ProbAddMgrParam) {
 
 type ProbDelMgrParam struct {
 	ProbID    int `query:"problem_id" binding:"required"`
-	UserID    int `query:"user_id" binding:"required"`
-	CurUserID int `session:"user_id"`
-	UserGrp   int `session:"user_group"`
+	MgrUserID int `query:"user_id" binding:"required"`
+	Auth
 }
 
 func ProbDelMgr(ctx Context, param ProbDelMgrParam) {
-	if !PRCanEdit(param.CurUserID, param.UserGrp, param.ProbID) {
+	if !PRCanEdit(param.UserID, param.UserGrp, param.ProbID) {
 		ctx.JSONAPI(403, "", nil)
 		return
 	}
-	err := internal.PRDeletePermission(param.ProbID, -param.UserID)
+	err := internal.PRDeletePermission(param.ProbID, -param.MgrUserID)
 	if err != nil {
 		ctx.ErrorAPI(err)
 	}
 }
 
 type ProbPutDataParam struct {
-	ProbID  int                   `body:"problem_id" binding:"required" validate:"probid"`
-	Data    *multipart.FileHeader `body:"data" binding:"required"`
-	UserID  int                   `session:"user_id"`
-	UserGrp int                   `session:"user_group"`
+	ProbID int                   `body:"problem_id" binding:"required" validate:"probid"`
+	Data   *multipart.FileHeader `body:"data" binding:"required"`
+	Auth
 }
 
 func ProbPutData(ctx Context, param ProbPutDataParam) {
@@ -294,8 +291,7 @@ type ProbDownDataParam struct {
 	ProbID   int    `query:"problem_id" binding:"required" validate:"probid"`
 	CtstID   int    `query:"contest_id"`
 	DataType string `query:"type"`
-	UserID   int    `session:"user_id"`
-	UserGrp  int    `session:"user_group"`
+	Auth
 }
 
 func ProbDownData(ctx Context, param ProbDownDataParam) {
@@ -335,8 +331,7 @@ type ProbEditParam struct {
 	ProbID    int    `body:"problem_id" binding:"required" validate:"probid"`
 	Title     string `body:"title"`
 	AllowDown string `body:"allow_down"`
-	UserID    int    `session:"user_id"`
-	UserGrp   int    `session:"user_group"`
+	Auth
 }
 
 func ProbEdit(ctx Context, param ProbEditParam) {

@@ -95,10 +95,9 @@ func PermGet(ctx Context, param PermGetParam) {
 }
 
 type PermGetUserParam struct {
-	PermID    *int `query:"permission_id"`
-	UserID    int  `query:"user_id"`
-	CurUserID int  `session:"user_id"`
-	UserGrp   int  `session:"user_group"`
+	PermID     *int `query:"permission_id"`
+	PermUserID int  `query:"user_id"`
+	Auth
 }
 
 func PermGetUser(ctx Context, param PermGetUserParam) {
@@ -114,11 +113,11 @@ func PermGetUser(ctx Context, param PermGetUserParam) {
 			ctx.JSONAPI(200, "", map[string]any{"data": users})
 		}
 	} else {
-		if !libs.IsAdmin(param.UserGrp) && param.UserID != param.CurUserID {
+		if !libs.IsAdmin(param.UserGrp) && param.PermUserID != param.UserID {
 			ctx.JSONAPI(403, "", nil)
 			return
 		}
-		permissions, err := internal.USQueryPermission(param.UserID)
+		permissions, err := internal.USQueryPermission(param.PermUserID)
 		if err != nil {
 			ctx.ErrorAPI(err)
 		} else {
