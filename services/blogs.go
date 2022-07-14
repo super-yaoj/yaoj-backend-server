@@ -6,10 +6,15 @@ import (
 	"yao/libs"
 )
 
+// 1. blog exist
+// 2. user registered
+// 3. admin or author or blog is public
 func BLCanSee(auth Auth, blog_id int) bool {
 	var blog internal.Blog
 	err := libs.DBSelectSingle(&blog, "select blog_id, author, private from blogs where blog_id=?", blog_id)
 	if err != nil {
+		return false
+	} else if auth.UserID == 0 { // unregistered
 		return false
 	} else {
 		return libs.IsAdmin(auth.UserGrp) || auth.UserID == blog.Author || !blog.Private
@@ -27,7 +32,7 @@ func BLCanEdit(auth Auth, blog_id int) bool {
 }
 
 type BlogCreateParam struct {
-	UserID  int    `session:"user_id"`
+	UserID  int    `session:"user_id" validate:"gte=0"`
 	Private int    `body:"private" binding:"required"`
 	Title   string `body:"title"`
 	Content string `body:"content"`

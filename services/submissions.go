@@ -54,7 +54,7 @@ type SubmAddParam struct {
 // users can submit from a contest if and only if the contest is running and
 // he takes part in the contest (only these submissions are contest submissions)
 func SubmAdd(ctx Context, param SubmAddParam) {
-	if param.UserID <= 0 {
+	if param.UserID == 0 {
 		ctx.JSONAPI(401, "", nil)
 		return
 	}
@@ -230,7 +230,7 @@ func SubmGet(ctx Context, param SubmGetParam) {
 		return
 	}
 	//user cannot see submission details inside contests
-	by_problem := PRCanSeeWithoutContest(param.Auth, ret.ProblemId)
+	by_problem := ProbCanSee(param.Auth, ret.ProblemId)
 	can_edit := SMCanEdit(param.Auth, ret.SubmissionBase)
 	if !can_edit && ret.Submitter != param.UserID && !by_problem {
 		ctx.JSONAPI(403, "", nil)

@@ -11,10 +11,6 @@ type BlogCmntCreateParam struct {
 }
 
 func BlogCmntCreate(ctx Context, param BlogCmntCreateParam) {
-	if param.UserID <= 0 {
-		ctx.JSONAPI(401, "", nil)
-		return
-	}
 	if !BLCanSee(param.Auth, param.BlogID) {
 		ctx.JSONAPI(403, "", nil)
 		return

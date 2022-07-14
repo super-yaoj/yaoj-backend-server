@@ -12,15 +12,11 @@ import (
 )
 
 type PermCreateParam struct {
-	PermName string `body:"permission_name"`
+	PermName string `body:"permission_name" validate:"lte=190"`
 	UserGrp  int    `session:"user_group" validate:"admin"`
 }
 
 func PermCreate(ctx Context, param PermCreateParam) {
-	if len(param.PermName) > 190 {
-		ctx.JSONAPI(400, "permission name is too long", nil)
-		return
-	}
 	id, err := internal.PMCreate(param.PermName)
 	if err != nil {
 		ctx.ErrorAPI(err)
@@ -31,15 +27,11 @@ func PermCreate(ctx Context, param PermCreateParam) {
 
 type PermRenameParam struct {
 	PermID   int    `body:"permission_id" binding:"required"`
-	PermName string `body:"permission_name"`
+	PermName string `body:"permission_name" validate:"lte=190"`
 	UserGrp  int    `session:"user_group" validate:"admin"`
 }
 
 func PermRename(ctx Context, param PermRenameParam) {
-	if len(param.PermName) > 190 {
-		ctx.JSONAPI(400, "permission name is too long", nil)
-		return
-	}
 	if !internal.PMExists(param.PermID) {
 		ctx.JSONAPI(400, "no such permission id", nil)
 		return

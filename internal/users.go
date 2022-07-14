@@ -46,20 +46,6 @@ func ValidPassword(password string) bool {
 	return matched
 }
 
-func ValidEmail(email string) bool {
-	if email == "" {
-		return true
-	}
-	if len(email) > 50 {
-		return false
-	}
-	matched, err := regexp.MatchString("^[\\w_-]+@[\\w_.]+$", email)
-	if err != nil {
-		return false
-	}
-	return matched
-}
-
 func CheckPassword(user_id int, password string) (bool, error) {
 	if !ValidPassword(password) {
 		return false, nil

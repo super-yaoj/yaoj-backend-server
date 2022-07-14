@@ -17,13 +17,9 @@ import (
 	"github.com/super-yaoj/yaoj-core/pkg/problem"
 )
 
-// i. e. valid user_id with either:
-// 1. admin user_group
-// 2. problem permission
+// 1. valid user_id
+// 2. admin or problem permission
 func PRCanEdit(auth Auth, problem_id int) bool {
-	if auth.UserID < 0 {
-		return false
-	}
 	if libs.IsAdmin(auth.UserGrp) {
 		return true
 	}
@@ -31,8 +27,11 @@ func PRCanEdit(auth Auth, problem_id int) bool {
 	return count > 0
 }
 
-func PRCanSeeWithoutContest(auth Auth, problem_id int) bool {
-	if auth.UserID < 0 {
+// 1. public problem
+// 2. can edit
+// 3. permitted
+func ProbCanSee(auth Auth, problem_id int) bool {
+	if auth.UserID == 0 {
 		count, _ := libs.DBSelectSingleInt("select count(*) from problem_permissions where problem_id=? and permission_id=?", problem_id, libs.DefaultGroup)
 		return count > 0
 	}
@@ -45,7 +44,7 @@ func PRCanSeeWithoutContest(auth Auth, problem_id int) bool {
 
 /*
  */
-func PRCanSeeFromContest(auth Auth, problem_id, contest_id int) bool {
+func ProbCanSeeInCtst(auth Auth, problem_id, contest_id int) bool {
 	contest, _ := internal.CTQuery(contest_id, auth.UserID)
 	if CTCanEnter(auth.UserID, contest, CTCanEdit(auth, contest_id)) &&
 		contest.StartTime.Before(time.Now()) && contest.EndTime.After(time.Now()) {
@@ -54,26 +53,22 @@ func PRCanSeeFromContest(auth Auth, problem_id, contest_id int) bool {
 	return false
 }
 
-/*
-args: contest_id=0 means not in contest
-
-return: (must see from contest, can see)
-*/
-func PRCanSee(ctx Context, auth Auth, problem_id, contest_id int) (bool, bool) {
-	if !PRCanSeeWithoutContest(auth, problem_id) {
-		if contest_id <= 0 || !PRCanSeeFromContest(auth, problem_id, contest_id) {
-			ctx.JSONAPI(http.StatusForbidden, "", nil)
-			return false, false
-		}
+// args: contest_id=0 means not in contest
+func PRCanSee(ctx Context, auth Auth, problem_id, contest_id int) (mustSeeFromCtst bool, canSee bool) {
+	if ProbCanSee(auth, problem_id) {
+		return false, true
+	}
+	if contest_id > 0 && ProbCanSeeInCtst(auth, problem_id, contest_id) {
 		return true, true
 	}
-	return false, true
+	ctx.JSONAPI(http.StatusForbidden, "", nil)
+	return false, false
 }
 
 // authorization stored in session
 type Auth struct {
-	UserID  int `session:"user_id"`
-	UserGrp int `session:"user_group"`
+	UserID  int `session:"user_id" validate:"gte=0"`
+	UserGrp int `session:"user_group" validate:"gte=0,lte=3"`
 }
 
 // pagination query param
