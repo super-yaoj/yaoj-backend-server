@@ -279,27 +279,20 @@ func UserGrpEdit(ctx Context, param UserGrpEditParam) {
 }
 
 type UserListParam struct {
-	PageSize    int     `query:"pagesize" binding:"required" validate:"gte=1,lte=100"`
-	UserName    *string `query:"user_name"`
-	Left        *int    `query:"left"`
-	Right       *int    `query:"right"`
-	LeftUserID  *int    `query:"left_user_id"`
-	RightUserID *int    `query:"right_user_id"`
-	LeftRating  *int    `query:"left_rating"`
-	RightRating *int    `query:"right_rating"`
+	UserName *string `query:"user_name"`
+	Page
+	LeftUserID  *int `query:"left_user_id"`
+	RightUserID *int `query:"right_user_id"`
+	LeftRating  *int `query:"left_rating"`
+	RightRating *int `query:"right_rating"`
 }
 
 func UserList(ctx Context, param UserListParam) {
 	if param.UserName != nil {
-		var bound int
-		if param.Left != nil {
-			bound = *param.Left
-		} else if param.Right != nil {
-			bound = *param.Right
-		} else {
+		if !param.CanBound() {
 			return
 		}
-		users, isfull, err := internal.USListByName(*param.UserName+"%", bound, param.PageSize, param.Left != nil)
+		users, isfull, err := internal.USListByName(*param.UserName+"%", param.Bound(), param.PageSize, param.IsLeft())
 		if err != nil {
 			ctx.ErrorAPI(err)
 		} else {

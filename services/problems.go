@@ -20,34 +20,34 @@ import (
 // i. e. valid user_id with either:
 // 1. admin user_group
 // 2. problem permission
-func PRCanEdit(user_id int, user_group int, problem_id int) bool {
-	if user_id < 0 {
+func PRCanEdit(auth Auth, problem_id int) bool {
+	if auth.UserID < 0 {
 		return false
 	}
-	if libs.IsAdmin(user_group) {
+	if libs.IsAdmin(auth.UserGrp) {
 		return true
 	}
-	count, _ := libs.DBSelectSingleInt("select count(*) from problem_permissions where problem_id=? and permission_id=?", problem_id, -user_id)
+	count, _ := libs.DBSelectSingleInt("select count(*) from problem_permissions where problem_id=? and permission_id=?", problem_id, -auth.UserID)
 	return count > 0
 }
 
-func PRCanSeeWithoutContest(user_id int, user_group int, problem_id int) bool {
-	if user_id < 0 {
+func PRCanSeeWithoutContest(auth Auth, problem_id int) bool {
+	if auth.UserID < 0 {
 		count, _ := libs.DBSelectSingleInt("select count(*) from problem_permissions where problem_id=? and permission_id=?", problem_id, libs.DefaultGroup)
 		return count > 0
 	}
-	if PRCanEdit(user_id, user_group, problem_id) {
+	if PRCanEdit(auth, problem_id) {
 		return true
 	}
-	count, _ := libs.DBSelectSingleInt("select count(*) from ((select * from problem_permissions where problem_id=?) as a join (select * from user_permissions where user_id=?) as b on a.permission_id=b.permission_id)", problem_id, user_id)
+	count, _ := libs.DBSelectSingleInt("select count(*) from ((select * from problem_permissions where problem_id=?) as a join (select * from user_permissions where user_id=?) as b on a.permission_id=b.permission_id)", problem_id, auth.UserID)
 	return count > 0
 }
 
 /*
  */
-func PRCanSeeFromContest(user_id, user_group, problem_id, contest_id int) bool {
-	contest, _ := internal.CTQuery(contest_id, user_id)
-	if CTCanEnter(user_id, contest, CTCanEdit(user_id, user_group, contest_id)) &&
+func PRCanSeeFromContest(auth Auth, problem_id, contest_id int) bool {
+	contest, _ := internal.CTQuery(contest_id, auth.UserID)
+	if CTCanEnter(auth.UserID, contest, CTCanEdit(auth, contest_id)) &&
 		contest.StartTime.Before(time.Now()) && contest.EndTime.After(time.Now()) {
 		return internal.CTHasProblem(contest_id, problem_id)
 	}
@@ -59,9 +59,9 @@ args: contest_id=0 means not in contest
 
 return: (must see from contest, can see)
 */
-func PRCanSee(ctx Context, user_id, user_group, problem_id, contest_id int) (bool, bool) {
-	if !PRCanSeeWithoutContest(user_id, user_group, problem_id) {
-		if contest_id <= 0 || !PRCanSeeFromContest(user_id, user_group, problem_id, contest_id) {
+func PRCanSee(ctx Context, auth Auth, problem_id, contest_id int) (bool, bool) {
+	if !PRCanSeeWithoutContest(auth, problem_id) {
+		if contest_id <= 0 || !PRCanSeeFromContest(auth, problem_id, contest_id) {
 			ctx.JSONAPI(http.StatusForbidden, "", nil)
 			return false, false
 		}
@@ -76,24 +76,40 @@ type Auth struct {
 	UserGrp int `session:"user_group"`
 }
 
-type ProbListParam struct {
-	Auth
+// pagination query param
+type Page struct {
 	Left     *int `query:"left"`
 	Right    *int `query:"right"`
 	PageSize int  `query:"pagesize" binding:"required" validate:"gte=1,lte=100"`
 }
 
+func (r *Page) CanBound() bool {
+	return r.Left != nil || r.Right != nil
+}
+
+func (r *Page) Bound() int {
+	if r.Left != nil {
+		return *r.Left
+	} else if r.Right != nil {
+		return *r.Right
+	}
+	return 0
+}
+func (r *Page) IsLeft() bool {
+	return r.Left != nil
+}
+
+type ProbListParam struct {
+	Auth
+	Page
+}
+
 func ProbList(ctx Context, param ProbListParam) {
-	var bound int
-	if param.Left != nil {
-		bound = *param.Left
-	} else if param.Right != nil {
-		bound = *param.Right
-	} else {
+	if !param.Page.CanBound() {
 		return
 	}
 	problems, isfull, err := internal.PRList(
-		bound, param.PageSize, param.UserID, param.Left != nil, libs.IsAdmin(param.UserGrp),
+		param.Page.Bound(), param.PageSize, param.UserID, param.IsLeft(), libs.IsAdmin(param.UserGrp),
 	)
 	if err != nil {
 		ctx.ErrorAPI(err)
@@ -123,7 +139,7 @@ type ProbGetParam struct {
 }
 
 func ProbGet(ctx Context, param ProbGetParam) {
-	in_contest, ok := PRCanSee(ctx, param.UserID, param.UserGrp, param.ProbID, param.CtstID)
+	in_contest, ok := PRCanSee(ctx, param.Auth, param.ProbID, param.CtstID)
 	if !ok {
 		return
 	}
@@ -136,7 +152,7 @@ func ProbGet(ctx Context, param ProbGetParam) {
 		prob.Tutorial_zh = ""
 		prob.Tutorial_en = ""
 	}
-	can_edit := PRCanEdit(param.UserID, param.UserGrp, param.ProbID)
+	can_edit := PRCanEdit(param.Auth, param.ProbID)
 	if !can_edit {
 		prob.DataInfo = problem.DataInfo{}
 	}
@@ -150,7 +166,7 @@ type ProbGetPermParam struct {
 }
 
 func ProbGetPerm(ctx Context, param ProbGetPermParam) {
-	if !PRCanEdit(param.UserID, param.UserGrp, param.ProbID) {
+	if !PRCanEdit(param.Auth, param.ProbID) {
 		ctx.JSONAPI(403, "", nil)
 		return
 	}
@@ -169,7 +185,7 @@ type ProbAddPermParam struct {
 }
 
 func ProbAddPerm(ctx Context, param ProbAddPermParam) {
-	if !PRCanEdit(param.UserID, param.UserGrp, param.ProbID) {
+	if !PRCanEdit(param.Auth, param.ProbID) {
 		ctx.JSONAPI(403, "", nil)
 		return
 	}
@@ -190,7 +206,7 @@ type ProbDelPermParam struct {
 }
 
 func ProbDelPerm(ctx Context, param ProbDelPermParam) {
-	if !PRCanEdit(param.UserID, param.UserGrp, param.ProbID) {
+	if !PRCanEdit(param.Auth, param.ProbID) {
 		ctx.JSONAPI(403, "", nil)
 		return
 	}
@@ -206,7 +222,7 @@ type ProbGetMgrParam struct {
 }
 
 func ProbGetMgr(ctx Context, param ProbGetMgrParam) {
-	if !PRCanEdit(param.UserID, param.UserGrp, param.ProbID) {
+	if !PRCanEdit(param.Auth, param.ProbID) {
 		ctx.JSONAPI(403, "", nil)
 		return
 	}
@@ -225,7 +241,7 @@ type ProbAddMgrParam struct {
 }
 
 func ProbAddMgr(ctx Context, param ProbAddMgrParam) {
-	if !PRCanEdit(param.UserID, param.UserGrp, param.ProbID) {
+	if !PRCanEdit(param.Auth, param.ProbID) {
 		ctx.JSONAPI(403, "", nil)
 		return
 	}
@@ -246,7 +262,7 @@ type ProbDelMgrParam struct {
 }
 
 func ProbDelMgr(ctx Context, param ProbDelMgrParam) {
-	if !PRCanEdit(param.UserID, param.UserGrp, param.ProbID) {
+	if !PRCanEdit(param.Auth, param.ProbID) {
 		ctx.JSONAPI(403, "", nil)
 		return
 	}
@@ -263,7 +279,7 @@ type ProbPutDataParam struct {
 }
 
 func ProbPutData(ctx Context, param ProbPutDataParam) {
-	if !PRCanEdit(param.UserID, param.UserGrp, param.ProbID) {
+	if !PRCanEdit(param.Auth, param.ProbID) {
 		ctx.JSONAPI(403, "", nil)
 		return
 	}
@@ -298,7 +314,7 @@ func ProbDownData(ctx Context, param ProbDownDataParam) {
 	internal.ProblemRWLock.RLock(param.ProbID)
 	defer internal.ProblemRWLock.RUnlock(param.ProbID)
 	if param.DataType == "data" {
-		if !PRCanEdit(param.UserID, param.UserGrp, param.ProbID) {
+		if !PRCanEdit(param.Auth, param.ProbID) {
 			ctx.JSONAPI(403, "", nil)
 			return
 		}
@@ -310,7 +326,7 @@ func ProbDownData(ctx Context, param ProbDownDataParam) {
 			ctx.FileAttachment(path, fmt.Sprintf("problem_%d.zip", param.ProbID))
 		}
 	} else {
-		_, ok := PRCanSee(ctx, param.UserID, param.UserGrp, param.ProbID, param.CtstID)
+		_, ok := PRCanSee(ctx, param.Auth, param.ProbID, param.CtstID)
 		if !ok {
 			ctx.JSONAPI(403, "", nil)
 			return
@@ -335,7 +351,7 @@ type ProbEditParam struct {
 }
 
 func ProbEdit(ctx Context, param ProbEditParam) {
-	if !PRCanEdit(param.UserID, param.UserGrp, param.ProbID) {
+	if !PRCanEdit(param.Auth, param.ProbID) {
 		ctx.JSONAPI(403, "", nil)
 		return
 	}

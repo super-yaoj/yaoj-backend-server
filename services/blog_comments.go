@@ -15,7 +15,7 @@ func BlogCmntCreate(ctx Context, param BlogCmntCreateParam) {
 		ctx.JSONAPI(401, "", nil)
 		return
 	}
-	if !BLCanSee(param.UserID, param.UserGrp, param.BlogID) {
+	if !BLCanSee(param.Auth, param.BlogID) {
 		ctx.JSONAPI(403, "", nil)
 		return
 	}
@@ -38,7 +38,7 @@ func BlogCmntGet(ctx Context, param BlogCmntGetParam) {
 		ctx.JSONAPI(404, "", nil)
 		return
 	}
-	if !BLCanSee(param.UserID, param.UserGrp, param.BlogID) {
+	if !BLCanSee(param.Auth, param.BlogID) {
 		ctx.JSONAPI(403, "", nil)
 		return
 	}

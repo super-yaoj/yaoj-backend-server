@@ -71,22 +71,15 @@ func PermDel(ctx Context, param PermDelParam) {
 }
 
 type PermGetParam struct {
-	PageSize int  `query:"pagesize" binding:"required" validate:"gte=1,lte=100"`
-	Left     *int `query:"left"`
-	Right    *int `query:"right"`
-	UserGrp  int  `session:"user_group" validate:"admin"`
+	Page
+	UserGrp int `session:"user_group" validate:"admin"`
 }
 
 func PermGet(ctx Context, param PermGetParam) {
-	var bound int
-	if param.Left != nil {
-		bound = *param.Left
-	} else if param.Right != nil {
-		bound = *param.Right
-	} else {
+	if !param.CanBound() {
 		return
 	}
-	p, isfull, err := internal.PMQuery(bound, param.PageSize, param.Left != nil)
+	p, isfull, err := internal.PMQuery(param.Bound(), param.PageSize, param.IsLeft())
 	if err != nil {
 		ctx.ErrorAPI(err)
 	} else {

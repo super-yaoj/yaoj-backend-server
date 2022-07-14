@@ -16,26 +16,19 @@ import (
 
 type SubmListParam struct {
 	Auth
-	Left     *int `query:"left"`
-	Right    *int `query:"right"`
-	PageSize int  `query:"pagesize" binding:"required" validate:"gte=1,lte=100"`
-	ProbID   int  `query:"problem_id"`
-	CtstID   int  `query:"contest_id"`
-	Submtter int  `query:"submitter"`
+	Page
+	ProbID   int `query:"problem_id"`
+	CtstID   int `query:"contest_id"`
+	Submtter int `query:"submitter"`
 }
 
 func SubmList(ctx Context, param SubmListParam) {
-	var bound int
-	if param.Left != nil {
-		bound = *param.Left
-	} else if param.Right != nil {
-		bound = *param.Right
-	} else {
+	if !param.CanBound() {
 		return
 	}
 	submissions, isfull, err := internal.SMList(
-		bound, param.PageSize, param.UserID, param.Submtter, param.ProbID, param.CtstID,
-		param.Left != nil, libs.IsAdmin(param.UserGrp),
+		param.Bound(), param.PageSize, param.UserID, param.Submtter, param.ProbID, param.CtstID,
+		param.IsLeft(), libs.IsAdmin(param.UserGrp),
 	)
 	if err != nil {
 		ctx.ErrorAPI(err)
@@ -65,7 +58,7 @@ func SubmAdd(ctx Context, param SubmAddParam) {
 		ctx.JSONAPI(401, "", nil)
 		return
 	}
-	in_contest, ok := PRCanSee(ctx, param.UserID, param.UserGrp, param.ProbID, param.CtstID)
+	in_contest, ok := PRCanSee(ctx, param.Auth, param.ProbID, param.CtstID)
 	if !ok {
 		return
 	}
@@ -237,8 +230,8 @@ func SubmGet(ctx Context, param SubmGetParam) {
 		return
 	}
 	//user cannot see submission details inside contests
-	by_problem := PRCanSeeWithoutContest(param.UserID, param.UserGrp, ret.ProblemId)
-	can_edit := SMCanEdit(param.UserID, param.UserGrp, ret.SubmissionBase)
+	by_problem := PRCanSeeWithoutContest(param.Auth, ret.ProblemId)
+	can_edit := SMCanEdit(param.Auth, ret.SubmissionBase)
 	if !can_edit && ret.Submitter != param.UserID && !by_problem {
 		ctx.JSONAPI(403, "", nil)
 	} else {
@@ -279,9 +272,9 @@ func SubmCustom(ctx Context, param SubmCustomParam) {
 	ctx.JSONAPI(200, "", map[string]any{"result": string(result)})
 }
 
-func SMCanEdit(user_id, user_group int, sub internal.SubmissionBase) bool {
-	return PRCanEdit(user_id, user_group, sub.ProblemId) ||
-		(sub.ContestId > 0 && CTCanEdit(user_id, user_group, sub.ContestId))
+func SMCanEdit(auth Auth, sub internal.SubmissionBase) bool {
+	return PRCanEdit(auth, sub.ProblemId) ||
+		(sub.ContestId > 0 && CTCanEdit(auth, sub.ContestId))
 }
 
 type SubmDelParam struct {
@@ -295,7 +288,7 @@ func SubmDel(ctx Context, param SubmDelParam) {
 		ctx.JSONAPI(404, "", nil)
 		return
 	}
-	if !SMCanEdit(param.UserID, param.UserGrp, sub) {
+	if !SMCanEdit(param.Auth, sub) {
 		ctx.JSONAPI(403, "", nil)
 		return
 	}
@@ -317,7 +310,7 @@ func Rejudge(ctx Context, param RejudgeParam) {
 			ctx.JSONRPC(404, -32600, "", nil)
 			return
 		}
-		if !PRCanEdit(param.UserID, param.UserGrp, *param.ProbID) {
+		if !PRCanEdit(param.Auth, *param.ProbID) {
 			ctx.JSONRPC(403, -32600, "", nil)
 			return
 		}
@@ -331,7 +324,7 @@ func Rejudge(ctx Context, param RejudgeParam) {
 			ctx.JSONRPC(404, -32600, "", nil)
 			return
 		}
-		if !SMCanEdit(param.UserID, param.UserGrp, sub) {
+		if !SMCanEdit(param.Auth, sub) {
 			ctx.JSONRPC(403, -32600, "", nil)
 			return
 		}
