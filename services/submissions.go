@@ -230,7 +230,7 @@ func SubmGet(ctx Context, param SubmGetParam) {
 		return
 	}
 	//user cannot see submission details inside contests
-	by_problem := ProbCanSee(param.Auth, ret.ProblemId)
+	by_problem := param.Auth.CanSeeProb(ret.ProblemId)
 	can_edit := SMCanEdit(param.Auth, ret.SubmissionBase)
 	if !can_edit && ret.Submitter != param.UserID && !by_problem {
 		ctx.JSONAPI(403, "", nil)
@@ -273,7 +273,7 @@ func SubmCustom(ctx Context, param SubmCustomParam) {
 }
 
 func SMCanEdit(auth Auth, sub internal.SubmissionBase) bool {
-	return PRCanEdit(auth, sub.ProblemId) ||
+	return auth.CanEditProb(sub.ProblemId) ||
 		(sub.ContestId > 0 && CTCanEdit(auth, sub.ContestId))
 }
 
@@ -310,7 +310,7 @@ func Rejudge(ctx Context, param RejudgeParam) {
 			ctx.JSONRPC(404, -32600, "", nil)
 			return
 		}
-		if !PRCanEdit(param.Auth, *param.ProbID) {
+		if !param.Auth.CanEditProb(*param.ProbID) {
 			ctx.JSONRPC(403, -32600, "", nil)
 			return
 		}

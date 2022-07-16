@@ -18,6 +18,7 @@ type Context struct {
 
 // APIWriteBack
 func (ctx Context) JSONAPI(statusCode int, errorMessage string, data map[string]any) {
+	log.Printf("[api] code=%d, msg=%q", statusCode, errorMessage)
 	if data == nil {
 		data = map[string]any{}
 	}

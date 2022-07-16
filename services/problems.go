@@ -17,31 +17,6 @@ import (
 	"github.com/super-yaoj/yaoj-core/pkg/problem"
 )
 
-// 1. valid user_id
-// 2. admin or problem permission
-func PRCanEdit(auth Auth, problem_id int) bool {
-	if libs.IsAdmin(auth.UserGrp) {
-		return true
-	}
-	count, _ := libs.DBSelectSingleInt("select count(*) from problem_permissions where problem_id=? and permission_id=?", problem_id, -auth.UserID)
-	return count > 0
-}
-
-// 1. public problem
-// 2. can edit
-// 3. permitted
-func ProbCanSee(auth Auth, problem_id int) bool {
-	if auth.UserID == 0 {
-		count, _ := libs.DBSelectSingleInt("select count(*) from problem_permissions where problem_id=? and permission_id=?", problem_id, libs.DefaultGroup)
-		return count > 0
-	}
-	if PRCanEdit(auth, problem_id) {
-		return true
-	}
-	count, _ := libs.DBSelectSingleInt("select count(*) from ((select * from problem_permissions where problem_id=?) as a join (select * from user_permissions where user_id=?) as b on a.permission_id=b.permission_id)", problem_id, auth.UserID)
-	return count > 0
-}
-
 /*
  */
 func ProbCanSeeInCtst(auth Auth, problem_id, contest_id int) bool {
@@ -55,7 +30,7 @@ func ProbCanSeeInCtst(auth Auth, problem_id, contest_id int) bool {
 
 // args: contest_id=0 means not in contest
 func PRCanSee(ctx Context, auth Auth, problem_id, contest_id int) (mustSeeFromCtst bool, canSee bool) {
-	if ProbCanSee(auth, problem_id) {
+	if auth.CanSeeProb(problem_id) {
 		return false, true
 	}
 	if contest_id > 0 && ProbCanSeeInCtst(auth, problem_id, contest_id) {
@@ -63,35 +38,6 @@ func PRCanSee(ctx Context, auth Auth, problem_id, contest_id int) (mustSeeFromCt
 	}
 	ctx.JSONAPI(http.StatusForbidden, "", nil)
 	return false, false
-}
-
-// authorization stored in session
-type Auth struct {
-	UserID  int `session:"user_id" validate:"gte=0"`
-	UserGrp int `session:"user_group" validate:"gte=0,lte=3"`
-}
-
-// pagination query param
-type Page struct {
-	Left     *int `query:"left"`
-	Right    *int `query:"right"`
-	PageSize int  `query:"pagesize" binding:"required" validate:"gte=1,lte=100"`
-}
-
-func (r *Page) CanBound() bool {
-	return r.Left != nil || r.Right != nil
-}
-
-func (r *Page) Bound() int {
-	if r.Left != nil {
-		return *r.Left
-	} else if r.Right != nil {
-		return *r.Right
-	}
-	return 0
-}
-func (r *Page) IsLeft() bool {
-	return r.Left != nil
 }
 
 type ProbListParam struct {
@@ -147,7 +93,7 @@ func ProbGet(ctx Context, param ProbGetParam) {
 		prob.Tutorial_zh = ""
 		prob.Tutorial_en = ""
 	}
-	can_edit := PRCanEdit(param.Auth, param.ProbID)
+	can_edit := param.Auth.CanEditProb(param.ProbID)
 	if !can_edit {
 		prob.DataInfo = problem.DataInfo{}
 	}
@@ -161,7 +107,7 @@ type ProbGetPermParam struct {
 }
 
 func ProbGetPerm(ctx Context, param ProbGetPermParam) {
-	if !PRCanEdit(param.Auth, param.ProbID) {
+	if !param.Auth.CanEditProb(param.ProbID) {
 		ctx.JSONAPI(403, "", nil)
 		return
 	}
@@ -180,7 +126,7 @@ type ProbAddPermParam struct {
 }
 
 func ProbAddPerm(ctx Context, param ProbAddPermParam) {
-	if !PRCanEdit(param.Auth, param.ProbID) {
+	if !param.Auth.CanEditProb(param.ProbID) {
 		ctx.JSONAPI(403, "", nil)
 		return
 	}
@@ -201,7 +147,7 @@ type ProbDelPermParam struct {
 }
 
 func ProbDelPerm(ctx Context, param ProbDelPermParam) {
-	if !PRCanEdit(param.Auth, param.ProbID) {
+	if !param.Auth.CanEditProb(param.ProbID) {
 		ctx.JSONAPI(403, "", nil)
 		return
 	}
@@ -217,7 +163,7 @@ type ProbGetMgrParam struct {
 }
 
 func ProbGetMgr(ctx Context, param ProbGetMgrParam) {
-	if !PRCanEdit(param.Auth, param.ProbID) {
+	if !param.Auth.CanEditProb(param.ProbID) {
 		ctx.JSONAPI(403, "", nil)
 		return
 	}
@@ -236,7 +182,7 @@ type ProbAddMgrParam struct {
 }
 
 func ProbAddMgr(ctx Context, param ProbAddMgrParam) {
-	if !PRCanEdit(param.Auth, param.ProbID) {
+	if !param.Auth.CanEditProb(param.ProbID) {
 		ctx.JSONAPI(403, "", nil)
 		return
 	}
@@ -257,7 +203,7 @@ type ProbDelMgrParam struct {
 }
 
 func ProbDelMgr(ctx Context, param ProbDelMgrParam) {
-	if !PRCanEdit(param.Auth, param.ProbID) {
+	if !param.Auth.CanEditProb(param.ProbID) {
 		ctx.JSONAPI(403, "", nil)
 		return
 	}
@@ -274,7 +220,7 @@ type ProbPutDataParam struct {
 }
 
 func ProbPutData(ctx Context, param ProbPutDataParam) {
-	if !PRCanEdit(param.Auth, param.ProbID) {
+	if !param.Auth.CanEditProb(param.ProbID) {
 		ctx.JSONAPI(403, "", nil)
 		return
 	}
@@ -309,7 +255,7 @@ func ProbDownData(ctx Context, param ProbDownDataParam) {
 	internal.ProblemRWLock.RLock(param.ProbID)
 	defer internal.ProblemRWLock.RUnlock(param.ProbID)
 	if param.DataType == "data" {
-		if !PRCanEdit(param.Auth, param.ProbID) {
+		if !param.Auth.CanEditProb(param.ProbID) {
 			ctx.JSONAPI(403, "", nil)
 			return
 		}
@@ -346,7 +292,7 @@ type ProbEditParam struct {
 }
 
 func ProbEdit(ctx Context, param ProbEditParam) {
-	if !PRCanEdit(param.Auth, param.ProbID) {
+	if !param.Auth.CanEditProb(param.ProbID) {
 		ctx.JSONAPI(403, "", nil)
 		return
 	}
