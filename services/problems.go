@@ -8,7 +8,6 @@ import (
 	"os"
 	"path"
 	"strings"
-	"time"
 	"yao/internal"
 	"yao/libs"
 	"yao/service"
@@ -16,29 +15,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/super-yaoj/yaoj-core/pkg/problem"
 )
-
-/*
- */
-func ProbCanSeeInCtst(auth Auth, problem_id, contest_id int) bool {
-	contest, _ := internal.CTQuery(contest_id, auth.UserID)
-	if CTCanEnter(auth.UserID, contest, CTCanEdit(auth, contest_id)) &&
-		contest.StartTime.Before(time.Now()) && contest.EndTime.After(time.Now()) {
-		return internal.CTHasProblem(contest_id, problem_id)
-	}
-	return false
-}
-
-// args: contest_id=0 means not in contest
-func PRCanSee(ctx Context, auth Auth, problem_id, contest_id int) (mustSeeFromCtst bool, canSee bool) {
-	if auth.CanSeeProb(problem_id) {
-		return false, true
-	}
-	if contest_id > 0 && ProbCanSeeInCtst(auth, problem_id, contest_id) {
-		return true, true
-	}
-	ctx.JSONAPI(http.StatusForbidden, "", nil)
-	return false, false
-}
 
 type ProbListParam struct {
 	Auth
@@ -50,7 +26,7 @@ func ProbList(ctx Context, param ProbListParam) {
 		return
 	}
 	problems, isfull, err := internal.PRList(
-		param.Page.Bound(), param.PageSize, param.UserID, param.IsLeft(), libs.IsAdmin(param.UserGrp),
+		param.Page.Bound(), param.PageSize, param.UserID, param.IsLeft(), param.IsAdmin(),
 	)
 	if err != nil {
 		ctx.ErrorAPI(err)
@@ -80,24 +56,23 @@ type ProbGetParam struct {
 }
 
 func ProbGet(ctx Context, param ProbGetParam) {
-	in_contest, ok := PRCanSee(ctx, param.Auth, param.ProbID, param.CtstID)
-	if !ok {
-		return
-	}
-	prob, err := internal.PRQuery(param.ProbID, param.UserID)
-	if err != nil {
-		ctx.ErrorAPI(err)
-		return
-	}
-	if in_contest {
-		prob.Tutorial_zh = ""
-		prob.Tutorial_en = ""
-	}
-	can_edit := param.Auth.CanEditProb(param.ProbID)
-	if !can_edit {
-		prob.DataInfo = problem.DataInfo{}
-	}
-	ctx.JSONAPI(200, "", map[string]any{"problem": *prob, "can_edit": can_edit})
+	param.Auth.SetCtst(param.CtstID).TrySeeProb(param.ProbID).
+		Then(func(ctstid int) {
+			prob, err := internal.PRQuery(param.ProbID, param.UserID)
+			if err != nil {
+				ctx.ErrorAPI(err)
+				return
+			}
+			if ctstid > 0 {
+				prob.Tutorial_zh = ""
+				prob.Tutorial_en = ""
+			}
+			can_edit := param.Auth.CanEditProb(param.ProbID)
+			if !can_edit {
+				prob.DataInfo = problem.DataInfo{}
+			}
+			ctx.JSONAPI(200, "", map[string]any{"problem": *prob, "can_edit": can_edit})
+		})
 }
 
 // 获取题目权限
@@ -267,18 +242,19 @@ func ProbDownData(ctx Context, param ProbDownDataParam) {
 			ctx.FileAttachment(path, fmt.Sprintf("problem_%d.zip", param.ProbID))
 		}
 	} else {
-		_, ok := PRCanSee(ctx, param.Auth, param.ProbID, param.CtstID)
-		if !ok {
-			ctx.JSONAPI(403, "", nil)
-			return
-		}
-		path := internal.PRGetSampleZip(param.ProbID)
-		_, err := os.Stat(path)
-		if err != nil {
-			ctx.JSONAPI(400, "no data", nil)
-		} else {
-			ctx.FileAttachment(path, fmt.Sprintf("sample_%d.zip", param.ProbID))
-		}
+		param.Auth.SetCtst(param.CtstID).TrySeeProb(param.ProbID).
+			Then(func(ctstid int) {
+				path := internal.PRGetSampleZip(param.ProbID)
+				_, err := os.Stat(path)
+				if err != nil {
+					ctx.JSONAPI(400, "no data", nil)
+				} else {
+					ctx.FileAttachment(path, fmt.Sprintf("sample_%d.zip", param.ProbID))
+				}
+			}).
+			Else(func(a int) {
+				ctx.JSONAPI(403, "", nil)
+			})
 	}
 }
 

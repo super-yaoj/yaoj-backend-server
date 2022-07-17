@@ -87,7 +87,7 @@ type PermGetUserParam struct {
 
 func PermGetUser(ctx Context, param PermGetUserParam) {
 	if param.PermID != nil {
-		if !libs.IsAdmin(param.UserGrp) {
+		if !param.IsAdmin() {
 			ctx.JSONAPI(403, "", nil)
 			return
 		}
@@ -98,7 +98,7 @@ func PermGetUser(ctx Context, param PermGetUserParam) {
 			ctx.JSONAPI(200, "", map[string]any{"data": users})
 		}
 	} else {
-		if !libs.IsAdmin(param.UserGrp) && param.PermUserID != param.UserID {
+		if !param.IsAdmin() && param.PermUserID != param.UserID {
 			ctx.JSONAPI(403, "", nil)
 			return
 		}

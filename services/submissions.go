@@ -28,7 +28,7 @@ func SubmList(ctx Context, param SubmListParam) {
 	}
 	submissions, isfull, err := internal.SMList(
 		param.Bound(), param.PageSize, param.UserID, param.Submtter, param.ProbID, param.CtstID,
-		param.IsLeft(), libs.IsAdmin(param.UserGrp),
+		param.IsLeft(), param.IsAdmin(),
 	)
 	if err != nil {
 		ctx.ErrorAPI(err)
@@ -58,37 +58,31 @@ func SubmAdd(ctx Context, param SubmAddParam) {
 		ctx.JSONAPI(401, "", nil)
 		return
 	}
-	in_contest, ok := PRCanSee(ctx, param.Auth, param.ProbID, param.CtstID)
-	if !ok {
-		return
-	}
-	if !in_contest {
-		param.CtstID = 0
-	}
+	param.Auth.SetCtst(param.CtstID).TrySeeProb(param.ProbID).Then(func(ctstid int) {
+		pro := internal.PRLoad(param.ProbID)
+		if !internal.PRHasData(pro, "tests") {
+			ctx.JSONAPI(400, "problem has no data", nil)
+			return
+		}
+		var sub problem.Submission
+		var language utils.LangTag
+		var preview map[string]internal.ContentPreview
+		if param.SubmAll != nil {
+			sub, preview, language = parseZipFile(ctx, "all.zip", pro.SubmConfig)
+		} else {
+			sub, preview, language = parseMultiFiles(ctx, pro.SubmConfig)
+		}
+		if sub == nil {
+			return
+		}
 
-	pro := internal.PRLoad(param.ProbID)
-	if !internal.PRHasData(pro, "tests") {
-		ctx.JSONAPI(400, "problem has no data", nil)
-		return
-	}
-	var sub problem.Submission
-	var language utils.LangTag
-	var preview map[string]internal.ContentPreview
-	if param.SubmAll != nil {
-		sub, preview, language = parseZipFile(ctx, "all.zip", pro.SubmConfig)
-	} else {
-		sub, preview, language = parseMultiFiles(ctx, pro.SubmConfig)
-	}
-	if sub == nil {
-		return
-	}
-
-	w := bytes.NewBuffer(nil)
-	sub.DumpTo(w)
-	err := internal.SMCreate(param.UserID, param.ProbID, param.CtstID, language, w.Bytes(), preview)
-	if err != nil {
-		ctx.ErrorAPI(err)
-	}
+		w := bytes.NewBuffer(nil)
+		sub.DumpTo(w)
+		err := internal.SMCreate(param.UserID, param.ProbID, param.CtstID, language, w.Bytes(), preview)
+		if err != nil {
+			ctx.ErrorAPI(err)
+		}
+	})
 }
 
 // When the submitted file is a zip file
@@ -274,7 +268,7 @@ func SubmCustom(ctx Context, param SubmCustomParam) {
 
 func SMCanEdit(auth Auth, sub internal.SubmissionBase) bool {
 	return auth.CanEditProb(sub.ProblemId) ||
-		(sub.ContestId > 0 && CTCanEdit(auth, sub.ContestId))
+		(sub.ContestId > 0 && auth.CanEditCtst(sub.ContestId))
 }
 
 type SubmDelParam struct {

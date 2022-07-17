@@ -17,7 +17,7 @@ func BLCanSee(auth Auth, blog_id int) bool {
 	} else if auth.UserID == 0 { // unregistered
 		return false
 	} else {
-		return libs.IsAdmin(auth.UserGrp) || auth.UserID == blog.Author || !blog.Private
+		return auth.IsAdmin() || auth.UserID == blog.Author || !blog.Private
 	}
 }
 
@@ -27,7 +27,7 @@ func BLCanEdit(auth Auth, blog_id int) bool {
 	if err != nil {
 		return false
 	} else {
-		return libs.IsAdmin(auth.UserGrp) || auth.UserID == blog.Author
+		return auth.IsAdmin() || auth.UserID == blog.Author
 	}
 }
 

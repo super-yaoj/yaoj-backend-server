@@ -56,7 +56,7 @@ func BlogCmntDel(ctx Context, param BlogCmntDelParam) {
 	err := libs.DBSelectSingle(&comment, "select author, blog_id from blog_comments where comment_id=?", param.CmntID)
 	if err != nil {
 		ctx.JSONAPI(404, "", nil)
-	} else if !libs.IsAdmin(param.UserGrp) && comment.Author != param.UserID {
+	} else if !param.IsAdmin() && comment.Author != param.UserID {
 		ctx.JSONAPI(403, "", nil)
 	} else {
 		err = internal.BLDeleteComment(param.CmntID, comment.BlogId)
