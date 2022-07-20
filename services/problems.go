@@ -132,15 +132,16 @@ func ProbGet(ctx Context, param ProbGetParam) {
 		ctx.ErrorAPI(err)
 		return
 	}
+	ret_prob := *prob
 	if in_contest {
-		prob.Tutorial_zh = ""
-		prob.Tutorial_en = ""
+		ret_prob.Tutorial_zh = ""
+		ret_prob.Tutorial_en = ""
 	}
 	can_edit := PRCanEdit(param.UserID, param.UserGrp, param.ProbID)
 	if !can_edit {
-		prob.DataInfo = problem.DataInfo{}
+		ret_prob.DataInfo = problem.DataInfo{}
 	}
-	ctx.JSONAPI(200, "", map[string]any{"problem": *prob, "can_edit": can_edit})
+	ctx.JSONAPI(200, "", map[string]any{"problem": ret_prob, "can_edit": can_edit})
 }
 
 // 获取题目权限

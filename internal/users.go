@@ -6,21 +6,19 @@ import (
 	"yao/libs"
 )
 
-type UserSmall struct {
+type UserBase struct {
 	Id        int    `db:"user_id" json:"user_id"`
 	Name      string `db:"user_name" json:"user_name"`
 	Usergroup int    `db:"user_group" json:"user_group"`
+	Rating    int    `db:"rating" json:"rating"`
 }
 
 type User struct {
-	Id            int       `db:"user_id" json:"user_id"`
-	Name          string    `db:"user_name" json:"user_name"`
+	UserBase
 	Password      string    `db:"password" json:"password"`
 	Motto         string    `db:"motto" json:"motto"`
-	Rating        int       `db:"rating" json:"rating"`
 	RegisterTime  time.Time `db:"register_time" json:"register_time"`
 	RememberToken string    `db:"remember_token" json:"remember_token"`
-	Usergroup     int       `db:"user_group" json:"user_group"`
 	Gender        int       `db:"gender" json:"gender"`
 	Email         string    `db:"email" json:"email"`
 	Organization  string    `db:"organization" json:"organization"`
@@ -74,9 +72,9 @@ func USQuery(user_id int) (User, error) {
 	return user, err
 }
 
-func USQuerySmall(user_id int) (UserSmall, error) {
-	user := UserSmall{Id: user_id}
-	err := libs.DBSelectSingle(&user, "select user_name, user_group from user_info where user_id=?", user_id)
+func UserQueryBase(user_id int) (UserBase, error) {
+	user := UserBase{Id: user_id}
+	err := libs.DBSelectSingle(&user, "select user_name, user_group, rating from user_info where user_id=?", user_id)
 	return user, err
 }
 
@@ -134,14 +132,14 @@ func USExists(user_id int) bool {
 	return count > 0
 }
 
-func USListByName(user_name string, bound, pagesize int, isleft bool) ([]UserSmall, bool, error) {
-	var users []UserSmall
+func USListByName(user_name string, bound, pagesize int, isleft bool) ([]UserBase, bool, error) {
+	var users []UserBase
 	pagesize += 1
 	var err error
 	if isleft {
-		err = libs.DBSelectAll(&users, "select user_id, user_name from user_info where user_id>=? and user_name like ? order by user_id limit ?", bound, user_name, pagesize)
+		err = libs.DBSelectAll(&users, "select user_id, user_name, rating from user_info where user_id>=? and user_name like ? order by user_id limit ?", bound, user_name, pagesize)
 	} else {
-		err = libs.DBSelectAll(&users, "select user_id, user_name from user_info where user_id<=? and user_name like ? order by user_id desc limit ?", bound, user_name, pagesize)
+		err = libs.DBSelectAll(&users, "select user_id, user_name, rating from user_info where user_id<=? and user_name like ? order by user_id desc limit ?", bound, user_name, pagesize)
 	}
 	isfull := len(users) == pagesize
 	if isfull {

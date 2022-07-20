@@ -77,7 +77,7 @@ func UserLogin(ctx Context, param UserLoginParam) {
 		return
 	}
 	password := internal.SaltPassword(param.Passwd)
-	user := internal.UserSmall{Name: param.UserName}
+	user := internal.UserBase{Name: param.UserName}
 	err := libs.DBSelectSingle(
 		&user, "select user_id, user_group from user_info where user_name=? and password=?",
 		param.UserName, password,
@@ -123,7 +123,7 @@ type UserInitParam struct {
 
 func UserInit(ctx Context, param UserInitParam) {
 	sess := sessions.Default(ctx.Context)
-	var ret func(internal.UserSmall) = func(user internal.UserSmall) {
+	var ret func(internal.UserBase) = func(user internal.UserBase) {
 		fmt.Println(user)
 		if user.Usergroup == libs.USBanned {
 			UserLogout(ctx, UserLogoutParam{})
@@ -140,7 +140,7 @@ func UserInit(ctx Context, param UserInitParam) {
 	}
 
 	tmp, err := ctx.Cookie("user_id")
-	user := internal.UserSmall{Id: -1, Name: "", Usergroup: libs.USNormal}
+	user := internal.UserBase{Id: -1, Name: "", Usergroup: libs.USNormal}
 	if err == nil {
 		id, err := strconv.Atoi(tmp)
 		remember_token, err1 := ctx.Cookie("remember_token")
@@ -262,7 +262,7 @@ func UserGrpEdit(ctx Context, param UserGrpEditParam) {
 		ctx.JSONAPI(403, "", nil)
 		return
 	}
-	target, err := internal.USQuerySmall(param.UserGrp)
+	target, err := internal.UserQueryBase(param.UserID)
 	if err != nil {
 		ctx.JSONAPI(400, "no such user id", nil)
 		return
@@ -322,5 +322,24 @@ func UserList(ctx Context, param UserListParam) {
 		} else {
 			ctx.JSONAPI(200, "", map[string]any{"data": users, "isfull": isfull})
 		}
+	}
+}
+
+type UserRatingParam struct {
+	UserId int `query:"user_id" binding:"required"`
+}
+
+func UserRating(ctx Context, param UserRatingParam) {
+	var ratings []struct {
+		Rating 		int 		`db:"rating" json:"rating"`
+		ContestId 	int 		`db:"contest_id" json:"contest_id"`
+		Time 		time.Time 	`db:"time" json:"time"`
+		Title 		string 		`db:"title" json:"title"`
+	}
+	err := libs.DBSelectAll(&ratings, "select rating, a.contest_id, title, time from ((select rating, contest_id, time from ratings where user_id=?) as a inner join contests on a.contest_id=contests.contest_id)", param.UserId)
+	if err != nil {
+		ctx.ErrorAPI(err)
+	} else {
+		ctx.JSONAPI(200, "", map[string]any{"ratings": ratings})
 	}
 }

@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"crypto/sha256"
+	"encoding/gob"
 	"fmt"
 	"io"
 	"math/rand"
@@ -143,4 +144,13 @@ func StartsWith(a, b string) bool {
 
 func TimeStamp() int64 {
 	return time.Now().UnixMilli()
+}
+
+func DeepCopy(dst, src any) error {
+	var buf bytes.Buffer
+	err := gob.NewEncoder(&buf).Encode(src)
+	if err != nil {
+		return err
+	}
+	return gob.NewDecoder(&buf).Decode(dst)
 }

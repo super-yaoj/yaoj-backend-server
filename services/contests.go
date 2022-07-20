@@ -193,7 +193,8 @@ type CtstEditParam struct {
 }
 
 func CtstEdit(ctx Context, param CtstEditParam) {
-	if !internal.CTExists(param.CtstID) {
+	ctst, err := internal.CTQuery(param.CtstID, -1)
+	if err != nil {
 		ctx.JSONAPI(404, "", nil)
 		return
 	}
@@ -206,6 +207,12 @@ func CtstEdit(ctx Context, param CtstEditParam) {
 	if err != nil {
 		ctx.JSONAPI(400, "time format error", nil)
 		return
+	}
+	if ctst.Finished {
+		start = ctst.StartTime
+		param.Duration = int(ctst.EndTime.Sub(ctst.StartTime).Minutes())
+		param.PrtstOnly = libs.If(ctst.Pretest, 1, 0)
+		param.ScorePrivate = libs.If(ctst.ScorePrivate, 1, 0)
 	}
 	err = internal.CTModify(param.CtstID, title, start, param.Duration, param.PrtstOnly, param.ScorePrivate)
 	if err != nil {
@@ -405,5 +412,88 @@ func CtstSignout(ctx Context, param CtstSignoutParam) {
 	err := internal.CTDeleteParticipant(param.CtstID, param.UserID)
 	if err != nil {
 		ctx.ErrorAPI(err)
+	}
+}
+
+type CtstStandingParam struct {
+	CtstID int `query:"contest_id" binding:"required"`
+	UserID int `session:"user_id"`
+	UserGrp int `session:"user_group"`
+}
+
+func CtstStanding(ctx Context, param CtstStandingParam) {
+	ctst, err := internal.CTQuery(param.CtstID, -1)
+	if err != nil {
+		ctx.JSONAPI(404, "", nil)
+		return
+	}
+	can_edit := CTCanEdit(param.UserID, param.UserGrp, param.CtstID)
+	if !CTCanEnter(param.UserID, ctst, can_edit) {
+		ctx.JSONAPI(403, "", nil)
+		return
+	}
+	raw_standing := internal.CTGetStanding(param.CtstID)
+	standing := []internal.CTStandingEntry{}
+	libs.DeepCopy(&standing, raw_standing)
+	if !can_edit && ctst.EndTime.After(time.Now()) {
+		if ctst.ScorePrivate {
+			for _, v := range standing {
+				if v.UserId == param.UserID {
+					standing = []internal.CTStandingEntry{v}
+					break
+				}
+			}
+		}
+		if ctst.Pretest {
+			for k := range standing {
+				standing[k].Scores = standing[k].SScores
+				for i := range standing[k].Hacked {
+					standing[k].Hacked[i] = false
+				}
+			}
+		}
+	}
+	problems, err := internal.CTGetProblems(param.CtstID)
+	if err != nil {
+		ctx.ErrorAPI(err)
+	} else {
+		ctx.JSONAPI(200, "", map[string]any{"standing": standing, "problems": problems})
+	}
+}
+
+type CtstFinishParam struct {
+	CtstID int `body:"contest_id" binding:"required"`
+	UserID int `session:"user_id"`
+	UserGrp int `session:"user_group"`
+}
+
+func CtstFinish(ctx Context, param CtstFinishParam) {
+	ctst, err := internal.CTQuery(param.CtstID, -1)
+	if err != nil {
+		ctx.JSONRPC(404, -32600, "", nil)
+		return
+	}
+	if !CTCanEdit(param.UserID, param.UserGrp, param.CtstID) {
+		ctx.JSONRPC(403, -32600, "", nil)
+		return
+	}
+	if ctst.Finished {
+		ctx.JSONRPC(400, -32600, "Contest is already finished.", nil)
+		return
+	}
+	if ctst.EndTime.After(time.Now()) {
+		ctx.JSONRPC(400, -32600, "Contest hasn't finished.", nil)
+		return
+	}
+	count, _ := libs.DBSelectSingleInt("select count(*) from submissions where contest_id=? and status>=0 and status<? limit 1", param.CtstID, internal.Finished)
+	if count > 0 {
+		ctx.JSONRPC(400, -32600, "There are still some contest submissions judging, please wait.", nil)
+		return
+	}
+	err = internal.CTFinish(param.CtstID)
+	if err != nil {
+		ctx.ErrorRPC(err)
+	} else {
+		ctx.JSONRPC(200, 0, "", nil)
 	}
 }

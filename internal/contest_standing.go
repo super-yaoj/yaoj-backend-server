@@ -11,10 +11,7 @@ import (
 
 type CTStandingEntry struct {
 	UserId       int
-	TotalScore   float64
-	TotalSScore  float64 //total sample score
-	TotalPenalty time.Duration
-	TotalHacked  bool
+	UserName 	 string
 	SubIds 		 []int
 	Scores       []float64
 	SScores      []float64 //sample scores
@@ -42,21 +39,26 @@ type standingSubm struct {
 	Hacked 		bool 		`db:"hacked"`
 }
 
+type standingUser struct {
+	Rating 		int 	`db:"rating"`
+	UserName 	string 	`db:"user_name"`
+}
+
 var (
 	allStandings = libs.NewMemoryCache(time.Hour, 100)
 	ctsMultiLock = libs.NewMappedMultiRWMutex()
 	dataColumns = "submission_id, submitter, problem_id, score, sample_score, hacked, submit_time"
 )
 
-func newStandingEntry(userid, userating, probs int) CTStandingEntry {
+func newStandingEntry(user_id, rating int, user_name string, probs int) CTStandingEntry {
 	return CTStandingEntry{
-		userid, 0, 0, 0, false,
+		user_id, user_name,
 		make([]int, probs),
 		make([]float64, probs),
 		make([]float64, probs),
 		make([]time.Duration, probs),
 		make([]bool, probs),
-		userating, 0, 0,
+		rating, 0, 0,
 	}
 }
 
@@ -65,11 +67,11 @@ func updateEntry(standing *CTStanding, sub *standingSubm, getRating bool) {
 	if !ok {
 		uid = len(standing.entries)
 		standing.uidMap[sub.Submitter] = uid
-		rating := 0
+		info := standingUser{}
 		if getRating {
-			rating, _ = libs.DBSelectSingleInt("select rating from user_info where user_id=?", sub.Submitter)
+			libs.DBSelectSingle(&info, "select rating, user_name from user_info where user_id=?", sub.Submitter)
 		}
-		standing.entries = append(standing.entries, newStandingEntry(sub.Submitter, rating, len(standing.pidMap)))
+		standing.entries = append(standing.entries, newStandingEntry(sub.Submitter, info.Rating, info.UserName, len(standing.pidMap)))
 	}
 	pid, ok := standing.pidMap[sub.Problem]
 	if !ok {
@@ -85,22 +87,6 @@ func updateEntry(standing *CTStanding, sub *standingSubm, getRating bool) {
 	entry.SubIds[pid] = sub.Id
 	entry.Penalties[pid] = sub.Penalty.Sub(standing.startTime)
 	entry.Hacked[pid] = sub.Hacked
-	entry.TotalScore = 0
-	for _, i := range entry.Scores {
-		entry.TotalScore += i
-	}
-	entry.TotalSScore = 0
-	for _, i := range entry.SScores {
-		entry.TotalSScore += i
-	}
-	entry.TotalPenalty = 0
-	for _, i := range entry.Penalties {
-		entry.TotalPenalty += i
-	}
-	entry.TotalHacked = false
-	for _, i := range entry.Hacked {
-		entry.TotalHacked = entry.TotalHacked || i
-	}
 }
 
 func CTRenewStanding(contest_id int) {
@@ -112,7 +98,7 @@ func CTRenewStanding(contest_id int) {
 		return
 	}
 	var subs []standingSubm
-	err = libs.DBSelectAll(&subs, "select " + dataColumns + " from submissons where contest_id=? order by submission_id", contest_id)
+	err = libs.DBSelectAll(&subs, "select " + dataColumns + " from submissions where contest_id=? order by submission_id", contest_id)
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -133,40 +119,48 @@ func CTRenewStanding(contest_id int) {
 		standing.pidMap[val.Id] = key
 	}
 	
-	for _, sub := range subs {
-		updateEntry(standing, &sub, false)
-	}
-	uids := make([]int, len(subs))
-	for i := range subs {
-		uids[i] = subs[i].Submitter
-	}
-	rows, err := libs.DBQuery("select user_id, rating from user_info where user_id in (" + libs.JoinArray(uids) + ")")
-	defer rows.Close()
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	var user_rating map[int]int
-	for rows.Next() {
-		var id, rating int
-		rows.Scan(&id, &rating)
-		user_rating[id] = rating
-	}
-	for i := range standing.entries {
-		standing.entries[i].OrgRating = user_rating[standing.entries[i].UserId]
+	if len(subs) > 0 {
+		for _, sub := range subs {
+			updateEntry(standing, &sub, false)
+		}
+		uids := make([]int, len(subs))
+		for i := range subs {
+			uids[i] = subs[i].Submitter
+		}
+		rows, err := libs.DBQuery("select user_id, rating, user_name from user_info where user_id in (" + libs.JoinArray(uids) + ")")
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		defer rows.Close()
+		user_rating := make(map[int]standingUser)
+		for rows.Next() {
+			var id, rating int
+			var user_name string
+			rows.Scan(&id, &rating, &user_name)
+			user_rating[id] = standingUser{rating, user_name}
+		}
+		for i := range standing.entries {
+			user := user_rating[standing.entries[i].UserId]
+			standing.entries[i].UserName  = user.UserName
+			standing.entries[i].OrgRating = user.Rating
+		}
 	}
 	allStandings.Set(contest_id, standing)
 }
 
 func CTSUpdateSubmission(contest_id, sid int) {
+	if CTHasFinished(contest_id) {
+		return
+	}
 	ctsMultiLock.Lock(contest_id)
-	defer ctsMultiLock.Unlock(contest_id)
 	standing, ok := allStandings.Get(contest_id)
 	if !ok {
 		ctsMultiLock.Unlock(contest_id)
 		CTRenewStanding(contest_id)
 		return
 	}
+	defer ctsMultiLock.Unlock(contest_id)
 	var sub standingSubm
 	err := libs.DBSelectSingle(&sub, "select " + dataColumns + " from submissions where submission_id=?", sid)
 	if err != nil {
@@ -177,20 +171,24 @@ func CTSUpdateSubmission(contest_id, sid int) {
 }
 
 func CTSDeleteSubmission(sub SubmissionBase) {
+	if CTHasFinished(sub.ContestId) {
+		return
+	}
 	ctsMultiLock.Lock(sub.ContestId)
-	defer ctsMultiLock.Unlock(sub.ContestId)
 	raw_standing, ok := allStandings.Get(sub.ContestId)
 	if !ok {
 		ctsMultiLock.Unlock(sub.ContestId)
 		CTRenewStanding(sub.ContestId)
 		return
 	}
+	defer ctsMultiLock.Unlock(sub.ContestId)
 	standing := raw_standing.(*CTStanding)
 	uid := standing.uidMap[sub.Submitter]
 	pid := standing.pidMap[sub.ProblemId]
 	if standing.entries[uid].SubIds[pid] > sub.Id {//isn't the last commit
 		return
 	}
+	standing.entries[uid].SubIds[pid] = 0
 	var newsub standingSubm
 	err := libs.DBSelectSingle(&sub, "select " + dataColumns + " from submissions where problem_id=? and contest_id=? and submitter=? order by submission_id desc limit 1", sub.ProblemId, sub.ContestId, sub.Submitter)
 	if err != nil {//no more submissions
@@ -204,15 +202,10 @@ func CTGetStanding(contest_id int) []CTStandingEntry {
 	defer ctsMultiLock.RUnlock(contest_id)
 	standing, ok := allStandings.Get(contest_id)
 	if !ok {
-		finished, err := libs.DBSelectSingleInt("select finished from contests where contest_id=?", contest_id)
-		if err != nil {
-			fmt.Println(err)
-			return nil
-		}
-		if finished > 0 {
+		if CTHasFinished(contest_id) {
 			var entries []CTStandingEntry
 			var js []byte
-			err = libs.DBSelectSingleColumn(&js, "select standing from contest_standing where contest_id=?", contest_id)
+			err := libs.DBSelectSingleColumn(&js, "select standing from contest_standing where contest_id=?", contest_id)
 			if err != nil {
 				fmt.Println(err)
 				return nil
@@ -236,13 +229,13 @@ func CTGetStanding(contest_id int) []CTStandingEntry {
 	return standing.(*CTStanding).entries
 }
 
-func (entry CTStandingEntry) Rate(rating int) {
+func (entry *CTStandingEntry) Rate(rating int) {
 	entry.NewRating = rating
 }
-func (entry CTStandingEntry) Rating() int {
+func (entry *CTStandingEntry) Rating() int {
 	return entry.OrgRating
 }
-func (entry CTStandingEntry) Count() int {
+func (entry *CTStandingEntry) Count() int {
 	return entry.PastContests
 }
 
@@ -271,16 +264,47 @@ func getPastContests(entries []CTStandingEntry) error {
 You must ensure that there's no more submissions judging in this contest.
 */
 func CTFinish(contest_id int) error {
+	var err error
+	//For safety, recalculate standing
+	CTRenewStanding(contest_id)
 	standing := CTGetStanding(contest_id)
-	err := getPastContests(standing)
-	if err != nil {
-		return err
+	if len(standing) > 0 {
+		err = getPastContests(standing)
+		if err != nil {
+			return err
+		}
+		standing_p := make([]*CTStandingEntry, len(standing))
+		for i := range standing {
+			standing_p[i] = &standing[i]
+		}
+		err = utils.CalcRating(standing_p)
+		if err != nil {
+			return err
+		}
+		//Write standings into database
+		uids := make([]int, len(standing))
+		values := make([]string, len(standing))
+		for key, i := range standing {
+			uids[key] = i.UserId
+		}
+		//save rating changes to table `ratings`
+		current := time.Now().UTC().Format("2006-01-02 15:04:05")
+		for key, i := range standing {
+			values[key] = fmt.Sprintf("(%d, %d, %d, \"%s\")", i.UserId, i.NewRating, contest_id, current)
+		}
+		_, err = libs.DBUpdate("insert into ratings values " + libs.JoinArray(values))
+		if err != nil {
+			return err
+		}
+		//change user rating in table `user_info`
+		for key, i := range standing {
+			values[key] = fmt.Sprintf("(%d, %d)", i.UserId, i.NewRating)
+		}
+		_, err = libs.DBUpdate("insert into user_info (user_id, rating) values " + libs.JoinArray(values) + " on duplicate key update rating=values(rating)")
+		if err != nil {
+			return err
+		}
 	}
-	err = utils.CalcRating(standing)
-	if err != nil {
-		return err
-	}
-	//Write standings into database
 	js, err := jsoniter.Marshal(standing)
 	if err != nil {
 		return err

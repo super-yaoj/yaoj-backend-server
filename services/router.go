@@ -19,11 +19,12 @@ The router table for yaoj back-end server
 urls with first letter upper are rpcs, others are apis.
 */
 var Router map[string][]Request = map[string][]Request{
-	"/GetTime":    {{"POST", GetTime}},
-	"/Init":       {{"POST", service.GinHandler(UserInit)}},
-	"/UserLogin":  {{"POST", service.GinHandler(UserLogin)}},
-	"/UserLogout": {{"POST", service.GinHandler(UserLogout)}},
-	"/Rejudge":    {{"POST", service.GinHandler(Rejudge)}},
+	"/GetTime":       {{"POST", GetTime}},
+	"/Init":          {{"POST", service.GinHandler(UserInit)}},
+	"/UserLogin":     {{"POST", service.GinHandler(UserLogin)}},
+	"/UserLogout":    {{"POST", service.GinHandler(UserLogout)}},
+	"/Rejudge":       {{"POST", service.GinHandler(Rejudge)}},
+	"/FinishContest": {{"POST", service.GinHandler(CtstFinish)}},
 
 	"/user": {
 		{"GET", service.GinHandler(UserGet)},
@@ -48,6 +49,7 @@ var Router map[string][]Request = map[string][]Request{
 		{"DELETE", service.GinHandler(PermDelUser)},
 	},
 	"/users": {{"GET", service.GinHandler(UserList)}},
+	"/ratings": {{"GET", service.GinHandler(UserRating)}},
 
 	"/blog": {
 		{"GET", service.GinHandler(BlogGet)},
@@ -113,6 +115,9 @@ var Router map[string][]Request = map[string][]Request{
 		{"GET", service.GinHandler(CtstProbGet)},
 		{"POST", service.GinHandler(CtstProbAdd)},
 		{"DELETE", service.GinHandler(CtstProbDel)},
+	},
+	"/contest_standing": {
+		{"GET", service.GinHandler(CtstStanding)},
 	},
 
 	"/submissions": {{"GET", service.GinHandler(SubmList)}},

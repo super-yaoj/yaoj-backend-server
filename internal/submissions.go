@@ -30,6 +30,7 @@ type Submission struct {
 	SubmissionBase
 	ProblemName   string    `db:"problem_name" json:"problem_name"`
 	SubmitterName string    `db:"submitter_name" json:"submitter_name"`
+	Rating 		  int    	`db:"rating" json:"rating"`
 	Status        int       `db:"status" json:"status"`
 	Score         float64   `db:"score" json:"score"`
 	SubmitTime    time.Time `db:"submit_time" json:"submit_time"`
@@ -110,18 +111,19 @@ func SMGetExtraInfo(subs []Submission) {
 		users = append(users, val.Submitter)
 	}
 	type Name struct {
-		Id   int    `db:"id"`
-		Name string `db:"name"`
+		Id     int    `db:"id"`
+		Name   string `db:"name"`
+		Rating int    `db:"rating"`
 	}
 	var pname, uname []Name
 	libs.DBSelectAll(&pname, "select problem_id as id, title as name from problems where problem_id in (" + libs.JoinArray(probs) + ")")
-	libs.DBSelectAll(&uname, "select user_id as id, user_name as name from user_info where user_id in (" + libs.JoinArray(users) + ")")
+	libs.DBSelectAll(&uname, "select user_id as id, user_name as name, rating from user_info where user_id in (" + libs.JoinArray(users) + ")")
 	sort.Slice(pname, func(i, j int) bool { return pname[i].Id < pname[j].Id })
 	sort.Slice(uname, func(i, j int) bool { return uname[i].Id < uname[j].Id })
 	for key, val := range subs {
 		pid := sort.Search(len(pname), func(i int) bool { return pname[i].Id >= val.ProblemId })
 		uid := sort.Search(len(uname), func(i int) bool { return uname[i].Id >= val.Submitter })
-		subs[key].ProblemName, subs[key].SubmitterName = pname[pid].Name, uname[uid].Name
+		subs[key].ProblemName, subs[key].SubmitterName, subs[key].Rating = pname[pid].Name, uname[uid].Name, uname[uid].Rating
 	}
 }
 
@@ -381,9 +383,18 @@ func SMRejudge(submission_id int) error {
 }
 
 func SMRemoveTestDetails(js string) string {
+	if js == "" {
+		return ""
+	}
 	var val map[string]any
 	jsoniter.UnmarshalFromString(js, &val)
+	if val["Subtask"] == nil {
+		return ""
+	}
 	for _, subtask := range val["Subtask"].([]any) {
+		if subtask.(map[string]any)["Testcase"] == nil {
+			continue
+		}
 		for _, test := range subtask.(map[string]any)["Testcase"].([]any) {
 			test.(map[string]any)["File"] = nil
 		}
