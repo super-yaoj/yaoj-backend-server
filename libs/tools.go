@@ -58,12 +58,7 @@ func HasInt(srt []int, val int) bool {
 }
 
 func HasElement[T comparable](arr []T, val T) bool {
-	for _, v := range arr {
-		if v == val {
-			return true
-		}
-	}
-	return false
+	return FindSlice(arr, val) >= 0
 }
 
 func JoinArray[T any](val []T) string {
@@ -153,4 +148,51 @@ func DeepCopy(dst, src any) error {
 		return err
 	}
 	return gob.NewDecoder(&buf).Decode(dst)
+}
+
+type Numbers interface {
+	int | int8 | int16 | int32 | int64 | float32 | float64 | uint | uint8 | uint16 | uint32 | uint64
+}
+
+func Max[T Numbers](a, b T) T {
+	if a < b {
+		return b
+	} else {
+		return a
+	}
+}
+
+func Min[T Numbers](a, b T) T {
+	if a < b {
+		return a
+	} else {
+		return b
+	}
+}
+
+func FindSlice[T comparable](a []T, val T) int {
+	for i := range a {
+		if a[i] == val {
+			return i
+		}
+	}
+	return -1
+}
+
+func DeleteSlice[T any](a []T, id int) {
+	a = append(a[:id], a[id+1:]...)
+}
+/*
+resort an sorted array after one entry has modified
+*/
+func ResortEntry[T any](a []T, f func(int, int) bool, id int) {
+	t := a[id]
+	for id > 0 && !f(id - 1, id) {
+		a[id] = a[id - 1]
+		a[id - 1] = t
+	}
+	for id + 1 < len(a) && !f(id, id + 1) {
+		a[id] = a[id + 1]
+		a[id + 1] = t
+	}
 }

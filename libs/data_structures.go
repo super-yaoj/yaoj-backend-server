@@ -20,12 +20,12 @@ type cacheMap struct {
 }
 
 type MemoryCache interface {
-	Set(string, any)
-	Get(string) (any, bool)
-	Delete(string)
+	Set(int, any)
+	Get(int) (any, bool)
+	Delete(int)
 }
 
-func NewMemoryCache(expire time.Duration, check_length int) *cacheMap {
+func NewMemoryCache(expire time.Duration, check_length int) MemoryCache {
 	return &cacheMap{sync.RWMutex{}, make(map[int]*mapEntry), expire, check_length}
 }
 

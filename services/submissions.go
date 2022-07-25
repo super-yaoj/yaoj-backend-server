@@ -83,10 +83,11 @@ func SubmAdd(ctx Context, param SubmAddParam) {
 	var sub problem.Submission
 	var language utils.LangTag
 	var preview map[string]internal.ContentPreview
+	var length int
 	if param.SubmAll != nil {
-		sub, preview, language = parseZipFile(ctx, "all.zip", pro.SubmConfig)
+		sub, preview, language, length = parseZipFile(ctx, "all.zip", pro.SubmConfig)
 	} else {
-		sub, preview, language = parseMultiFiles(ctx, pro.SubmConfig)
+		sub, preview, language, length = parseMultiFiles(ctx, pro.SubmConfig)
 	}
 	if sub == nil {
 		return
@@ -94,17 +95,17 @@ func SubmAdd(ctx Context, param SubmAddParam) {
 
 	w := bytes.NewBuffer(nil)
 	sub.DumpTo(w)
-	err := internal.SMCreate(param.UserID, param.ProbID, param.CtstID, language, w.Bytes(), preview)
+	err := internal.SMCreate(param.UserID, param.ProbID, param.CtstID, language, w.Bytes(), preview, length)
 	if err != nil {
 		ctx.ErrorAPI(err)
 	}
 }
 
 // When the submitted file is a zip file
-func parseZipFile(ctx Context, field string, config internal.SubmConfig) (problem.Submission, map[string]internal.ContentPreview, utils.LangTag) {
+func parseZipFile(ctx Context, field string, config internal.SubmConfig) (problem.Submission, map[string]internal.ContentPreview, utils.LangTag, int) {
 	file, header, err := ctx.Request.FormFile(field)
 	if err != nil {
-		return nil, nil, 0
+		return nil, nil, 0, 0
 	}
 	language := -1
 	sub := make(problem.Submission)
@@ -116,22 +117,24 @@ func parseZipFile(ctx Context, field string, config internal.SubmConfig) (proble
 	}
 	if header.Size > tot_size {
 		ctx.JSONAPI(400, "file too large", nil)
-		return nil, nil, 0
+		return nil, nil, 0, 0
 	}
 
 	w := bytes.NewBuffer(nil)
 	_, err = io.Copy(w, file)
 	if err != nil {
 		ctx.ErrorAPI(err)
-		return nil, nil, 0
+		return nil, nil, 0, 0
 	}
 	ret, err := libs.UnzipMemory(w.Bytes())
 	if err != nil {
 		ctx.JSONAPI(400, "invalid zip file: "+err.Error(), nil)
-		return nil, nil, 0
+		return nil, nil, 0, 0
 	}
+	length := 0
 	for name, val := range ret {
 		matched := ""
+		length += len(val)
 		//find corresponding key
 		for key := range config {
 			if key == name || libs.StartsWith(name, key+".") {
@@ -141,22 +144,23 @@ func parseZipFile(ctx Context, field string, config internal.SubmConfig) (proble
 		}
 		if matched == "" {
 			ctx.JSONAPI(400, "no field matches file name: "+name, nil)
-			return nil, nil, 0
+			return nil, nil, 0, 0
 		}
 		//TODO: get language by file suffix
 		preview[matched] = getPreview(val, config[matched].Accepted, -1)
 		sub.SetSource(workflow.Gsubm, matched, name, bytes.NewReader(val))
 	}
-	return sub, preview, utils.LangTag(language)
+	return sub, preview, utils.LangTag(language), length
 }
 
 /*
 When user submits files one by one
 */
-func parseMultiFiles(ctx Context, config internal.SubmConfig) (problem.Submission, map[string]internal.ContentPreview, utils.LangTag) {
+func parseMultiFiles(ctx Context, config internal.SubmConfig) (problem.Submission, map[string]internal.ContentPreview, utils.LangTag, int) {
 	sub := make(problem.Submission)
 	preview := make(map[string]internal.ContentPreview)
 	language := -1
+	length := 0
 	for key, val := range config {
 		str, ok := ctx.GetPostForm(key + "_text")
 		name, lang := key, -1
@@ -164,16 +168,17 @@ func parseMultiFiles(ctx Context, config internal.SubmConfig) (problem.Submissio
 		if val.Accepted == utils.Csource {
 			lang, ok = libs.PostIntRange(ctx.Context, key+"_lang", 0, len(libs.LangSuf)-1)
 			if !ok || (val.Langs != nil && !libs.HasElement(val.Langs, utils.LangTag(lang))) {
-				return nil, nil, 0
+				return nil, nil, 0, 0
 			}
 			language = lang
 			name += libs.LangSuf[lang]
 		}
 		if ok {
 			//text
+			length += len(str)
 			if len(str) > int(val.Length) {
 				ctx.JSONAPI(400, "file "+key+" too large", nil)
-				return nil, nil, 0
+				return nil, nil, 0, 0
 			}
 			byt := []byte(str)
 			preview[key] = getPreview(byt, val.Accepted, utils.LangTag(lang))
@@ -183,23 +188,24 @@ func parseMultiFiles(ctx Context, config internal.SubmConfig) (problem.Submissio
 			file, header, err := ctx.Request.FormFile(key + "_file")
 			if err != nil {
 				ctx.ErrorAPI(err)
-				return nil, nil, 0
+				return nil, nil, 0, 0
 			}
+			length += int(header.Size)
 			if header.Size > int64(val.Length) {
 				ctx.JSONAPI(400, "file "+key+" too large", nil)
-				return nil, nil, 0
+				return nil, nil, 0, 0
 			}
 			w := bytes.NewBuffer(nil)
 			_, err = io.Copy(w, file)
 			if err != nil {
 				ctx.ErrorAPI(err)
-				return nil, nil, 0
+				return nil, nil, 0, 0
 			}
 			preview[key] = getPreview(w.Bytes(), val.Accepted, utils.LangTag(lang))
 			sub.SetSource(workflow.Gsubm, key, name, w)
 		}
 	}
-	return sub, preview, utils.LangTag(language)
+	return sub, preview, utils.LangTag(language), length
 }
 
 // Get previews of submitted contents
@@ -265,7 +271,7 @@ func SubmCustom(ctx Context, param SubmCustomParam) {
 		"source": {Langs: nil, Accepted: utils.Csource, Length: 64 * 1024},
 		"input":  {Langs: nil, Accepted: utils.Cplain, Length: 10 * 1024 * 1024},
 	}
-	subm, _, _ := parseMultiFiles(ctx, config)
+	subm, _, _, _ := parseMultiFiles(ctx, config)
 	if subm == nil {
 		return
 	}

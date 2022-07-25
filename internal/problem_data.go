@@ -170,3 +170,11 @@ func PRHasData(pro *Problem, mode string) bool {
 	}
 	return false
 }
+
+func PRFullScore(problem_id int) float64 {
+	pro := PRLoad(problem_id)
+	if pro == nil {
+		return 0
+	}
+	return pro.DataInfo.Fullscore
+}

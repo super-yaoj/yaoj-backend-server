@@ -156,6 +156,7 @@ func PRRejudge(problem_id int) error {
 	if err != nil {
 		return err
 	}
+	PRSRenew(problem_id)
 	for _, i := range sub {
 		SMJudge(i, true, current)
 	}

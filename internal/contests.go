@@ -146,7 +146,7 @@ func CTCreate() (int64, error) {
 
 func CTModify(contest_id int, title string, start time.Time, last int, pretest int, score_private int) error {
 	_, err := libs.DBUpdate("update contests set title=?, start_time=?, end_time=?, pretest=?, score_private=? where contest_id=?", title, start, start.Add(time.Duration(last)*time.Minute), pretest, score_private, contest_id)
-	go CTRenewStanding(contest_id)
+	go CTSRenew(contest_id)
 	return err
 }
 
@@ -180,13 +180,13 @@ func CTDeletePermission(contest_id, permission_id int) error {
 
 func CTAddProblem(contest_id, problem_id int) error {
 	_, err := libs.DBUpdate("insert ignore into contest_problems values (?, ?)", contest_id, problem_id)
-	go CTRenewStanding(contest_id)
+	go CTSRenew(contest_id)
 	return err
 }
 
 func CTDeleteProblem(contest_id, problem_id int) error {
 	_, err := libs.DBUpdate("delete from contest_problems where contest_id=? and problem_id=?", contest_id, problem_id)
-	go CTRenewStanding(contest_id)
+	go CTSRenew(contest_id)
 	return err
 }
 

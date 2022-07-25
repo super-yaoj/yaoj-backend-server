@@ -432,7 +432,7 @@ func CtstStanding(ctx Context, param CtstStandingParam) {
 		ctx.JSONAPI(403, "", nil)
 		return
 	}
-	raw_standing := internal.CTGetStanding(param.CtstID)
+	raw_standing := internal.CTSGet(param.CtstID)
 	standing := []internal.CTStandingEntry{}
 	libs.DeepCopy(&standing, raw_standing)
 	if !can_edit && ctst.EndTime.After(time.Now()) {

@@ -141,7 +141,7 @@ func ProbGet(ctx Context, param ProbGetParam) {
 	if !can_edit {
 		ret_prob.DataInfo = problem.DataInfo{}
 	}
-	ctx.JSONAPI(200, "", map[string]any{"problem": ret_prob, "can_edit": can_edit})
+	ctx.JSONAPI(200, "", map[string]any{"problem": ret_prob, "can_edit": can_edit, "in_contest": in_contest})
 }
 
 // 获取题目权限
@@ -411,4 +411,49 @@ func ProbEdit(ctx Context, param ProbEditParam) {
 	} else {
 		libs.DBUpdate("update problems set title=? where problem_id=?", param.Title, param.ProbID)
 	}
+}
+
+type ProbStatisticParam struct {
+	ProbID    int    `query:"problem_id" binding:"required"`
+	Mode      string `query:"mode" binding:"required"`//one of {"time", "memory"}
+	Pagesize  int    `query:"pagesize" binding:"required" validate:"gte=1,lte=100"`
+	Left     *int    `query:"left"`
+	LeftId   *int    `query:"left_id"`
+	Right    *int    `query:"right"`
+	RightId  *int    `query:"right_id"`
+	UserID    int    `session:"user_id"`
+	UserGrp   int    `session:"user_group"`
+}
+
+func ProbStatistic(ctx Context, param ProbStatisticParam) {
+	if !internal.PRExists(param.ProbID) {
+		ctx.JSONAPI(404, "", nil)
+		return
+	}
+	//Users can see statistics if and only if they are out of contest
+	if !PRCanSeeWithoutContest(param.UserID, param.UserGrp, param.ProbID) {
+		ctx.JSONAPI(403, "", nil)
+		return
+	}
+	subs, isfull := []int{}, false
+	if param.Left != nil {
+		if param.LeftId == nil {
+			ctx.JSONAPI(400, "left_id is null", nil)
+			return
+		}
+		subs, isfull = internal.PRSGetSubmissions(param.ProbID, *param.Left, *param.LeftId, param.Pagesize, true, param.Mode)
+	} else {
+		if param.RightId == nil {
+			ctx.JSONAPI(400, "right_id is null", nil)
+			return
+		}
+		subs, isfull = internal.PRSGetSubmissions(param.ProbID, *param.Right, *param.RightId, param.Pagesize, false, param.Mode)
+	}
+	if subs == nil {
+		ctx.JSONAPI(400, "", nil)
+		return
+	}
+	ret := internal.SMListByIds(subs)
+	acnum, totnum := internal.PRSGetACRatio(param.ProbID)
+	ctx.JSONAPI(200, "", map[string]any{"data": ret, "isfull": isfull, "acnum": acnum, "totnum": totnum})
 }

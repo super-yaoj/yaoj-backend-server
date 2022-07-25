@@ -36,7 +36,7 @@ type standingSubm struct {
 	Score  	  	float64 	`db:"score"`
 	SampleScore float64 	`db:"sample_score"`
 	Penalty   	time.Time 	`db:"submit_time"`
-	Hacked 		bool 		`db:"hacked"`
+	Accepted 	int 	`db:"accepted"`
 }
 
 type standingUser struct {
@@ -47,7 +47,7 @@ type standingUser struct {
 var (
 	allStandings = libs.NewMemoryCache(time.Hour, 100)
 	ctsMultiLock = libs.NewMappedMultiRWMutex()
-	dataColumns = "submission_id, submitter, problem_id, score, sample_score, hacked, submit_time"
+	standingCols = "submission_id, submitter, problem_id, score, sample_score, accepted, submit_time"
 )
 
 func newStandingEntry(user_id, rating int, user_name string, probs int) CTStandingEntry {
@@ -62,7 +62,7 @@ func newStandingEntry(user_id, rating int, user_name string, probs int) CTStandi
 	}
 }
 
-func updateEntry(standing *CTStanding, sub *standingSubm, getRating bool) {
+func updateCTSEntry(standing *CTStanding, sub *standingSubm, getRating bool) {
 	uid, ok := standing.uidMap[sub.Submitter]
 	if !ok {
 		uid = len(standing.entries)
@@ -75,7 +75,7 @@ func updateEntry(standing *CTStanding, sub *standingSubm, getRating bool) {
 	}
 	pid, ok := standing.pidMap[sub.Problem]
 	if !ok {
-		fmt.Println("No such contest problem in CTRenewStanding()!!")
+		fmt.Println("No such contest problem in updateCTSEntry()!!")
 		return
 	}
 	entry := &standing.entries[uid]
@@ -86,10 +86,10 @@ func updateEntry(standing *CTStanding, sub *standingSubm, getRating bool) {
 	entry.SScores[pid] = sub.SampleScore
 	entry.SubIds[pid] = sub.Id
 	entry.Penalties[pid] = sub.Penalty.Sub(standing.startTime)
-	entry.Hacked[pid] = sub.Hacked
+	entry.Hacked[pid] = (sub.Accepted & ExtraAccepted) == 0
 }
 
-func CTRenewStanding(contest_id int) {
+func CTSRenew(contest_id int) {
 	ctsMultiLock.Lock(contest_id)
 	defer ctsMultiLock.Unlock(contest_id)
 	contest, err := CTQuery(contest_id, -1)
@@ -98,7 +98,7 @@ func CTRenewStanding(contest_id int) {
 		return
 	}
 	var subs []standingSubm
-	err = libs.DBSelectAll(&subs, "select " + dataColumns + " from submissions where contest_id=? order by submission_id", contest_id)
+	err = libs.DBSelectAll(&subs, "select " + standingCols + " from submissions where contest_id=? order by submission_id", contest_id)
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -121,7 +121,7 @@ func CTRenewStanding(contest_id int) {
 	
 	if len(subs) > 0 {
 		for _, sub := range subs {
-			updateEntry(standing, &sub, false)
+			updateCTSEntry(standing, &sub, false)
 		}
 		uids := make([]int, len(subs))
 		for i := range subs {
@@ -154,20 +154,18 @@ func CTSUpdateSubmission(contest_id, sid int) {
 		return
 	}
 	ctsMultiLock.Lock(contest_id)
+	defer ctsMultiLock.Unlock(contest_id)
 	standing, ok := allStandings.Get(contest_id)
 	if !ok {
-		ctsMultiLock.Unlock(contest_id)
-		CTRenewStanding(contest_id)
 		return
 	}
-	defer ctsMultiLock.Unlock(contest_id)
 	var sub standingSubm
-	err := libs.DBSelectSingle(&sub, "select " + dataColumns + " from submissions where submission_id=?", sid)
+	err := libs.DBSelectSingle(&sub, "select " + standingCols + " from submissions where submission_id=?", sid)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
-	updateEntry(standing.(*CTStanding), &sub, true)
+	updateCTSEntry(standing.(*CTStanding), &sub, true)
 }
 
 func CTSDeleteSubmission(sub SubmissionBase) {
@@ -175,13 +173,11 @@ func CTSDeleteSubmission(sub SubmissionBase) {
 		return
 	}
 	ctsMultiLock.Lock(sub.ContestId)
+	defer ctsMultiLock.Unlock(sub.ContestId)
 	raw_standing, ok := allStandings.Get(sub.ContestId)
 	if !ok {
-		ctsMultiLock.Unlock(sub.ContestId)
-		CTRenewStanding(sub.ContestId)
 		return
 	}
-	defer ctsMultiLock.Unlock(sub.ContestId)
 	standing := raw_standing.(*CTStanding)
 	uid := standing.uidMap[sub.Submitter]
 	pid := standing.pidMap[sub.ProblemId]
@@ -190,14 +186,14 @@ func CTSDeleteSubmission(sub SubmissionBase) {
 	}
 	standing.entries[uid].SubIds[pid] = 0
 	var newsub standingSubm
-	err := libs.DBSelectSingle(&sub, "select " + dataColumns + " from submissions where problem_id=? and contest_id=? and submitter=? order by submission_id desc limit 1", sub.ProblemId, sub.ContestId, sub.Submitter)
+	err := libs.DBSelectSingle(&sub, "select " + standingCols + " from submissions where problem_id=? and contest_id=? and submitter=? order by submission_id desc limit 1", sub.ProblemId, sub.ContestId, sub.Submitter)
 	if err != nil {//no more submissions
 		newsub = standingSubm{Submitter: sub.Submitter, Problem: sub.ProblemId}
 	}
-	updateEntry(standing, &newsub, false)
+	updateCTSEntry(standing, &newsub, false)
 }
 
-func CTGetStanding(contest_id int) []CTStandingEntry {
+func CTSGet(contest_id int) []CTStandingEntry {
 	ctsMultiLock.RLock(contest_id)
 	defer ctsMultiLock.RUnlock(contest_id)
 	standing, ok := allStandings.Get(contest_id)
@@ -218,7 +214,7 @@ func CTGetStanding(contest_id int) []CTStandingEntry {
 			return entries
 		}
 		ctsMultiLock.RUnlock(contest_id)
-		CTRenewStanding(contest_id)
+		CTSRenew(contest_id)
 		ctsMultiLock.RLock(contest_id)
 		standing, ok = allStandings.Get(contest_id)
 		if !ok {
@@ -266,8 +262,8 @@ You must ensure that there's no more submissions judging in this contest.
 func CTFinish(contest_id int) error {
 	var err error
 	//For safety, recalculate standing
-	CTRenewStanding(contest_id)
-	standing := CTGetStanding(contest_id)
+	CTSRenew(contest_id)
+	standing := CTSGet(contest_id)
 	if len(standing) > 0 {
 		err = getPastContests(standing)
 		if err != nil {

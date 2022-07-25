@@ -2,7 +2,6 @@ package internal
 
 import (
 	"fmt"
-	"math"
 	"sort"
 	"sync"
 	"time"
@@ -39,7 +38,8 @@ type Submission struct {
 	Memory        int       `db:"memory" json:"memory"`
 	Preview 	  string	`db:"content_preview" json:"preview"`
 	SampleScore   float64 	`db:"sample_score" json:"sample_score"`
-	Hacked 		  bool 		`db:"hacked" json:"hacked"`
+	Accepted 	  int 		`db:"accepted" json:"accepted"`
+	Length        int       `db:"length" json:"length"`
 	
 	Details 	  SubmissionDetails `json:"details"`
 	Uuid 		  int64 //useless field for submission query
@@ -52,6 +52,13 @@ type SubmissionBase struct {
 	Submitter     int       `db:"submitter" json:"submitter"`
 }
 
+const (
+	PretestAccepted = 1
+	TestsAccepted = 2
+	ExtraAccepted = 4
+	Accepted = 7
+	submColumns = "submission_id, submitter, problem_id, contest_id, status, score, time, memory, language, submit_time, sample_score, accepted, length"
+)
 /*
 Priority: in contest > not in contest, real-time judge > rejudge, pretest > tests > extra
 
@@ -81,9 +88,9 @@ func SMJudge(sub SubmissionBase, rejudge bool, uuid int64) error {
 	return nil
 }
 
-func SMCreate(user_id, problem_id, contest_id int, language utils.LangTag, zipfile []byte, preview map[string]ContentPreview) error {
+func SMCreate(user_id, problem_id, contest_id int, language utils.LangTag, zipfile []byte, preview map[string]ContentPreview, length int) error {
 	current := libs.TimeStamp()
-	id, err := libs.DBInsertGetId("insert into submissions values (null, ?, ?, ?, ?, 0, -1, -1, ?, ?, 0, 0, ?)", user_id, problem_id, contest_id, Waiting, language, time.Now(), current)
+	id, err := libs.DBInsertGetId("insert into submissions values (null, ?, ?, ?, ?, 0, -1, -1, ?, ?, 0, 0, ?, ?)", user_id, problem_id, contest_id, Waiting, language, time.Now(), current, length)
 	if err != nil {
 		return err
 	}
@@ -96,6 +103,30 @@ func SMCreate(user_id, problem_id, contest_id int, language utils.LangTag, zipfi
 		return err
 	}
 	return SMJudge(SubmissionBase{int(id), problem_id, contest_id, user_id}, false, current)
+}
+
+func SMListByIds(subids []int) []Submission {
+	if len(subids) == 0 {
+		return []Submission{}
+	}
+	sidmap := make(map[int]int)
+	for i, j := range subids {
+		sidmap[j] = i
+	}
+	rows, err := libs.DBQuery("select " + submColumns + " from submissions where submission_id in (" + libs.JoinArray(subids) + ")")
+	if err != nil {
+		fmt.Println(err)
+		return nil
+	}
+	defer rows.Close()
+	subs := make([]Submission, len(subids))
+	for rows.Next() {
+		var cur Submission
+		rows.StructScan(&cur)
+		subs[sidmap[cur.Id]] = cur
+	}
+	SMGetExtraInfo(subs)
+	return subs
 }
 
 /*
@@ -157,8 +188,6 @@ For params problem_id, contest_id, submitter, if you do not want to limit them t
 user_id is the current user's id
 */
 func SMList(bound, pagesize, user_id, submitter, problem_id, contest_id int, isleft, isadmin bool) ([]Submission, bool, error) {
-	const columns = "submission_id, submitter, problem_id, contest_id, status, score, time, memory, language, submit_time, sample_score, hacked"
-	
 	query := libs.If(problem_id == 0, "", fmt.Sprintf(" and problem_id=%d", problem_id)) +
 		libs.If(contest_id == 0, "", fmt.Sprintf(" and contest_id=%d", contest_id)) +
 		libs.If(submitter == 0, "", fmt.Sprintf(" and submitter=%d", submitter))
@@ -220,9 +249,9 @@ func SMList(bound, pagesize, user_id, submitter, problem_id, contest_id int, isl
 	var submissions []Submission
 	var err error
 	if isleft {
-		err = libs.DBSelectAll(&submissions, fmt.Sprintf("select %s from submissions where submission_id<=%d and %s %s order by submission_id desc limit %d", columns, bound, must, query, pagesize))
+		err = libs.DBSelectAll(&submissions, fmt.Sprintf("select %s from submissions where submission_id<=%d and %s %s order by submission_id desc limit %d", submColumns, bound, must, query, pagesize))
 	} else {
-		err = libs.DBSelectAll(&submissions, fmt.Sprintf("select %s from submissions where submission_id>=%d and %s %s order by submission_id limit %d", columns, bound, must, query, pagesize))
+		err = libs.DBSelectAll(&submissions, fmt.Sprintf("select %s from submissions where submission_id>=%d and %s %s order by submission_id limit %d", submColumns, bound, must, query, pagesize))
 	}
 	if err != nil {
 		return nil, false, err
@@ -267,21 +296,20 @@ func SMUpdate(sid, pid int, mode string, result []byte) error {
 	}
 
 	var score, time_used, memory_used float64 = 0, 0, 0
-	accepted := false
+	accepted := true
 	var err error
 	res_map := make(map[string]any)
 	err = jsoniter.Unmarshal(result, &res_map)
 	is_subtask, has_data := res_map["IsSubtask"].(bool)
 	
 	if err == nil && has_data {
-		accepted = true
 		for _, subtask := range res_map["Subtask"].([]any) {
 			var sub_score float64
 			first := true
 			for _, test := range subtask.(map[string]any)["Testcase"].([]any) {
 				test_score := test.(map[string]any)["Score"].(float64)
 				time_used += test.(map[string]any)["Time"].(float64)
-				memory_used = math.Max(memory_used, test.(map[string]any)["Memory"].(float64))
+				memory_used = libs.Max(memory_used, test.(map[string]any)["Memory"].(float64))
 				if first {
 					sub_score = test_score
 					first = false
@@ -290,9 +318,9 @@ func SMUpdate(sid, pid int, mode string, result []byte) error {
 				if is_subtask {
 					switch testdata.CalcMethod {
 					case problem.Mmin:
-						sub_score = math.Min(sub_score, test_score)
+						sub_score = libs.Min(sub_score, test_score)
 					case problem.Mmax:
-						sub_score = math.Max(sub_score, test_score)
+						sub_score = libs.Max(sub_score, test_score)
 					case problem.Msum:
 						sub_score += test_score
 					}
@@ -307,13 +335,16 @@ func SMUpdate(sid, pid int, mode string, result []byte) error {
 		}
 	}
 	
+	//'and status>=0' means when meets an internal error, we shouldn't update status
 	if mode == "tests" {
-		_, err = libs.DBUpdate("update submissions set status=status|?, score=?, time=?, memory=? where submission_id=?",
-			JudgingTests, score, int(time_used/float64(time.Millisecond)), int(memory_used/1024), sid)
+		_, err = libs.DBUpdate("update submissions set status=status|?, accepted=accepted|?, score=?, time=?, memory=? where submission_id=? and status>=0",
+			JudgingTests, libs.If(accepted, TestsAccepted, 0), score, int(time_used/float64(time.Millisecond)), int(memory_used/1024), sid)
 	} else if mode == "pretest" {
-		_, err = libs.DBUpdate("update submissions set status=status|?, sample_score=? where submission_id=?", JudgingPretest, score, sid)
+		_, err = libs.DBUpdate("update submissions set status=status|?, accepted=accepted|?, sample_score=? where submission_id=? and status>=0",
+			JudgingPretest, libs.If(accepted, PretestAccepted, 0), score, sid)
 	} else {
-		_, err = libs.DBUpdate("update submissions set status=status|?, hacked=? where submission_id=?", JudgingExtra, !accepted, sid)
+		_, err = libs.DBUpdate("update submissions set status=status|?, accepted=accepted|? where submission_id=? and status>=0",
+			JudgingExtra, libs.If(accepted, ExtraAccepted, 0), sid)
 	}
 	if err != nil {
 		return err
@@ -324,14 +355,16 @@ func SMUpdate(sid, pid int, mode string, result []byte) error {
 	}
 	var subinfo struct {
 		SubmissionBase
-		Status int  `db:"status"`
+		Status   int  `db:"status"`
 	}
 	err = libs.DBSelectSingle(&subinfo, "select submission_id, problem_id, contest_id, status from submissions where submission_id=?", sid)
 	if err != nil {
 		return err
 	}
-	if subinfo.Status == Finished {
+	//we should ensure that each submission will be exactly updated once
+	if subinfo.Status == Finished || (subinfo.Status < 0 && mode == "tests") {
 		//TODO: some corresponding updates
+		PRSAddSubmission(subinfo.ProblemId, subinfo.Id)
 		if subinfo.ContestId > 0 {
 			CTSUpdateSubmission(subinfo.ContestId, subinfo.Id)
 		}
@@ -365,6 +398,7 @@ func SMDelete(sub SubmissionBase) error {
 	if sub.ContestId > 0 {
 		CTSDeleteSubmission(sub)
 	}
+	PRSDeleteSubmission(sub)
 	return nil
 }
 
@@ -375,10 +409,11 @@ func SMRejudge(submission_id int) error {
 	}
 	//update uuid to cancel other entries in the judging queue
 	current := libs.TimeStamp()
-	_, err = libs.DBUpdate("update submissions set uuid=?, status=0 where submission_id=?", current, submission_id)
+	_, err = libs.DBUpdate("update submissions set uuid=?, status=0, accpted=0 where submission_id=?", current, submission_id)
 	if err != nil {
 		return err
 	}
+	PRSDeleteSubmission(sub)
 	return SMJudge(sub, true, current)
 }
 

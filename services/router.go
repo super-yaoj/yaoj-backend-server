@@ -69,6 +69,7 @@ var Router map[string][]Request = map[string][]Request{
 		{"POST", service.GinHandler(AnceCreate)},
 		{"DELETE", service.GinHandler(AnceDel)},
 	},
+	
 	"/problems": {{"GET", service.GinHandler(ProbList)}},
 	"/problem": {
 		{"GET", service.GinHandler(ProbGet)},
@@ -88,6 +89,9 @@ var Router map[string][]Request = map[string][]Request{
 	"/problem_data": {
 		{"GET", service.GinHandler(ProbDownData)},
 		{"PUT", service.GinHandler(ProbPutData)},
+	},
+	"/problem_statistic": {
+		{"GET", service.GinHandler(ProbStatistic)},
 	},
 
 	"/contests": {{"GET", service.GinHandler(CtstList)}},

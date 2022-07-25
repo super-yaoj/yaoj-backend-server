@@ -82,6 +82,8 @@ func judgerStart(judger *Judger) {
 			if !judgeSubmission(sid, uuid, mode, judger) {
 				libs.DBUpdate("update submissions set status=? where submission_id=?", InternalError, sid)
 				libs.DBUpdate("update submission_details set result=\"\", pretest_result=\"\", extra_result=\"\" where submission_id=?", sid)
+				sub, _ := SMGetBaseInfo(sid)
+				SMUpdate(sid, sub.ProblemId, subm.mode, []byte{})
 			}
 		} else {
 			judgeCustomTest(sid, subm.callback, judger)
