@@ -402,7 +402,7 @@ func CtstFinish(ctx Context, param CtstFinishParam) {
 		ctx.JSONRPC(404, -32600, "", nil)
 		return
 	}
-	if param.CanEditCtst(param.CtstID) {
+	if !param.CanEditCtst(param.CtstID) {
 		ctx.JSONRPC(403, -32600, "", nil)
 		return
 	}
