@@ -102,7 +102,8 @@ func PRSRenew(problem_id int) {
 	allStatistic.Delete(problem_id)
 	statistic := &problemStatistic{}
 	statistic.uidMap = make(map[int]int)
-	statistic.totSubs, err = libs.DBSelectSingleInt("select count(*) from submissions where problem_id=?", problem_id)
+	statistic.sids = make(map[int]struct{})
+	statistic.totSubs, err = libs.DBSelectSingleInt("select count(*) from submissions where problem_id=? and status=?", problem_id, Finished)
 	for i := range subs {
 		statistic.sids[subs[i].Id] = struct{}{}
 		statistic.updateEntry(&subs[i], false)
@@ -208,12 +209,12 @@ func PRSGetSubmissions(problem_id, bound, bound_id, pagesize int, isleft bool, m
 	subs := []int{}
 	if isleft {
 		for i := start; i < n && i < start + pagesize; i++ {
-			subs = append(subs, val.value[val.sorted[i]])
+			subs = append(subs, val.sid[val.sorted[i]])
 		}
 		return subs, start + pagesize + 1 <= n
 	} else {
 		for i := libs.Max(0, start - pagesize); i < start; i++ {
-			subs = append(subs, val.value[val.sorted[i]])
+			subs = append(subs, val.sid[val.sorted[i]])
 		}
 		return subs, start > pagesize
 	}

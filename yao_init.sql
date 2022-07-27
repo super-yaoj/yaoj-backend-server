@@ -146,7 +146,6 @@ CREATE TABLE `contest_participants` (
 
 LOCK TABLES `contest_participants` WRITE;
 /*!40000 ALTER TABLE `contest_participants` DISABLE KEYS */;
-INSERT INTO `contest_participants` VALUES (1,2);
 /*!40000 ALTER TABLE `contest_participants` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -171,7 +170,6 @@ CREATE TABLE `contest_permissions` (
 
 LOCK TABLES `contest_permissions` WRITE;
 /*!40000 ALTER TABLE `contest_permissions` DISABLE KEYS */;
-INSERT INTO `contest_permissions` VALUES (1,1);
 /*!40000 ALTER TABLE `contest_permissions` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -195,7 +193,6 @@ CREATE TABLE `contest_problems` (
 
 LOCK TABLES `contest_problems` WRITE;
 /*!40000 ALTER TABLE `contest_problems` DISABLE KEYS */;
-INSERT INTO `contest_problems` VALUES (1,1),(1,2);
 /*!40000 ALTER TABLE `contest_problems` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -241,7 +238,7 @@ CREATE TABLE `contests` (
   `registrants` int(11) DEFAULT NULL,
   PRIMARY KEY (`contest_id`),
   KEY `end_time` (`end_time`)
-) ENGINE=MyISAM AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -250,7 +247,6 @@ CREATE TABLE `contests` (
 
 LOCK TABLES `contests` WRITE;
 /*!40000 ALTER TABLE `contests` DISABLE KEYS */;
-INSERT INTO `contests` VALUES (1,'New Contest','2022-07-08 08:31:00','2022-07-08 18:31:00',0,0,0,0,1);
 /*!40000 ALTER TABLE `contests` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -265,7 +261,7 @@ CREATE TABLE `custom_tests` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `content` mediumblob,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=10 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -340,7 +336,7 @@ CREATE TABLE `problems` (
   `check_sum` char(64) DEFAULT NULL,
   `allow_down` varchar(256) DEFAULT NULL,
   PRIMARY KEY (`problem_id`)
-) ENGINE=MyISAM AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -349,8 +345,33 @@ CREATE TABLE `problems` (
 
 LOCK TABLES `problems` WRITE;
 /*!40000 ALTER TABLE `problems` DISABLE KEYS */;
-INSERT INTO `problems` VALUES (1,'The First Problem!!!!!😊',0,'280f257162880bfd0a1d998b5cb321c152c12211fe5c0a2a24133ae733582ba3',''),(2,'New Problem',0,'64469d5f7070564af17f6b8aeae34795adbe3dcc31dc2a9782a2bca8d63e596b','');
 /*!40000 ALTER TABLE `problems` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `ratings`
+--
+
+DROP TABLE IF EXISTS `ratings`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+ SET character_set_client = utf8mb4 ;
+CREATE TABLE `ratings` (
+  `user_id` int(11) DEFAULT NULL,
+  `rating` int(11) DEFAULT NULL,
+  `contest_id` int(11) DEFAULT NULL,
+  `time` datetime DEFAULT NULL,
+  KEY `user_id` (`user_id`),
+  KEY `contest_id` (`contest_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `ratings`
+--
+
+LOCK TABLES `ratings` WRITE;
+/*!40000 ALTER TABLE `ratings` DISABLE KEYS */;
+/*!40000 ALTER TABLE `ratings` ENABLE KEYS */;
 UNLOCK TABLES;
 
 --
@@ -399,14 +420,15 @@ CREATE TABLE `submissions` (
   `language` int(11) DEFAULT NULL,
   `submit_time` datetime DEFAULT NULL,
   `sample_score` float DEFAULT NULL,
-  `hacked` tinyint(1) DEFAULT NULL,
+  `accepted` int(11) DEFAULT NULL,
   `uuid` bigint(20) DEFAULT NULL,
+  `length` int(11) DEFAULT NULL,
   PRIMARY KEY (`submission_id`),
-  KEY `submitter` (`submitter`),
-  KEY `problem_id` (`problem_id`),
   KEY `contest_id` (`contest_id`),
-  KEY `status` (`status`)
-) ENGINE=InnoDB AUTO_INCREMENT=40 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+  KEY `status` (`status`),
+  KEY `submitter` (`submitter`,`accepted`),
+  KEY `problem_id` (`problem_id`,`accepted`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -440,7 +462,7 @@ CREATE TABLE `user_info` (
   PRIMARY KEY (`user_id`),
   UNIQUE KEY `user_name` (`user_name`),
   UNIQUE KEY `rating` (`rating` DESC,`user_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -449,7 +471,7 @@ CREATE TABLE `user_info` (
 
 LOCK TABLES `user_info` WRITE;
 /*!40000 ALTER TABLE `user_info` DISABLE KEYS */;
-INSERT INTO `user_info` VALUES (1,'root','BFBBCEEB2D6402DF09EF79FE161F8A86A5466B183835F86FAF96584A09D41154','',1,'2022-06-18 20:56:40','xNeBscCEIx0pwA8p46vsnhwnxcA04yaA',0,0,'',''),(2,'wzy','BFBBCEEB2D6402DF09EF79FE161F8A86A5466B183835F86FAF96584A09D41154','',0,'2022-07-08 08:32:15','G8twAEsVsqbpgS1jIm4ecqCnejW7ddIu',2,0,'','');
+INSERT INTO `user_info` VALUES (1,'root','BFBBCEEB2D6402DF09EF79FE161F8A86A5466B183835F86FAF96584A09D41154','123123',0,'2022-06-18 20:56:40','cMSBK6sLTqB59UvhsKXbJe87UjyMTB7b',3,1,'zeyuan-w21@mails.tsinghua.edu.cn','清华大学交叉信息研究院');
 /*!40000 ALTER TABLE `user_info` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -474,7 +496,7 @@ CREATE TABLE `user_permissions` (
 
 LOCK TABLES `user_permissions` WRITE;
 /*!40000 ALTER TABLE `user_permissions` DISABLE KEYS */;
-INSERT INTO `user_permissions` VALUES (1,1),(2,1);
+INSERT INTO `user_permissions` VALUES (1,1);
 /*!40000 ALTER TABLE `user_permissions` ENABLE KEYS */;
 UNLOCK TABLES;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
@@ -487,4 +509,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2022-07-10 21:18:10
+-- Dump completed on 2022-07-27 17:02:58
