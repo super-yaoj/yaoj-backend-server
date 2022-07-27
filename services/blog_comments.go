@@ -6,17 +6,12 @@ import (
 )
 
 type BlogCmntCreateParam struct {
-	BlogID  int `body:"blog_id" binding:"required"`
-	UserID  int `session:"user_id"`
-	UserGrp int `session:"user_group"`
+	BlogID int `body:"blog_id" binding:"required"`
+	Auth
 }
 
 func BlogCmntCreate(ctx Context, param BlogCmntCreateParam) {
-	if param.UserID <= 0 {
-		ctx.JSONAPI(401, "", nil)
-		return
-	}
-	if !BLCanSee(param.UserID, param.UserGrp, param.BlogID) {
+	if !BLCanSee(param.Auth, param.BlogID) {
 		ctx.JSONAPI(403, "", nil)
 		return
 	}
@@ -30,9 +25,8 @@ func BlogCmntCreate(ctx Context, param BlogCmntCreateParam) {
 }
 
 type BlogCmntGetParam struct {
-	BlogID  int `query:"blog_id" binding:"required"`
-	UserID  int `session:"user_id"`
-	UserGrp int `session:"user_group"`
+	BlogID int `query:"blog_id" binding:"required"`
+	Auth
 }
 
 func BlogCmntGet(ctx Context, param BlogCmntGetParam) {
@@ -40,7 +34,7 @@ func BlogCmntGet(ctx Context, param BlogCmntGetParam) {
 		ctx.JSONAPI(404, "", nil)
 		return
 	}
-	if !BLCanSee(param.UserID, param.UserGrp, param.BlogID) {
+	if !BLCanSee(param.Auth, param.BlogID) {
 		ctx.JSONAPI(403, "", nil)
 		return
 	}
@@ -53,9 +47,8 @@ func BlogCmntGet(ctx Context, param BlogCmntGetParam) {
 }
 
 type BlogCmntDelParam struct {
-	CmntID  int `query:"comment_id" binding:"required"`
-	UserID  int `session:"user_id"`
-	UserGrp int `session:"user_group"`
+	CmntID int `query:"comment_id" binding:"required"`
+	Auth
 }
 
 func BlogCmntDel(ctx Context, param BlogCmntDelParam) {
@@ -63,7 +56,7 @@ func BlogCmntDel(ctx Context, param BlogCmntDelParam) {
 	err := libs.DBSelectSingle(&comment, "select author, blog_id from blog_comments where comment_id=?", param.CmntID)
 	if err != nil {
 		ctx.JSONAPI(404, "", nil)
-	} else if !libs.IsAdmin(param.UserGrp) && comment.Author != param.UserID {
+	} else if !param.IsAdmin() && comment.Author != param.UserID {
 		ctx.JSONAPI(403, "", nil)
 	} else {
 		err = internal.BLDeleteComment(param.CmntID, comment.BlogId)

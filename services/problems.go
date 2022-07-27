@@ -8,7 +8,6 @@ import (
 	"os"
 	"path"
 	"strings"
-	"time"
 	"yao/internal"
 	"yao/libs"
 	"yao/service"
@@ -17,78 +16,17 @@ import (
 	"github.com/super-yaoj/yaoj-core/pkg/problem"
 )
 
-// i. e. valid user_id with either:
-// 1. admin user_group
-// 2. problem permission
-func PRCanEdit(user_id int, user_group int, problem_id int) bool {
-	if user_id < 0 {
-		return false
-	}
-	if libs.IsAdmin(user_group) {
-		return true
-	}
-	count, _ := libs.DBSelectSingleInt("select count(*) from problem_permissions where problem_id=? and permission_id=?", problem_id, -user_id)
-	return count > 0
-}
-
-func PRCanSeeWithoutContest(user_id int, user_group int, problem_id int) bool {
-	if user_id < 0 {
-		count, _ := libs.DBSelectSingleInt("select count(*) from problem_permissions where problem_id=? and permission_id=?", problem_id, libs.DefaultGroup)
-		return count > 0
-	}
-	if PRCanEdit(user_id, user_group, problem_id) {
-		return true
-	}
-	count, _ := libs.DBSelectSingleInt("select count(*) from ((select * from problem_permissions where problem_id=?) as a join (select * from user_permissions where user_id=?) as b on a.permission_id=b.permission_id)", problem_id, user_id)
-	return count > 0
-}
-
-/*
- */
-func PRCanSeeFromContest(user_id, user_group, problem_id, contest_id int) bool {
-	contest, _ := internal.CTQuery(contest_id, user_id)
-	if CTCanEnter(user_id, contest, CTCanEdit(user_id, user_group, contest_id)) &&
-		contest.StartTime.Before(time.Now()) && contest.EndTime.After(time.Now()) {
-		return internal.CTHasProblem(contest_id, problem_id)
-	}
-	return false
-}
-
-/*
-args: contest_id=0 means not in contest
-
-return: (must see from contest, can see)
-*/
-func PRCanSee(ctx Context, user_id, user_group, problem_id, contest_id int) (bool, bool) {
-	if !PRCanSeeWithoutContest(user_id, user_group, problem_id) {
-		if contest_id <= 0 || !PRCanSeeFromContest(user_id, user_group, problem_id, contest_id) {
-			ctx.JSONAPI(http.StatusForbidden, "", nil)
-			return false, false
-		}
-		return true, true
-	}
-	return false, true
-}
-
 type ProbListParam struct {
-	UserID   int  `session:"user_id"`
-	UserGrp  int  `session:"user_group"`
-	Left     *int `query:"left"`
-	Right    *int `query:"right"`
-	PageSize int  `query:"pagesize" binding:"required" validate:"gte=1,lte=100"`
+	Auth
+	Page
 }
 
 func ProbList(ctx Context, param ProbListParam) {
-	var bound int
-	if param.Left != nil {
-		bound = *param.Left
-	} else if param.Right != nil {
-		bound = *param.Right
-	} else {
+	if !param.Page.CanBound() {
 		return
 	}
 	problems, isfull, err := internal.PRList(
-		bound, param.PageSize, param.UserID, param.Left != nil, libs.IsAdmin(param.UserGrp),
+		param.Page.Bound(), param.PageSize, param.UserID, param.IsLeft(), param.IsAdmin(),
 	)
 	if err != nil {
 		ctx.ErrorAPI(err)
@@ -112,51 +50,42 @@ func ProbAdd(ctx Context, param ProbAddParam) {
 
 // 查询问题
 type ProbGetParam struct {
-	ProbID  int `query:"problem_id" binding:"required"`
-	CtstID  int `query:"contest_id"`
-	UserID  int `session:"user_id"`
-	UserGrp int `session:"user_group"`
+	Auth
+	ProbID int `query:"problem_id" binding:"required" validate:"probid"`
+	CtstID int `query:"contest_id"`
 }
 
 func ProbGet(ctx Context, param ProbGetParam) {
-	if !internal.PRExists(param.ProbID) {
-		ctx.JSONAPI(http.StatusNotFound, "", nil)
-		return
-	}
-	in_contest, ok := PRCanSee(ctx, param.UserID, param.UserGrp, param.ProbID, param.CtstID)
-	if !ok {
-		return
-	}
-	prob, err := internal.PRQuery(param.ProbID, param.UserID)
-	if err != nil {
-		ctx.ErrorAPI(err)
-		return
-	}
-	ret_prob := *prob
-	if in_contest {
-		ret_prob.Tutorial_zh = ""
-		ret_prob.Tutorial_en = ""
-	}
-	can_edit := PRCanEdit(param.UserID, param.UserGrp, param.ProbID)
-	if !can_edit {
-		ret_prob.DataInfo = problem.DataInfo{}
-	}
-	ctx.JSONAPI(200, "", map[string]any{"problem": ret_prob, "can_edit": can_edit, "in_contest": in_contest})
+	param.Auth.SetCtst(param.CtstID).TrySeeProb(param.ProbID).
+		Then(func(ctstid int) {
+			prob, err := internal.PRQuery(param.ProbID, param.UserID)
+			if err != nil {
+				ctx.ErrorAPI(err)
+				return
+			}
+			ret_prob := *prob
+			if ctstid > 0 {
+				ret_prob.Tutorial_zh = ""
+				ret_prob.Tutorial_en = ""
+			}
+			can_edit := param.Auth.CanEditProb(param.ProbID)
+			if !can_edit {
+				ret_prob.DataInfo = problem.DataInfo{}
+			}
+			ctx.JSONAPI(200, "", map[string]any{"problem": ret_prob, "can_edit": can_edit, "in_contest": ctstid})
+		}).Else(func(ctstid int) {
+			ctx.JSONAPI(http.StatusForbidden, "", nil)
+		})
 }
 
 // 获取题目权限
 type ProbGetPermParam struct {
-	ProbID  int `query:"problem_id" binding:"required"`
-	UserID  int `session:"user_id"`
-	UserGrp int `session:"user_group"`
+	Auth
+	ProbID int `query:"problem_id" binding:"required" validate:"probid"`
 }
 
 func ProbGetPerm(ctx Context, param ProbGetPermParam) {
-	if !internal.PRExists(param.ProbID) {
-		ctx.JSONAPI(404, "", nil)
-		return
-	}
-	if !PRCanEdit(param.UserID, param.UserGrp, param.ProbID) {
+	if !param.Auth.CanEditProb(param.ProbID) {
 		ctx.JSONAPI(403, "", nil)
 		return
 	}
@@ -169,18 +98,13 @@ func ProbGetPerm(ctx Context, param ProbGetPermParam) {
 }
 
 type ProbAddPermParam struct {
-	ProbID  int `body:"problem_id" binding:"required"`
-	PermID  int `body:"permission_id" binding:"required"`
-	UserID  int `session:"user_id"`
-	UserGrp int `session:"user_group"`
+	ProbID int `body:"problem_id" binding:"required" validate:"probid"`
+	PermID int `body:"permission_id" binding:"required"`
+	Auth
 }
 
 func ProbAddPerm(ctx Context, param ProbAddPermParam) {
-	if !internal.PRExists(param.ProbID) {
-		ctx.JSONAPI(404, "", nil)
-		return
-	}
-	if !PRCanEdit(param.UserID, param.UserGrp, param.ProbID) {
+	if !param.Auth.CanEditProb(param.ProbID) {
 		ctx.JSONAPI(403, "", nil)
 		return
 	}
@@ -195,14 +119,13 @@ func ProbAddPerm(ctx Context, param ProbAddPermParam) {
 }
 
 type ProbDelPermParam struct {
-	ProbID  int `query:"problem_id" binding:"required"`
-	PermID  int `query:"permission_id" binding:"required"`
-	UserID  int `session:"user_id"`
-	UserGrp int `session:"user_group"`
+	ProbID int `query:"problem_id" binding:"required"`
+	PermID int `query:"permission_id" binding:"required"`
+	Auth
 }
 
 func ProbDelPerm(ctx Context, param ProbDelPermParam) {
-	if !PRCanEdit(param.UserID, param.UserGrp, param.ProbID) {
+	if !param.Auth.CanEditProb(param.ProbID) {
 		ctx.JSONAPI(403, "", nil)
 		return
 	}
@@ -213,17 +136,12 @@ func ProbDelPerm(ctx Context, param ProbDelPermParam) {
 }
 
 type ProbGetMgrParam struct {
-	ProbID  int `query:"problem_id" binding:"required"`
-	UserID  int `session:"user_id"`
-	UserGrp int `session:"user_group"`
+	ProbID int `query:"problem_id" binding:"required" validate:"probid"`
+	Auth
 }
 
 func ProbGetMgr(ctx Context, param ProbGetMgrParam) {
-	if !internal.PRExists(param.ProbID) {
-		ctx.JSONAPI(404, "", nil)
-		return
-	}
-	if !PRCanEdit(param.UserID, param.UserGrp, param.ProbID) {
+	if !param.Auth.CanEditProb(param.ProbID) {
 		ctx.JSONAPI(403, "", nil)
 		return
 	}
@@ -236,26 +154,21 @@ func ProbGetMgr(ctx Context, param ProbGetMgrParam) {
 }
 
 type ProbAddMgrParam struct {
-	ProbID    int `body:"problem_id" binding:"required"`
-	UserID    int `body:"user_id" binding:"required"`
-	CurUserID int `session:"user_id"`
-	UserGrp   int `session:"user_group"`
+	ProbID    int `body:"problem_id" binding:"required" validate:"probid"`
+	MgrUserID int `body:"user_id" binding:"required"`
+	Auth
 }
 
 func ProbAddMgr(ctx Context, param ProbAddMgrParam) {
-	if !internal.PRExists(param.ProbID) {
-		ctx.JSONAPI(404, "", nil)
-		return
-	}
-	if !PRCanEdit(param.CurUserID, param.UserGrp, param.ProbID) {
+	if !param.Auth.CanEditProb(param.ProbID) {
 		ctx.JSONAPI(403, "", nil)
 		return
 	}
-	if !internal.USExists(param.UserID) {
+	if !internal.USExists(param.MgrUserID) {
 		ctx.JSONAPI(400, "no such user id", nil)
 		return
 	}
-	err := internal.PRAddPermission(param.ProbID, -param.UserID)
+	err := internal.PRAddPermission(param.ProbID, -param.MgrUserID)
 	if err != nil {
 		ctx.ErrorAPI(err)
 	}
@@ -263,35 +176,29 @@ func ProbAddMgr(ctx Context, param ProbAddMgrParam) {
 
 type ProbDelMgrParam struct {
 	ProbID    int `query:"problem_id" binding:"required"`
-	UserID    int `query:"user_id" binding:"required"`
-	CurUserID int `session:"user_id"`
-	UserGrp   int `session:"user_group"`
+	MgrUserID int `query:"user_id" binding:"required"`
+	Auth
 }
 
 func ProbDelMgr(ctx Context, param ProbDelMgrParam) {
-	if !PRCanEdit(param.CurUserID, param.UserGrp, param.ProbID) {
+	if !param.Auth.CanEditProb(param.ProbID) {
 		ctx.JSONAPI(403, "", nil)
 		return
 	}
-	err := internal.PRDeletePermission(param.ProbID, -param.UserID)
+	err := internal.PRDeletePermission(param.ProbID, -param.MgrUserID)
 	if err != nil {
 		ctx.ErrorAPI(err)
 	}
 }
 
 type ProbPutDataParam struct {
-	ProbID  int                   `body:"problem_id" binding:"required"`
-	Data    *multipart.FileHeader `body:"data" binding:"required"`
-	UserID  int                   `session:"user_id"`
-	UserGrp int                   `session:"user_group"`
+	ProbID int                   `body:"problem_id" binding:"required" validate:"probid"`
+	Data   *multipart.FileHeader `body:"data" binding:"required"`
+	Auth
 }
 
 func ProbPutData(ctx Context, param ProbPutDataParam) {
-	if !internal.PRExists(param.ProbID) {
-		ctx.JSONAPI(404, "", nil)
-		return
-	}
-	if !PRCanEdit(param.UserID, param.UserGrp, param.ProbID) {
+	if !param.Auth.CanEditProb(param.ProbID) {
 		ctx.JSONAPI(403, "", nil)
 		return
 	}
@@ -316,22 +223,17 @@ func ProbPutData(ctx Context, param ProbPutDataParam) {
 }
 
 type ProbDownDataParam struct {
-	ProbID   int    `query:"problem_id" binding:"required"`
+	ProbID   int    `query:"problem_id" binding:"required" validate:"probid"`
 	CtstID   int    `query:"contest_id"`
 	DataType string `query:"type"`
-	UserID   int    `session:"user_id"`
-	UserGrp  int    `session:"user_group"`
+	Auth
 }
 
 func ProbDownData(ctx Context, param ProbDownDataParam) {
-	if !internal.PRExists(param.ProbID) {
-		ctx.JSONAPI(404, "", nil)
-		return
-	}
 	internal.ProblemRWLock.RLock(param.ProbID)
 	defer internal.ProblemRWLock.RUnlock(param.ProbID)
 	if param.DataType == "data" {
-		if !PRCanEdit(param.UserID, param.UserGrp, param.ProbID) {
+		if !param.Auth.CanEditProb(param.ProbID) {
 			ctx.JSONAPI(403, "", nil)
 			return
 		}
@@ -343,37 +245,33 @@ func ProbDownData(ctx Context, param ProbDownDataParam) {
 			ctx.FileAttachment(path, fmt.Sprintf("problem_%d.zip", param.ProbID))
 		}
 	} else {
-		_, ok := PRCanSee(ctx, param.UserID, param.UserGrp, param.ProbID, param.CtstID)
-		if !ok {
-			ctx.JSONAPI(403, "", nil)
-			return
-		}
-		path := internal.PRGetSampleZip(param.ProbID)
-		_, err := os.Stat(path)
-		if err != nil {
-			ctx.JSONAPI(400, "no data", nil)
-		} else {
-			ctx.FileAttachment(path, fmt.Sprintf("sample_%d.zip", param.ProbID))
-		}
+		param.Auth.SetCtst(param.CtstID).TrySeeProb(param.ProbID).
+			Then(func(ctstid int) {
+				path := internal.PRGetSampleZip(param.ProbID)
+				_, err := os.Stat(path)
+				if err != nil {
+					ctx.JSONAPI(400, "no data", nil)
+				} else {
+					ctx.FileAttachment(path, fmt.Sprintf("sample_%d.zip", param.ProbID))
+				}
+			}).
+			Else(func(a int) {
+				ctx.JSONAPI(403, "", nil)
+			})
 	}
 }
 
 type Context = service.Context
 
 type ProbEditParam struct {
-	ProbID    int    `body:"problem_id" binding:"required"`
+	ProbID    int    `body:"problem_id" binding:"required" validate:"probid"`
 	Title     string `body:"title"`
 	AllowDown string `body:"allow_down"`
-	UserID    int    `session:"user_id"`
-	UserGrp   int    `session:"user_group"`
+	Auth
 }
 
 func ProbEdit(ctx Context, param ProbEditParam) {
-	if !internal.PRExists(param.ProbID) {
-		ctx.JSONAPI(404, "", nil)
-		return
-	}
-	if !PRCanEdit(param.UserID, param.UserGrp, param.ProbID) {
+	if !param.Auth.CanEditProb(param.ProbID) {
 		ctx.JSONAPI(403, "", nil)
 		return
 	}
@@ -414,46 +312,43 @@ func ProbEdit(ctx Context, param ProbEditParam) {
 }
 
 type ProbStatisticParam struct {
-	ProbID    int    `query:"problem_id" binding:"required"`
+	Auth
+	Page
+	ProbID    int    `query:"problem_id" binding:"required" validate:"probid"`
 	Mode      string `query:"mode" binding:"required"`//one of {"time", "memory"}
-	Pagesize  int    `query:"pagesize" binding:"required" validate:"gte=1,lte=100"`
-	Left     *int    `query:"left"`
 	LeftId   *int    `query:"left_id"`
-	Right    *int    `query:"right"`
 	RightId  *int    `query:"right_id"`
-	UserID    int    `session:"user_id"`
-	UserGrp   int    `session:"user_group"`
 }
 
 func ProbStatistic(ctx Context, param ProbStatisticParam) {
-	if !internal.PRExists(param.ProbID) {
-		ctx.JSONAPI(404, "", nil)
-		return
-	}
 	//Users can see statistics if and only if they are out of contest
-	if !PRCanSeeWithoutContest(param.UserID, param.UserGrp, param.ProbID) {
-		ctx.JSONAPI(403, "", nil)
-		return
-	}
-	subs, isfull := []int{}, false
-	if param.Left != nil {
-		if param.LeftId == nil {
-			ctx.JSONAPI(400, "left_id is null", nil)
+	param.TrySeeProb(param.ProbID).Then(func(ctstid int) {
+		if !param.CanBound() {
+			ctx.JSONAPI(400, "both left and right are null", nil)
 			return
 		}
-		subs, isfull = internal.PRSGetSubmissions(param.ProbID, *param.Left, *param.LeftId, param.Pagesize, true, param.Mode)
-	} else {
-		if param.RightId == nil {
-			ctx.JSONAPI(400, "right_id is null", nil)
+		subs, isfull := []int{}, false
+		if param.IsLeft() {
+			if param.LeftId == nil {
+				ctx.JSONAPI(400, "left_id is null", nil)
+				return
+			}
+			subs, isfull = internal.PRSGetSubmissions(param.ProbID, *param.Left, *param.LeftId, param.PageSize, true, param.Mode)
+		} else {
+			if param.RightId == nil {
+				ctx.JSONAPI(400, "right_id is null", nil)
+				return
+			}
+			subs, isfull = internal.PRSGetSubmissions(param.ProbID, *param.Right, *param.RightId, param.PageSize, false, param.Mode)
+		}
+		if subs == nil {
+			ctx.JSONAPI(400, "", nil)
 			return
 		}
-		subs, isfull = internal.PRSGetSubmissions(param.ProbID, *param.Right, *param.RightId, param.Pagesize, false, param.Mode)
-	}
-	if subs == nil {
-		ctx.JSONAPI(400, "", nil)
-		return
-	}
-	ret := internal.SMListByIds(subs)
-	acnum, totnum := internal.PRSGetACRatio(param.ProbID)
-	ctx.JSONAPI(200, "", map[string]any{"data": ret, "isfull": isfull, "acnum": acnum, "totnum": totnum})
+		ret := internal.SMListByIds(subs)
+		acnum, totnum := internal.PRSGetACRatio(param.ProbID)
+		ctx.JSONAPI(200, "", map[string]any{"data": ret, "isfull": isfull, "acnum": acnum, "totnum": totnum})
+	}).Else(func(ctstid int) {
+		ctx.JSONAPI(http.StatusForbidden, "", nil)
+	})
 }

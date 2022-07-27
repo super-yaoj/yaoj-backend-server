@@ -12,15 +12,11 @@ import (
 )
 
 type PermCreateParam struct {
-	PermName string `body:"permission_name"`
+	PermName string `body:"permission_name" validate:"lte=190"`
 	UserGrp  int    `session:"user_group" validate:"admin"`
 }
 
 func PermCreate(ctx Context, param PermCreateParam) {
-	if len(param.PermName) > 190 {
-		ctx.JSONAPI(400, "permission name is too long", nil)
-		return
-	}
 	id, err := internal.PMCreate(param.PermName)
 	if err != nil {
 		ctx.ErrorAPI(err)
@@ -31,15 +27,11 @@ func PermCreate(ctx Context, param PermCreateParam) {
 
 type PermRenameParam struct {
 	PermID   int    `body:"permission_id" binding:"required"`
-	PermName string `body:"permission_name"`
+	PermName string `body:"permission_name" validate:"lte=190"`
 	UserGrp  int    `session:"user_group" validate:"admin"`
 }
 
 func PermRename(ctx Context, param PermRenameParam) {
-	if len(param.PermName) > 190 {
-		ctx.JSONAPI(400, "permission name is too long", nil)
-		return
-	}
 	if !internal.PMExists(param.PermID) {
 		ctx.JSONAPI(400, "no such permission id", nil)
 		return
@@ -71,22 +63,15 @@ func PermDel(ctx Context, param PermDelParam) {
 }
 
 type PermGetParam struct {
-	PageSize int  `query:"pagesize" binding:"required" validate:"gte=1,lte=100"`
-	Left     *int `query:"left"`
-	Right    *int `query:"right"`
-	UserGrp  int  `session:"user_group" validate:"admin"`
+	Page
+	UserGrp int `session:"user_group" validate:"admin"`
 }
 
 func PermGet(ctx Context, param PermGetParam) {
-	var bound int
-	if param.Left != nil {
-		bound = *param.Left
-	} else if param.Right != nil {
-		bound = *param.Right
-	} else {
+	if !param.CanBound() {
 		return
 	}
-	p, isfull, err := internal.PMQuery(bound, param.PageSize, param.Left != nil)
+	p, isfull, err := internal.PMQuery(param.Bound(), param.PageSize, param.IsLeft())
 	if err != nil {
 		ctx.ErrorAPI(err)
 	} else {
@@ -95,15 +80,14 @@ func PermGet(ctx Context, param PermGetParam) {
 }
 
 type PermGetUserParam struct {
-	PermID    *int `query:"permission_id"`
-	UserID    int  `query:"user_id"`
-	CurUserID int  `session:"user_id"`
-	UserGrp   int  `session:"user_group"`
+	PermID     *int `query:"permission_id"`
+	PermUserID int  `query:"user_id"`
+	Auth
 }
 
 func PermGetUser(ctx Context, param PermGetUserParam) {
 	if param.PermID != nil {
-		if !libs.IsAdmin(param.UserGrp) {
+		if !param.IsAdmin() {
 			ctx.JSONAPI(403, "", nil)
 			return
 		}
@@ -114,11 +98,11 @@ func PermGetUser(ctx Context, param PermGetUserParam) {
 			ctx.JSONAPI(200, "", map[string]any{"data": users})
 		}
 	} else {
-		if !libs.IsAdmin(param.UserGrp) && param.UserID != param.CurUserID {
+		if !param.IsAdmin() && param.PermUserID != param.UserID {
 			ctx.JSONAPI(403, "", nil)
 			return
 		}
-		permissions, err := internal.USQueryPermission(param.UserID)
+		permissions, err := internal.USQueryPermission(param.PermUserID)
 		if err != nil {
 			ctx.ErrorAPI(err)
 		} else {

@@ -32,6 +32,7 @@ func process(f func(*gin.Context)) func(*gin.Context) {
 }
 
 func main() {
+	// parse config
 	flag.Parse()
 	if genConfig {
 		data, _ := yaml.Marshal(config)
@@ -46,15 +47,19 @@ func main() {
 	libs.BackDomain = config.BackDomain
 	libs.DataDir = config.DataDir
 	libs.TmpDir = config.TmpDir
+	libs.DataSource = config.DataSource
 
+	// init
 	libs.DirInit()
 	err := libs.DBInit()
 	if err != nil {
 		log.Fatal(err)
 	}
-	app := gin.Default()
-
+	defer libs.DBClose()
 	go internal.JudgersInit()
+
+	// server init
+	app := gin.Default()
 	app.POST("/FinishJudging", internal.FinishJudging)
 
 	app.Use(sessions.Sessions("sessionId", cookie.NewStore([]byte("3.1y4a1o5j9"))))
@@ -78,5 +83,4 @@ func main() {
 		}
 	}
 	app.Run(config.Listen)
-	defer libs.DBClose()
 }

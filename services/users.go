@@ -165,23 +165,6 @@ func UserInit(ctx Context, param UserInitParam) {
 	ret(user)
 }
 
-// 根据 session 中的 user_group 判断是否是管理
-// func ISAdmin(ctx Context) bool {
-// 	sess := sessions.Default(ctx)
-// 	user_group, ok := sess.Get("user_group").(int)
-// 	return ok && libs.IsAdmin(user_group)
-// }
-
-// 从 session 中获取 userid
-// func GetUserId(ctx Context) int {
-// 	sess := sessions.Default(ctx)
-// 	user_id, err := sess.Get("user_id").(int)
-// 	if !err {
-// 		return -1
-// 	}
-// 	return user_id
-// }
-
 type UserGetParam struct {
 	UserID int `query:"user_id" binding:"required"`
 }
@@ -204,12 +187,12 @@ func UserGet(ctx Context, param UserGetParam) {
 type UserEditParam struct {
 	CurUserID int    `session:"user_id"`
 	UserID    int    `body:"user_id" binding:"required"`
-	Gender    int    `body:"gender" binding:"required"`
+	Gender    int    `body:"gender" binding:"required" validate:"gte=0,lte=2"`
 	Passwd    string `body:"password"`
 	NewPasswd string `body:"new_password"`
-	Motto     string `body:"motto"`
-	Email     string `body:"email"`
-	Org       string `body:"organization"`
+	Motto     string `body:"motto" validate:"lte=350"`
+	Email     string `body:"email" validate:"email,lte=70"`
+	Org       string `body:"organization" validate:"lte=350"`
 }
 
 func UserEdit(ctx Context, param UserEditParam) {
@@ -232,18 +215,7 @@ func UserEdit(ctx Context, param UserEditParam) {
 		password = new_password
 	}
 	password = internal.SaltPassword(password)
-	if param.Gender < 0 || param.Gender > 2 {
-		return
-	}
 	motto, email, organization := param.Motto, param.Email, param.Org
-	if len(motto) > 350 || len(organization) > 150 {
-		ctx.JSONAPI(400, "length of motto or organization is too long", nil)
-		return
-	}
-	if !internal.ValidEmail(email) {
-		ctx.JSONAPI(400, "invalid email", nil)
-		return
-	}
 	err = internal.USModify(password, param.Gender, motto, email, organization, param.UserID)
 	if err != nil {
 		ctx.ErrorAPI(err)
@@ -279,27 +251,20 @@ func UserGrpEdit(ctx Context, param UserGrpEditParam) {
 }
 
 type UserListParam struct {
-	PageSize    int     `query:"pagesize" binding:"required" validate:"gte=1,lte=100"`
-	UserName    *string `query:"user_name"`
-	Left        *int    `query:"left"`
-	Right       *int    `query:"right"`
-	LeftUserID  *int    `query:"left_user_id"`
-	RightUserID *int    `query:"right_user_id"`
-	LeftRating  *int    `query:"left_rating"`
-	RightRating *int    `query:"right_rating"`
+	UserName *string `query:"user_name"`
+	Page
+	LeftUserID  *int `query:"left_user_id"`
+	RightUserID *int `query:"right_user_id"`
+	LeftRating  *int `query:"left_rating"`
+	RightRating *int `query:"right_rating"`
 }
 
 func UserList(ctx Context, param UserListParam) {
 	if param.UserName != nil {
-		var bound int
-		if param.Left != nil {
-			bound = *param.Left
-		} else if param.Right != nil {
-			bound = *param.Right
-		} else {
+		if !param.CanBound() {
 			return
 		}
-		users, isfull, err := internal.USListByName(*param.UserName+"%", bound, param.PageSize, param.Left != nil)
+		users, isfull, err := internal.USListByName(*param.UserName+"%", param.Bound(), param.PageSize, param.IsLeft())
 		if err != nil {
 			ctx.ErrorAPI(err)
 		} else {

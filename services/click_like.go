@@ -6,15 +6,11 @@ import (
 
 type ClickLikeParam struct {
 	Target string `body:"target"`
-	UserID int    `session:"user_id"`
+	UserID int    `session:"user_id" validate:"gte=0"`
 	BlogID int    `body:"id" binding:"required"`
 }
 
 func ClickLike(ctx Context, param ClickLikeParam) {
-	if param.UserID < 0 {
-		ctx.JSONAPI(401, "", nil)
-		return
-	}
 	var err error
 	switch param.Target {
 	case "blog":

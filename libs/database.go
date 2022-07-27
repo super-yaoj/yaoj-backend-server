@@ -12,7 +12,7 @@ import (
 var db *sqlx.DB
 
 func DBInit() error {
-	dsn := "yaoj@tcp(127.0.0.1:3306)/yaoj?charset=utf8mb4&parseTime=True&multiStatements=true"
+	dsn := DataSource
 	var err error
 	db, err = sqlx.Connect("mysql", dsn)
 	if err != nil {

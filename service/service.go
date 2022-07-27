@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"yao/libs"
 
+	"yao/internal"
+
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
 	"github.com/k0kubun/pp"
@@ -16,6 +18,7 @@ type Context struct {
 
 // APIWriteBack
 func (ctx Context) JSONAPI(statusCode int, errorMessage string, data map[string]any) {
+	log.Printf("[api] code=%d, msg=%q", statusCode, errorMessage)
 	if data == nil {
 		data = map[string]any{}
 	}
@@ -95,6 +98,16 @@ func init() {
 			return false
 		}
 		if !libs.IsAdmin(int(fl.Field().Int())) {
+			return false
+		}
+		return true
+	})
+	// check whether the problem id exist in database
+	defaultValidator.RegisterValidation("probid", func(fl validator.FieldLevel) bool {
+		if !fl.Field().CanInt() {
+			return false
+		}
+		if !internal.PRExists(int(fl.Field().Int())) {
 			return false
 		}
 		return true

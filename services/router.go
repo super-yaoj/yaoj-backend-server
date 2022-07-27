@@ -2,7 +2,6 @@ package services
 
 import (
 	"time"
-	"yao/libs"
 	"yao/service"
 
 	"github.com/gin-gonic/gin"
@@ -19,7 +18,7 @@ The router table for yaoj back-end server
 urls with first letter upper are rpcs, others are apis.
 */
 var Router map[string][]Request = map[string][]Request{
-	"/GetTime":       {{"POST", GetTime}},
+	"/GetTime":       {{"POST", service.GinHandler(GetTime)}},
 	"/Init":          {{"POST", service.GinHandler(UserInit)}},
 	"/UserLogin":     {{"POST", service.GinHandler(UserLogin)}},
 	"/UserLogout":    {{"POST", service.GinHandler(UserLogout)}},
@@ -133,6 +132,9 @@ var Router map[string][]Request = map[string][]Request{
 	"/custom_test": {{"POST", service.GinHandler(SubmCustom)}},
 }
 
-func GetTime(ctx *gin.Context) {
-	libs.RPCWriteBack(ctx, 200, 0, "", map[string]any{"server_time": time.Now()})
+type GetTimeParam struct {
+}
+
+func GetTime(ctx Context, param GetTimeParam) {
+	ctx.JSONRPC(200, 0, "", map[string]any{"server_time": time.Now()})
 }

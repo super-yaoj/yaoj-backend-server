@@ -6,28 +6,33 @@ import (
 	"yao/libs"
 )
 
-func BLCanSee(user_id, user_group, blog_id int) bool {
+// 1. blog exist
+// 2. user registered
+// 3. admin or author or blog is public
+func BLCanSee(auth Auth, blog_id int) bool {
 	var blog internal.Blog
 	err := libs.DBSelectSingle(&blog, "select blog_id, author, private from blogs where blog_id=?", blog_id)
 	if err != nil {
 		return false
+	} else if auth.UserID == 0 { // unregistered
+		return false
 	} else {
-		return libs.IsAdmin(user_group) || user_id == blog.Author || !blog.Private
+		return auth.IsAdmin() || auth.UserID == blog.Author || !blog.Private
 	}
 }
 
-func BLCanEdit(user_id, user_group, blog_id int) bool {
+func BLCanEdit(auth Auth, blog_id int) bool {
 	var blog internal.Blog
 	err := libs.DBSelectSingle(&blog, "select blog_id, author from blogs where blog_id=?", blog_id)
 	if err != nil {
 		return false
 	} else {
-		return libs.IsAdmin(user_group) || user_id == blog.Author
+		return auth.IsAdmin() || auth.UserID == blog.Author
 	}
 }
 
 type BlogCreateParam struct {
-	UserID  int    `session:"user_id"`
+	UserID  int    `session:"user_id" validate:"gte=0"`
 	Private int    `body:"private" binding:"required"`
 	Title   string `body:"title"`
 	Content string `body:"content"`
@@ -51,8 +56,7 @@ type BlogEditParam struct {
 	Private int    `body:"private" binding:"required" validate:"gte=0,lte=1"`
 	Title   string `body:"title"`
 	Content string `body:"content"`
-	UserID  int    `session:"user_id"`
-	UserGrp int    `session:"user_group"`
+	Auth
 }
 
 func BlogEdit(ctx Context, param BlogEditParam) {
@@ -60,7 +64,7 @@ func BlogEdit(ctx Context, param BlogEditParam) {
 		ctx.JSONAPI(404, "", nil)
 		return
 	}
-	if !BLCanEdit(param.UserID, param.UserGrp, param.BlogID) {
+	if !BLCanEdit(param.Auth, param.BlogID) {
 		ctx.JSONAPI(403, "", nil)
 		return
 	}
@@ -75,13 +79,12 @@ func BlogEdit(ctx Context, param BlogEditParam) {
 }
 
 type BlogDelParam struct {
-	BlogID  int `query:"blog_id" binding:"required"`
-	UserID  int `session:"user_id"`
-	UserGrp int `session:"user_group"`
+	BlogID int `query:"blog_id" binding:"required"`
+	Auth
 }
 
 func BlogDel(ctx Context, param BlogDelParam) {
-	if !BLCanEdit(param.UserID, param.UserGrp, param.BlogID) {
+	if !BLCanEdit(param.Auth, param.BlogID) {
 		ctx.JSONAPI(403, "", nil)
 		return
 	}
@@ -92,9 +95,8 @@ func BlogDel(ctx Context, param BlogDelParam) {
 }
 
 type BlogGetParam struct {
-	BlogID  int `query:"blog_id" binding:"required"`
-	UserID  int `session:"user_id"`
-	UserGrp int `session:"user_group"`
+	BlogID int `query:"blog_id" binding:"required"`
+	Auth
 }
 
 func BlogGet(ctx Context, param BlogGetParam) {
@@ -102,7 +104,7 @@ func BlogGet(ctx Context, param BlogGetParam) {
 		ctx.JSONAPI(404, "", nil)
 		return
 	}
-	if !BLCanSee(param.UserID, param.UserGrp, param.BlogID) {
+	if !BLCanSee(param.Auth, param.BlogID) {
 		ctx.JSONAPI(403, "", nil)
 		return
 	}
@@ -116,17 +118,16 @@ func BlogGet(ctx Context, param BlogGetParam) {
 }
 
 type BlogListParam struct {
-	UserID    *int `query:"user_id"`
-	Left      *int `query:"left"`
-	Right     *int `query:"right"`
-	PageSize  *int `query:"pagesize"`
-	CurUserID int  `session:"user_id"`
-	UserGrp   int  `session:"user_group"`
+	BlogUserID *int `query:"user_id"`
+	Left       *int `query:"left"`
+	Right      *int `query:"right"`
+	PageSize   *int `query:"pagesize"`
+	Auth
 }
 
 func BlogList(ctx Context, param BlogListParam) {
-	if param.UserID != nil {
-		blogs, err := internal.BLListUser(*param.UserID, param.CurUserID)
+	if param.BlogUserID != nil {
+		blogs, err := internal.BLListUser(*param.BlogUserID, param.UserID)
 		if err != nil {
 			ctx.ErrorAPI(err)
 		} else {
@@ -146,7 +147,7 @@ func BlogList(ctx Context, param BlogListParam) {
 			return
 		}
 		blogs, isfull, err := internal.BLListAll(
-			bound, *param.PageSize, param.CurUserID, param.Left != nil, libs.IsAdmin(param.UserGrp),
+			bound, *param.PageSize, param.UserID, param.Left != nil, libs.IsAdmin(param.UserGrp),
 		)
 		if err != nil {
 			ctx.ErrorAPI(err)
