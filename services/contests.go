@@ -37,8 +37,8 @@ func CtstGet(ctx Context, param CtstGetParam) {
 		ctx.JSONAPI(404, "", nil)
 		return
 	}
-	can_edit := param.Auth.CanEditCtst(param.CtstID)
-	if param.Auth.CanEnterCtst(contest) {
+	can_edit := param.CanEditCtst(param.CtstID)
+	if !param.CanEnterCtst(contest) {
 		ctx.JSONAPI(403, "", nil)
 		return
 	}
@@ -56,7 +56,7 @@ func CtstProbGet(ctx Context, param CtstProbGetParam) {
 		ctx.JSONAPI(404, "", nil)
 		return
 	}
-	if param.Auth.CanEnterCtst(contest) {
+	if !param.CanEnterCtst(contest) {
 		ctx.JSONAPI(403, "", nil)
 		return
 	}
@@ -79,7 +79,7 @@ func CtstProbAdd(ctx Context, param CtstProbAddParam) {
 		ctx.JSONAPI(404, "", nil)
 		return
 	}
-	if !param.Auth.CanEditCtst(param.CtstID) {
+	if !param.CanEditCtst(param.CtstID) {
 		ctx.JSONAPI(403, "", nil)
 		return
 	}
@@ -96,7 +96,7 @@ type CtstProbDelParam struct {
 }
 
 func CtstProbDel(ctx Context, param CtstProbDelParam) {
-	if !param.Auth.CanEditCtst(param.CtstID) {
+	if !param.CanEditCtst(param.CtstID) {
 		ctx.JSONAPI(403, "", nil)
 		return
 	}
@@ -137,7 +137,7 @@ func CtstEdit(ctx Context, param CtstEditParam) {
 		ctx.JSONAPI(404, "", nil)
 		return
 	}
-	if !param.Auth.CanEditCtst(param.CtstID) {
+	if !param.CanEditCtst(param.CtstID) {
 		ctx.JSONAPI(403, "", nil)
 		return
 	}
@@ -169,7 +169,7 @@ func CtstPermGet(ctx Context, param CtstPermGetParam) {
 		ctx.JSONAPI(404, "", nil)
 		return
 	}
-	if !param.Auth.CanEditCtst(param.CtstID) {
+	if !param.CanEditCtst(param.CtstID) {
 		ctx.JSONAPI(403, "", nil)
 		return
 	}
@@ -191,7 +191,7 @@ func CtstMgrGet(ctx Context, param CtstMgrGetParam) {
 		ctx.JSONAPI(404, "", nil)
 		return
 	}
-	if !param.Auth.CanEditCtst(param.CtstID) {
+	if !param.CanEditCtst(param.CtstID) {
 		ctx.JSONAPI(403, "", nil)
 		return
 	}
@@ -214,7 +214,7 @@ func CtstPermAdd(ctx Context, param CtstPermAddParam) {
 		ctx.JSONAPI(404, "", nil)
 		return
 	}
-	if !param.Auth.CanEditCtst(param.CtstID) {
+	if !param.CanEditCtst(param.CtstID) {
 		ctx.JSONAPI(403, "", nil)
 		return
 	}
@@ -239,7 +239,7 @@ func CtstMgrAdd(ctx Context, param CtstMgrAddParam) {
 		ctx.JSONAPI(404, "", nil)
 		return
 	}
-	if !param.Auth.CanEditCtst(param.CtstID) {
+	if !param.CanEditCtst(param.CtstID) {
 		ctx.JSONAPI(403, "", nil)
 		return
 	}
@@ -264,7 +264,7 @@ type CtstPermDelParam struct {
 }
 
 func CtstPermDel(ctx Context, param CtstPermDelParam) {
-	if !param.Auth.CanEditCtst(param.CtstID) {
+	if !param.CanEditCtst(param.CtstID) {
 		ctx.JSONAPI(403, "", nil)
 		return
 	}
@@ -281,7 +281,7 @@ type CtstMgrDelParam struct {
 }
 
 func CtstMgrDel(ctx Context, param CtstMgrDelParam) {
-	if !param.Auth.CanEditCtst(param.CtstID) {
+	if !param.CanEditCtst(param.CtstID) {
 		ctx.JSONAPI(403, "", nil)
 		return
 	}
