@@ -302,17 +302,13 @@ func SubmDel(ctx Context, param SubmDelParam) {
 }
 
 type RejudgeParam struct {
-	ProbID *int `body:"problem_id"`
+	ProbID *int `body:"problem_id" validate:"probid"`
 	SubmID int  `body:"submission_id"`
 	Auth
 }
 
 func Rejudge(ctx Context, param RejudgeParam) {
 	if param.ProbID != nil {
-		if !internal.PRExists(*param.ProbID) {
-			ctx.JSONRPC(404, -32600, "", nil)
-			return
-		}
 		if !param.Auth.CanEditProb(*param.ProbID) {
 			ctx.JSONRPC(403, -32600, "", nil)
 			return

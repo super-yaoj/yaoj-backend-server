@@ -26,16 +26,12 @@ func PermCreate(ctx Context, param PermCreateParam) {
 }
 
 type PermRenameParam struct {
-	PermID   int    `body:"permission_id" binding:"required"`
+	PermID   int    `body:"permission_id" binding:"required" validate:"prmsid"`
 	PermName string `body:"permission_name" validate:"lte=190"`
 	UserGrp  int    `session:"user_group" validate:"admin"`
 }
 
 func PermRename(ctx Context, param PermRenameParam) {
-	if !internal.PMExists(param.PermID) {
-		ctx.JSONAPI(400, "no such permission id", nil)
-		return
-	}
 	err := internal.PMChangeName(param.PermID, param.PermName)
 	if err != nil {
 		ctx.ErrorAPI(err)
@@ -43,7 +39,7 @@ func PermRename(ctx Context, param PermRenameParam) {
 }
 
 type PermDelParam struct {
-	PermID  int `query:"permission_id" binding:"required"`
+	PermID  int `query:"permission_id" binding:"required" validate:"prmsid"`
 	UserGrp int `session:"user_group" validate:"admin"`
 }
 
@@ -52,13 +48,9 @@ func PermDel(ctx Context, param PermDelParam) {
 		ctx.JSONAPI(400, "you cannot modify the default group", nil)
 		return
 	}
-	num, err := internal.PMDelete(param.PermID)
+	_, err := internal.PMDelete(param.PermID)
 	if err != nil {
 		ctx.ErrorAPI(err)
-	} else if num != 1 {
-		ctx.JSONAPI(400, "no such permission id", nil)
-	} else {
-		ctx.JSONAPI(200, "", nil)
 	}
 }
 
@@ -80,8 +72,8 @@ func PermGet(ctx Context, param PermGetParam) {
 }
 
 type PermGetUserParam struct {
-	PermID     *int `query:"permission_id"`
-	PermUserID int  `query:"user_id"`
+	PermID     *int `query:"permission_id" validate:"prmsid"`
+	PermUserID *int `query:"user_id" validate:"userid"`
 	Auth
 }
 
@@ -98,11 +90,11 @@ func PermGetUser(ctx Context, param PermGetUserParam) {
 			ctx.JSONAPI(200, "", map[string]any{"data": users})
 		}
 	} else {
-		if !param.IsAdmin() && param.PermUserID != param.UserID {
+		if !param.IsAdmin() && *param.PermUserID != param.UserID {
 			ctx.JSONAPI(403, "", nil)
 			return
 		}
-		permissions, err := internal.USQueryPermission(param.PermUserID)
+		permissions, err := internal.USQueryPermission(*param.PermUserID)
 		if err != nil {
 			ctx.ErrorAPI(err)
 		} else {
@@ -112,7 +104,7 @@ func PermGetUser(ctx Context, param PermGetUserParam) {
 }
 
 type PermAddUserParam struct {
-	PermID  int    `body:"permission_id" binding:"required"`
+	PermID  int    `body:"permission_id" binding:"required" validate:"prmsid"`
 	UserIDs string `body:"user_ids"`
 	UserGrp int    `session:"user_group" validate:"admin"`
 }
@@ -166,8 +158,8 @@ func PermAddUser(ctx Context, param PermAddUserParam) {
 }
 
 type PermDelUserParam struct {
-	PermID  int `query:"permission_id" binding:"required"`
-	UserID  int `query:"user_id" binding:"required"`
+	PermID  int `query:"permission_id" binding:"required" validate:"prmsid"`
+	UserID  int `query:"user_id" binding:"required" validate:"userid"`
 	UserGrp int `session:"user_group" validate:"admin"`
 }
 
@@ -176,10 +168,8 @@ func PermDelUser(ctx Context, param PermDelUserParam) {
 		ctx.JSONAPI(400, "you cannot modify the default group", nil)
 		return
 	}
-	res, err := internal.PMDeleteUser(param.PermID, param.UserID)
+	_, err := internal.PMDeleteUser(param.PermID, param.UserID)
 	if err != nil {
 		ctx.ErrorAPI(err)
-	} else if res != 1 {
-		ctx.JSONAPI(400, "doesn't exist", nil)
 	}
 }

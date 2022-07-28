@@ -52,7 +52,7 @@ func BlogCreate(ctx Context, param BlogCreateParam) {
 }
 
 type BlogEditParam struct {
-	BlogID  int    `body:"blog_id" binding:"required"`
+	BlogID  int    `body:"blog_id" binding:"required" validate:"blogid"`
 	Private int    `body:"private" binding:"required" validate:"gte=0,lte=1"`
 	Title   string `body:"title"`
 	Content string `body:"content"`
@@ -60,10 +60,6 @@ type BlogEditParam struct {
 }
 
 func BlogEdit(ctx Context, param BlogEditParam) {
-	if !internal.BLExists(param.BlogID) {
-		ctx.JSONAPI(404, "", nil)
-		return
-	}
 	if !BLCanEdit(param.Auth, param.BlogID) {
 		ctx.JSONAPI(403, "", nil)
 		return
@@ -79,7 +75,7 @@ func BlogEdit(ctx Context, param BlogEditParam) {
 }
 
 type BlogDelParam struct {
-	BlogID int `query:"blog_id" binding:"required"`
+	BlogID int `query:"blog_id" binding:"required" validate:"blogid"`
 	Auth
 }
 
@@ -95,15 +91,11 @@ func BlogDel(ctx Context, param BlogDelParam) {
 }
 
 type BlogGetParam struct {
-	BlogID int `query:"blog_id" binding:"required"`
+	BlogID int `query:"blog_id" binding:"required" validate:"blogid"`
 	Auth
 }
 
 func BlogGet(ctx Context, param BlogGetParam) {
-	if !internal.BLExists(param.BlogID) {
-		ctx.JSONAPI(404, "", nil)
-		return
-	}
 	if !BLCanSee(param.Auth, param.BlogID) {
 		ctx.JSONAPI(403, "", nil)
 		return
@@ -118,7 +110,7 @@ func BlogGet(ctx Context, param BlogGetParam) {
 }
 
 type BlogListParam struct {
-	BlogUserID *int `query:"user_id"`
+	BlogUserID *int `query:"user_id" validate:"userid"`
 	Left       *int `query:"left"`
 	Right      *int `query:"right"`
 	PageSize   *int `query:"pagesize"`

@@ -27,16 +27,12 @@ func CtstList(ctx Context, param CtstListParam) {
 }
 
 type CtstGetParam struct {
-	CtstID int `query:"contest_id" binding:"required"`
+	CtstID int `query:"contest_id" binding:"required" validate:"ctstid"`
 	Auth
 }
 
 func CtstGet(ctx Context, param CtstGetParam) {
-	contest, err := internal.CTQuery(param.CtstID, param.UserID)
-	if err != nil {
-		ctx.JSONAPI(404, "", nil)
-		return
-	}
+	contest, _ := internal.CTQuery(param.CtstID, param.UserID)
 	can_edit := param.CanEditCtst(param.CtstID)
 	if !param.CanEnterCtst(contest) {
 		ctx.JSONAPI(403, "", nil)
@@ -46,16 +42,12 @@ func CtstGet(ctx Context, param CtstGetParam) {
 }
 
 type CtstProbGetParam struct {
-	CtstID int `query:"contest_id" binding:"required"`
+	CtstID int `query:"contest_id" binding:"required" validate:"ctstid"`
 	Auth
 }
 
 func CtstProbGet(ctx Context, param CtstProbGetParam) {
 	contest, err := internal.CTQuery(param.CtstID, param.UserID)
-	if err != nil {
-		ctx.JSONAPI(404, "", nil)
-		return
-	}
 	if !param.CanEnterCtst(contest) {
 		ctx.JSONAPI(403, "", nil)
 		return
@@ -69,16 +61,12 @@ func CtstProbGet(ctx Context, param CtstProbGetParam) {
 }
 
 type CtstProbAddParam struct {
-	CtstID int `body:"contest_id" binding:"required"`
+	CtstID int `body:"contest_id" binding:"required" validate:"ctstid"`
 	ProbID int `body:"problem_id" binding:"required" validate:"probid"`
 	Auth
 }
 
 func CtstProbAdd(ctx Context, param CtstProbAddParam) {
-	if !internal.CTExists(param.CtstID) {
-		ctx.JSONAPI(404, "", nil)
-		return
-	}
 	if !param.CanEditCtst(param.CtstID) {
 		ctx.JSONAPI(403, "", nil)
 		return
@@ -90,8 +78,8 @@ func CtstProbAdd(ctx Context, param CtstProbAddParam) {
 }
 
 type CtstProbDelParam struct {
-	CtstID int `query:"contest_id" binding:"required"`
-	ProbID int `query:"problem_id" binding:"required"`
+	CtstID int `query:"contest_id" binding:"required" validate:"ctstid"`
+	ProbID int `query:"problem_id" binding:"required" validate:"probid"`
 	Auth
 }
 
@@ -122,7 +110,7 @@ func CtstCreate(ctx Context, param CtstCreateParam) {
 // https://pkg.go.dev/github.com/go-playground/validator/v10#hdr-Greater_Than
 // gte,lte 用在 string 上表示长度限制
 type CtstEditParam struct {
-	CtstID       int    `body:"contest_id" binding:"required"`
+	CtstID       int    `body:"contest_id" binding:"required" validate:"ctstid"`
 	Title        string `body:"title" validate:"gte=0,lte=190"`
 	StartTime    string `body:"start_time"`
 	Duration     int    `body:"last" binding:"required" validate:"gte=1,lte=1000000"`
@@ -133,10 +121,6 @@ type CtstEditParam struct {
 
 func CtstEdit(ctx Context, param CtstEditParam) {
 	ctst, err := internal.CTQuery(param.CtstID, -1)
-	if err != nil {
-		ctx.JSONAPI(404, "", nil)
-		return
-	}
 	if !param.CanEditCtst(param.CtstID) {
 		ctx.JSONAPI(403, "", nil)
 		return
@@ -160,15 +144,11 @@ func CtstEdit(ctx Context, param CtstEditParam) {
 }
 
 type CtstPermGetParam struct {
-	CtstID int `query:"contest_id" binding:"required"`
+	CtstID int `query:"contest_id" binding:"required" validate:"ctstid"`
 	Auth
 }
 
 func CtstPermGet(ctx Context, param CtstPermGetParam) {
-	if !internal.CTExists(param.CtstID) {
-		ctx.JSONAPI(404, "", nil)
-		return
-	}
 	if !param.CanEditCtst(param.CtstID) {
 		ctx.JSONAPI(403, "", nil)
 		return
@@ -182,15 +162,11 @@ func CtstPermGet(ctx Context, param CtstPermGetParam) {
 }
 
 type CtstMgrGetParam struct {
-	CtstID int `query:"contest_id" binding:"required"`
+	CtstID int `query:"contest_id" binding:"required" validate:"ctstid"`
 	Auth
 }
 
 func CtstMgrGet(ctx Context, param CtstMgrGetParam) {
-	if !internal.CTExists(param.CtstID) {
-		ctx.JSONAPI(404, "", nil)
-		return
-	}
 	if !param.CanEditCtst(param.CtstID) {
 		ctx.JSONAPI(403, "", nil)
 		return
@@ -204,22 +180,14 @@ func CtstMgrGet(ctx Context, param CtstMgrGetParam) {
 }
 
 type CtstPermAddParam struct {
-	CtstID int `body:"contest_id" binding:"required"`
-	PermID int `body:"permission_id" binding:"required"`
+	CtstID int `body:"contest_id" binding:"required" validate:"ctstid"`
+	PermID int `body:"permission_id" binding:"required" validate:"prmsid"`
 	Auth
 }
 
 func CtstPermAdd(ctx Context, param CtstPermAddParam) {
-	if !internal.CTExists(param.CtstID) {
-		ctx.JSONAPI(404, "", nil)
-		return
-	}
 	if !param.CanEditCtst(param.CtstID) {
 		ctx.JSONAPI(403, "", nil)
-		return
-	}
-	if !internal.PMExists(param.PermID) {
-		ctx.JSONAPI(400, "no such permission id", nil)
 		return
 	}
 	err := internal.CTAddPermission(param.CtstID, param.PermID)
@@ -229,16 +197,12 @@ func CtstPermAdd(ctx Context, param CtstPermAddParam) {
 }
 
 type CtstMgrAddParam struct {
-	CtstID    int `body:"contest_id" binding:"required"`
-	MgrUserID int `body:"user_id" binding:"required"`
+	CtstID    int `body:"contest_id" binding:"required" validate:"ctstid"`
+	MgrUserID int `body:"user_id" binding:"required" validate:"userid"`
 	Auth
 }
 
 func CtstMgrAdd(ctx Context, param CtstMgrAddParam) {
-	if !internal.CTExists(param.CtstID) {
-		ctx.JSONAPI(404, "", nil)
-		return
-	}
 	if !param.CanEditCtst(param.CtstID) {
 		ctx.JSONAPI(403, "", nil)
 		return
@@ -258,8 +222,8 @@ func CtstMgrAdd(ctx Context, param CtstMgrAddParam) {
 }
 
 type CtstPermDelParam struct {
-	CtstID int `query:"contest_id" binding:"required"`
-	PermID int `query:"permission_id" binding:"required"`
+	CtstID int `query:"contest_id" binding:"required" validate:"ctstid"`
+	PermID int `query:"permission_id" binding:"required" validate:"prmsid"`
 	Auth
 }
 
@@ -275,8 +239,8 @@ func CtstPermDel(ctx Context, param CtstPermDelParam) {
 }
 
 type CtstMgrDelParam struct {
-	CtstID    int `query:"contest_id" binding:"required"`
-	MgrUserID int `query:"user_id" binding:"required"`
+	CtstID    int `query:"contest_id" binding:"required" validate:"ctstid"`
+	MgrUserID int `query:"user_id" binding:"required" validate:"userid"`
 	Auth
 }
 
@@ -292,15 +256,11 @@ func CtstMgrDel(ctx Context, param CtstMgrDelParam) {
 }
 
 type CtstPtcpGetParam struct {
-	CtstID int `query:"contest_id" binding:"required"`
+	CtstID int `query:"contest_id" binding:"required" validate:"ctstid"`
 	Auth
 }
 
 func CtstPtcpGet(ctx Context, param CtstPtcpGetParam) {
-	if !internal.CTExists(param.CtstID) {
-		ctx.JSONAPI(404, "", nil)
-		return
-	}
 	if !param.CanSeeCtst(param.CtstID) {
 		ctx.JSONAPI(403, "", nil)
 		return
@@ -314,16 +274,12 @@ func CtstPtcpGet(ctx Context, param CtstPtcpGetParam) {
 }
 
 type CtstSignupParam struct {
-	CtstID int `body:"contest_id" binding:"required"`
+	CtstID int `body:"contest_id" binding:"required" validate:"ctstid"`
 	Auth
 }
 
 func CtstSignup(ctx Context, param CtstSignupParam) {
 	contest, err := internal.CTQuery(param.CtstID, param.UserID)
-	if err != nil {
-		ctx.JSONAPI(404, "", nil)
-		return
-	}
 	if !param.CanTakeCtst(contest) {
 		ctx.JSONAPI(403, "", nil)
 		return
@@ -335,7 +291,7 @@ func CtstSignup(ctx Context, param CtstSignupParam) {
 }
 
 type CtstSignoutParam struct {
-	CtstID int `query:"contest_id" binding:"required"`
+	CtstID int `query:"contest_id" binding:"required" validate:"ctstid"`
 	UserID int `session:"user_id"`
 }
 
@@ -348,15 +304,11 @@ func CtstSignout(ctx Context, param CtstSignoutParam) {
 
 type CtstStandingParam struct {
 	Auth
-	CtstID int `query:"contest_id" binding:"required"`
+	CtstID int `query:"contest_id" binding:"required" validate:"ctstid"`
 }
 
 func CtstStanding(ctx Context, param CtstStandingParam) {
 	ctst, err := internal.CTQuery(param.CtstID, -1)
-	if err != nil {
-		ctx.JSONAPI(404, "", nil)
-		return
-	}
 	can_edit := param.CanEditCtst(param.CtstID)
 	if !param.CanEnterCtst(ctst) {
 		ctx.JSONAPI(403, "", nil)
@@ -393,15 +345,11 @@ func CtstStanding(ctx Context, param CtstStandingParam) {
 
 type CtstFinishParam struct {
 	Auth
-	CtstID int `body:"contest_id" binding:"required"`
+	CtstID int `body:"contest_id" binding:"required" validate:"ctstid"`
 }
 
 func CtstFinish(ctx Context, param CtstFinishParam) {
 	ctst, err := internal.CTQuery(param.CtstID, -1)
-	if err != nil {
-		ctx.JSONRPC(404, -32600, "", nil)
-		return
-	}
 	if !param.CanEditCtst(param.CtstID) {
 		ctx.JSONRPC(403, -32600, "", nil)
 		return

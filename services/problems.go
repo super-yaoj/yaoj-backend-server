@@ -99,7 +99,7 @@ func ProbGetPerm(ctx Context, param ProbGetPermParam) {
 
 type ProbAddPermParam struct {
 	ProbID int `body:"problem_id" binding:"required" validate:"probid"`
-	PermID int `body:"permission_id" binding:"required"`
+	PermID int `body:"permission_id" binding:"required" validate:"prmsid"`
 	Auth
 }
 
@@ -119,8 +119,8 @@ func ProbAddPerm(ctx Context, param ProbAddPermParam) {
 }
 
 type ProbDelPermParam struct {
-	ProbID int `query:"problem_id" binding:"required"`
-	PermID int `query:"permission_id" binding:"required"`
+	ProbID int `query:"problem_id" binding:"required" validate:"probid"`
+	PermID int `query:"permission_id" binding:"required" validate:"prmsid"`
 	Auth
 }
 
@@ -155,7 +155,7 @@ func ProbGetMgr(ctx Context, param ProbGetMgrParam) {
 
 type ProbAddMgrParam struct {
 	ProbID    int `body:"problem_id" binding:"required" validate:"probid"`
-	MgrUserID int `body:"user_id" binding:"required"`
+	MgrUserID int `body:"user_id" binding:"required" validate:"userid"`
 	Auth
 }
 
@@ -175,8 +175,8 @@ func ProbAddMgr(ctx Context, param ProbAddMgrParam) {
 }
 
 type ProbDelMgrParam struct {
-	ProbID    int `query:"problem_id" binding:"required"`
-	MgrUserID int `query:"user_id" binding:"required"`
+	ProbID    int `query:"problem_id" binding:"required" validate:"probid"`
+	MgrUserID int `query:"user_id" binding:"required" validate:"userid"`
 	Auth
 }
 

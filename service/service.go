@@ -112,4 +112,40 @@ func init() {
 		}
 		return true
 	})
+	defaultValidator.RegisterValidation("ctstid", func(fl validator.FieldLevel) bool {
+		if !fl.Field().CanInt() {
+			return false
+		}
+		if !internal.CTExists(int(fl.Field().Int())) {
+			return false
+		}
+		return true
+	})
+	defaultValidator.RegisterValidation("prmsid", func(fl validator.FieldLevel) bool {
+		if !fl.Field().CanInt() {
+			return false
+		}
+		if !internal.PMExists(int(fl.Field().Int())) {
+			return false
+		}
+		return true
+	})
+	defaultValidator.RegisterValidation("userid", func(fl validator.FieldLevel) bool {
+		if !fl.Field().CanInt() {
+			return false
+		}
+		if !internal.USExists(int(fl.Field().Int())) {
+			return false
+		}
+		return true
+	})
+	defaultValidator.RegisterValidation("blogid", func(fl validator.FieldLevel) bool {
+		if !fl.Field().CanInt() {
+			return false
+		}
+		if !internal.BLExists(int(fl.Field().Int())) {
+			return false
+		}
+		return true
+	})
 }

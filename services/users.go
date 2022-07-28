@@ -166,7 +166,7 @@ func UserInit(ctx Context, param UserInitParam) {
 }
 
 type UserGetParam struct {
-	UserID int `query:"user_id" binding:"required"`
+	UserID int `query:"user_id" binding:"required" validate:"userid"`
 }
 
 func UserGet(ctx Context, param UserGetParam) {
@@ -186,7 +186,7 @@ func UserGet(ctx Context, param UserGetParam) {
 
 type UserEditParam struct {
 	CurUserID int    `session:"user_id"`
-	UserID    int    `body:"user_id" binding:"required"`
+	UserID    int    `body:"user_id" binding:"required" validate:"userid"`
 	Gender    int    `body:"gender" binding:"required" validate:"gte=0,lte=2"`
 	Passwd    string `body:"password"`
 	NewPasswd string `body:"new_password"`
@@ -224,7 +224,7 @@ func UserEdit(ctx Context, param UserEditParam) {
 }
 
 type UserGrpEditParam struct {
-	UserID  int `body:"user_id" binding:"required"`
+	UserID  int `body:"user_id" binding:"required" validate:"userid"`
 	UserGrp int `body:"user_group" binding:"required"`
 	CurGrp  int `session:"user_group" validate:"admin"`
 }
@@ -291,7 +291,7 @@ func UserList(ctx Context, param UserListParam) {
 }
 
 type UserRatingParam struct {
-	UserId int `query:"user_id" binding:"required"`
+	UserId int `query:"user_id" binding:"required" validate:"userid"`
 }
 
 func UserRating(ctx Context, param UserRatingParam) {

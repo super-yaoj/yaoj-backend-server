@@ -1,28 +1,17 @@
 package services
 
 import (
-	"fmt"
 	"yao/internal"
-	"yao/libs"
 )
 
 type AnceCreateParam struct {
-	BlogID   int `body:"blog_id" binding:"required"`
-	Priority int `body:"priority" binding:"required"`
+	BlogID   int `body:"blog_id" binding:"required" validate:"blogid"`
+	Priority int `body:"priority" binding:"required" validate:"gte=1,lte=10"`
 	UserGrp  int `session:"user_group" validate:"admin"`
 }
 
 func AnceCreate(ctx Context, param AnceCreateParam) {
-	if param.Priority < 1 || param.Priority > 10 {
-		ctx.JSONAPI(400, fmt.Sprintf("invalid request: parameter priority should be in [%d, %d]", 1, 10), nil)
-	}
-
-	count, err := libs.DBSelectSingleInt("select count(*) from blogs where blog_id=?", param.BlogID)
-	if err != nil || count == 0 {
-		ctx.JSONAPI(400, "invalid request", nil)
-		return
-	}
-	err = internal.ANCreate(param.BlogID, param.Priority)
+	err := internal.ANCreate(param.BlogID, param.Priority)
 	if err != nil {
 		ctx.ErrorAPI(err)
 		return
