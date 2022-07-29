@@ -13,14 +13,14 @@ import (
 )
 
 type ContentPreview struct {
-	Accepted 	utils.CtntType
-	Language 	utils.LangTag
-	Content 	string
+	Accepted utils.CtntType
+	Language utils.LangTag
+	Content  string
 }
 
 type SubmissionDetails struct {
-	ContentPreview string `db:"content_preview" json:"content_preview"`//json encoding of ContentPreview
-	Result 		   string `db:"result" json:"result"`
+	ContentPreview string `db:"content_preview" json:"content_preview"` //json encoding of ContentPreview
+	Result         string `db:"result" json:"result"`
 	PretestResult  string `db:"pretest_result" json:"pretest_result"`
 	ExtraResult    string `db:"extra_result" json:"extra_result"`
 }
@@ -29,36 +29,37 @@ type Submission struct {
 	SubmissionBase
 	ProblemName   string    `db:"problem_name" json:"problem_name"`
 	SubmitterName string    `db:"submitter_name" json:"submitter_name"`
-	Rating 		  int    	`db:"rating" json:"rating"`
+	Rating        int       `db:"rating" json:"rating"`
 	Status        int       `db:"status" json:"status"`
 	Score         float64   `db:"score" json:"score"`
 	SubmitTime    time.Time `db:"submit_time" json:"submit_time"`
 	Language      int       `db:"language" json:"language"`
 	Time          int       `db:"time" json:"time"`
 	Memory        int       `db:"memory" json:"memory"`
-	Preview 	  string	`db:"content_preview" json:"preview"`
-	SampleScore   float64 	`db:"sample_score" json:"sample_score"`
-	Accepted 	  int 		`db:"accepted" json:"accepted"`
+	Preview       string    `db:"content_preview" json:"preview"`
+	SampleScore   float64   `db:"sample_score" json:"sample_score"`
+	Accepted      int       `db:"accepted" json:"accepted"`
 	Length        int       `db:"length" json:"length"`
-	
-	Details 	  SubmissionDetails `json:"details"`
-	Uuid 		  int64 //useless field for submission query
+
+	Details SubmissionDetails `json:"details"`
+	Uuid    int64             //useless field for submission query
 }
 
 type SubmissionBase struct {
-	Id            int       `db:"submission_id" json:"submission_id"`
-	ProblemId     int       `db:"problem_id" json:"problem_id"`
-	ContestId     int       `db:"contest_id" json:"contest_id"`
-	Submitter     int       `db:"submitter" json:"submitter"`
+	Id        int `db:"submission_id" json:"submission_id"`
+	ProblemId int `db:"problem_id" json:"problem_id"`
+	ContestId int `db:"contest_id" json:"contest_id"`
+	Submitter int `db:"submitter" json:"submitter"`
 }
 
 const (
 	PretestAccepted = 1
-	TestsAccepted = 2
-	ExtraAccepted = 4
-	Accepted = 7
-	submColumns = "submission_id, submitter, problem_id, contest_id, status, score, time, memory, language, submit_time, sample_score, accepted, length"
+	TestsAccepted   = 2
+	ExtraAccepted   = 4
+	Accepted        = 7
+	submColumns     = "submission_id, submitter, problem_id, contest_id, status, score, time, memory, language, submit_time, sample_score, accepted, length"
 )
+
 /*
 Priority: in contest > not in contest, real-time judge > rejudge, pretest > tests > extra
 
@@ -147,8 +148,8 @@ func SMGetExtraInfo(subs []Submission) {
 		Rating int    `db:"rating"`
 	}
 	var pname, uname []Name
-	libs.DBSelectAll(&pname, "select problem_id as id, title as name from problems where problem_id in (" + libs.JoinArray(probs) + ")")
-	libs.DBSelectAll(&uname, "select user_id as id, user_name as name, rating from user_info where user_id in (" + libs.JoinArray(users) + ")")
+	libs.DBSelectAll(&pname, "select problem_id as id, title as name from problems where problem_id in ("+libs.JoinArray(probs)+")")
+	libs.DBSelectAll(&uname, "select user_id as id, user_name as name, rating from user_info where user_id in ("+libs.JoinArray(users)+")")
 	sort.Slice(pname, func(i, j int) bool { return pname[i].Id < pname[j].Id })
 	sort.Slice(uname, func(i, j int) bool { return uname[i].Id < uname[j].Id })
 	for key, val := range subs {
@@ -226,12 +227,12 @@ func SMList(bound, pagesize, user_id, submitter, problem_id, contest_id int, isl
 
 		must = "("
 		if problem_id == 0 {
-			must += libs.If(len(probs) == 0, "0", "(problem_id in (" + libs.JoinArray(probs) + "))")
+			must += libs.If(len(probs) == 0, "0", "(problem_id in ("+libs.JoinArray(probs)+"))")
 		} else {
 			must += libs.If(libs.HasElement(probs, problem_id), "1", "0")
 		}
 		if contest_id == 0 {
-			must += libs.If(len(conts) == 0, " or 0", " or (contest_id in (" + libs.JoinArray(conts) + "))")
+			must += libs.If(len(conts) == 0, " or 0", " or (contest_id in ("+libs.JoinArray(conts)+"))")
 		} else {
 			must += " or " + libs.If(libs.HasElement(conts, contest_id), "1", "0")
 		}
@@ -277,6 +278,7 @@ func SMPretestOnly(sub *Submission) {
 }
 
 var sm_update_mutex = sync.Mutex{}
+
 func SMUpdate(sid, pid int, mode string, result []byte) error {
 	sm_update_mutex.Lock()
 	defer sm_update_mutex.Unlock()
@@ -301,7 +303,7 @@ func SMUpdate(sid, pid int, mode string, result []byte) error {
 	res_map := make(map[string]any)
 	err = jsoniter.Unmarshal(result, &res_map)
 	is_subtask, has_data := res_map["IsSubtask"].(bool)
-	
+
 	if err == nil && has_data {
 		for _, subtask := range res_map["Subtask"].([]any) {
 			var sub_score float64
@@ -334,7 +336,7 @@ func SMUpdate(sid, pid int, mode string, result []byte) error {
 			}
 		}
 	}
-	
+
 	//'and status>=0' means when meets an internal error, we shouldn't update status
 	if mode == "tests" {
 		_, err = libs.DBUpdate("update submissions set status=status|?, accepted=accepted|?, score=?, time=?, memory=? where submission_id=? and status>=0",
@@ -349,13 +351,13 @@ func SMUpdate(sid, pid int, mode string, result []byte) error {
 	if err != nil {
 		return err
 	}
-	_, err = libs.DBUpdate("update submission_details set " + column_name + "=? where submission_id=?", result, sid)
+	_, err = libs.DBUpdate("update submission_details set "+column_name+"=? where submission_id=?", result, sid)
 	if err != nil {
 		return err
 	}
 	var subinfo struct {
 		SubmissionBase
-		Status   int  `db:"status"`
+		Status int `db:"status"`
 	}
 	err = libs.DBSelectSingle(&subinfo, "select submission_id, problem_id, contest_id, status from submissions where submission_id=?", sid)
 	if err != nil {
@@ -381,7 +383,7 @@ func SMJudgeCustomTest(content []byte) []byte {
 		return []byte{}
 	}
 	InsertCustomTest(int(sid), &callback)
-	result := <- callback
+	result := <-callback
 	go libs.DBUpdate("delete from custom_tests where id=?", sid)
 	return result
 }
@@ -409,7 +411,7 @@ func SMRejudge(submission_id int) error {
 	}
 	//update uuid to cancel other entries in the judging queue
 	current := libs.TimeStamp()
-	_, err = libs.DBUpdate("update submissions set uuid=?, status=0, accpted=0 where submission_id=?", current, submission_id)
+	_, err = libs.DBUpdate("update submissions set uuid=?, status=0, accepted=0 where submission_id=?", current, submission_id)
 	if err != nil {
 		return err
 	}
