@@ -1,6 +1,7 @@
 package service
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"yao/libs"
@@ -8,7 +9,6 @@ import (
 	"yao/internal"
 
 	"github.com/gin-gonic/gin"
-	"github.com/go-playground/validator/v10"
 	"github.com/k0kubun/pp"
 )
 
@@ -64,10 +64,15 @@ func (ctx Context) ErrorRPC(err error) {
 //
 // 注意 binding:"required" 并非适用于所有来源的绑定，目前只适用于 query 和 body
 //
-// validate 的用法见 https://pkg.go.dev/github.com/go-playground/validator/v10
+// validate
+//
+// required:
+// 对于引用类型，要求不能是 nil。
+// 对于其他值，要求不能是零值。
+// 对于指针要求既不是 nil 也不是零值。
 type StdHandlerFunc[T any] func(ctx Context, param T)
 
-var defaultValidator = validator.New()
+var defaultValidator = NewValidator()
 
 // 将标准化的 API handler 转化为 gin handler
 // route string, method string,
@@ -83,7 +88,13 @@ func GinHandler[T any](handler StdHandlerFunc[T]) gin.HandlerFunc {
 		pp.Println(data)
 		err = defaultValidator.Struct(data)
 		if err != nil {
-			ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			errs := err.(WalkError)
+			switch terr := errs[0].(type) {
+			case HttpStatErr:
+				ctx.JSON(int(terr), gin.H{"error": "validation failed"})
+			default:
+				ctx.JSON(http.StatusBadRequest, gin.H{"error": terr.Error()})
+			}
 			log.Printf("[validate]: %s", err)
 			return
 		}
@@ -91,61 +102,74 @@ func GinHandler[T any](handler StdHandlerFunc[T]) gin.HandlerFunc {
 	}
 }
 
+// that's say, http.StatusOk shouldn't be used as a error. You should use nil instead.
+type HttpStatErr int
+
+func (r HttpStatErr) Error() string {
+	return fmt.Sprint("http status code: ", int(r))
+}
+
+type ValFailedErr string
+
+func (r ValFailedErr) Error() string {
+	return fmt.Sprint("validation failed: ", string(r))
+}
+
 func init() {
 	// check whether the user_group belongs to admin
-	defaultValidator.RegisterValidation("admin", func(fl validator.FieldLevel) bool {
-		if !fl.Field().CanInt() {
-			return false
+	defaultValidator.RegisterValidation("admin", func(fv FieldValue) error {
+		if !fv.Value.CanInt() {
+			return HttpStatErr(http.StatusBadRequest)
 		}
-		if !libs.IsAdmin(int(fl.Field().Int())) {
-			return false
+		if !libs.IsAdmin(int(fv.Value.Int())) {
+			return HttpStatErr(http.StatusForbidden)
 		}
-		return true
+		return nil // ok
 	})
 	// check whether the problem id exist in database
-	defaultValidator.RegisterValidation("probid", func(fl validator.FieldLevel) bool {
-		if !fl.Field().CanInt() {
-			return false
+	defaultValidator.RegisterValidation("probid", func(fv FieldValue) error {
+		if !fv.Value.CanInt() {
+			return HttpStatErr(http.StatusBadRequest)
 		}
-		if !internal.PRExists(int(fl.Field().Int())) {
-			return false
+		if !internal.PRExists(int(fv.Value.Int())) {
+			return HttpStatErr(http.StatusNotFound)
 		}
-		return true
+		return nil
 	})
-	defaultValidator.RegisterValidation("ctstid", func(fl validator.FieldLevel) bool {
-		if !fl.Field().CanInt() {
-			return false
+	defaultValidator.RegisterValidation("ctstid", func(fv FieldValue) error {
+		if !fv.Value.CanInt() {
+			return HttpStatErr(http.StatusBadRequest)
 		}
-		if !internal.CTExists(int(fl.Field().Int())) {
-			return false
+		if !internal.CTExists(int(fv.Value.Int())) {
+			return HttpStatErr(http.StatusNotFound)
 		}
-		return true
+		return nil
 	})
-	defaultValidator.RegisterValidation("prmsid", func(fl validator.FieldLevel) bool {
-		if !fl.Field().CanInt() {
-			return false
+	defaultValidator.RegisterValidation("prmsid", func(fv FieldValue) error {
+		if !fv.Value.CanInt() {
+			return HttpStatErr(http.StatusBadRequest)
 		}
-		if !internal.PMExists(int(fl.Field().Int())) {
-			return false
+		if !internal.PMExists(int(fv.Value.Int())) {
+			return HttpStatErr(http.StatusNotFound)
 		}
-		return true
+		return nil
 	})
-	defaultValidator.RegisterValidation("userid", func(fl validator.FieldLevel) bool {
-		if !fl.Field().CanInt() {
-			return false
+	defaultValidator.RegisterValidation("userid", func(fv FieldValue) error {
+		if !fv.Value.CanInt() {
+			return HttpStatErr(http.StatusBadRequest)
 		}
-		if !internal.USExists(int(fl.Field().Int())) {
-			return false
+		if !internal.USExists(int(fv.Value.Int())) {
+			return HttpStatErr(http.StatusNotFound)
 		}
-		return true
+		return nil
 	})
-	defaultValidator.RegisterValidation("blogid", func(fl validator.FieldLevel) bool {
-		if !fl.Field().CanInt() {
-			return false
+	defaultValidator.RegisterValidation("blogid", func(fv FieldValue) error {
+		if !fv.Value.CanInt() {
+			return HttpStatErr(http.StatusBadRequest)
 		}
-		if !internal.BLExists(int(fl.Field().Int())) {
-			return false
+		if !internal.BLExists(int(fv.Value.Int())) {
+			return HttpStatErr(http.StatusNotFound)
 		}
-		return true
+		return nil
 	})
 }
