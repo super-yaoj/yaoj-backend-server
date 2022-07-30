@@ -2,6 +2,7 @@ package services
 
 import (
 	"fmt"
+	"net/http"
 	"yao/internal"
 	"yao/libs"
 )
@@ -40,14 +41,14 @@ type BlogCreateParam struct {
 
 func BlogCreate(ctx Context, param BlogCreateParam) {
 	if !internal.BLValidTitle(param.Title) {
-		ctx.JSONAPI(400, "invalid title", nil)
+		ctx.JSONAPI(http.StatusBadRequest, "invalid title", nil)
 		return
 	}
 	id, err := internal.BLCreate(param.UserID, param.Private, param.Title, param.Content)
 	if err != nil {
 		ctx.ErrorAPI(err)
 	} else {
-		ctx.JSONAPI(200, "", map[string]any{"id": id})
+		ctx.JSONAPI(http.StatusOK, "", map[string]any{"id": id})
 	}
 }
 
@@ -61,11 +62,11 @@ type BlogEditParam struct {
 
 func BlogEdit(ctx Context, param BlogEditParam) {
 	if !BLCanEdit(param.Auth, param.BlogID) {
-		ctx.JSONAPI(403, "", nil)
+		ctx.JSONAPI(http.StatusForbidden, "", nil)
 		return
 	}
 	if !internal.BLValidTitle(param.Title) {
-		ctx.JSONAPI(400, "invalid title", nil)
+		ctx.JSONAPI(http.StatusBadRequest, "invalid title", nil)
 		return
 	}
 	err := internal.BLEdit(param.BlogID, param.Private, param.Title, param.Content)
@@ -81,7 +82,7 @@ type BlogDelParam struct {
 
 func BlogDel(ctx Context, param BlogDelParam) {
 	if !BLCanEdit(param.Auth, param.BlogID) {
-		ctx.JSONAPI(403, "", nil)
+		ctx.JSONAPI(http.StatusForbidden, "", nil)
 		return
 	}
 	err := internal.BLDelete(param.BlogID)
@@ -97,7 +98,7 @@ type BlogGetParam struct {
 
 func BlogGet(ctx Context, param BlogGetParam) {
 	if !BLCanSee(param.Auth, param.BlogID) {
-		ctx.JSONAPI(403, "", nil)
+		ctx.JSONAPI(http.StatusForbidden, "", nil)
 		return
 	}
 	blog, err := internal.BLQuery(param.BlogID, param.UserID)
@@ -105,7 +106,7 @@ func BlogGet(ctx Context, param BlogGetParam) {
 		ctx.ErrorAPI(err)
 	} else {
 		ret, _ := libs.Struct2Map(blog)
-		ctx.JSONAPI(200, "", ret)
+		ctx.JSONAPI(http.StatusOK, "", ret)
 	}
 }
 
@@ -123,11 +124,11 @@ func BlogList(ctx Context, param BlogListParam) {
 		if err != nil {
 			ctx.ErrorAPI(err)
 		} else {
-			ctx.JSONAPI(200, "", map[string]any{"data": blogs})
+			ctx.JSONAPI(http.StatusOK, "", map[string]any{"data": blogs})
 		}
 	} else {
 		if param.PageSize == nil || *param.PageSize > 100 || *param.PageSize < 1 {
-			ctx.JSONAPI(400, fmt.Sprintf("invalid request: parameter pagesize should be in [%d, %d]", 1, 100), nil)
+			ctx.JSONAPI(http.StatusBadRequest, fmt.Sprintf("invalid request: parameter pagesize should be in [%d, %d]", 1, 100), nil)
 			return
 		}
 		var bound int
@@ -145,6 +146,6 @@ func BlogList(ctx Context, param BlogListParam) {
 			ctx.ErrorAPI(err)
 			return
 		}
-		ctx.JSONAPI(200, "", map[string]any{"isfull": isfull, "data": blogs})
+		ctx.JSONAPI(http.StatusOK, "", map[string]any{"isfull": isfull, "data": blogs})
 	}
 }

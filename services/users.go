@@ -2,6 +2,7 @@ package services
 
 import (
 	"fmt"
+	"net/http"
 	"strconv"
 	"time"
 	"yao/internal"
@@ -31,11 +32,11 @@ type UserSignUpParam struct {
 
 func UserSignUp(ctx Context, param UserSignUpParam) {
 	if err := validSign(param.UserName, param.Passwd); err != nil {
-		ctx.JSONRPC(400, -32600, err.Error(), nil)
+		ctx.JSONRPC(http.StatusBadRequest, -32600, err.Error(), nil)
 		return
 	}
 	if !VerifyCaptcha(param.VerifyID, param.VerifyCode) {
-		ctx.JSONAPI(400, "verify code is wrong", nil)
+		ctx.JSONAPI(http.StatusBadRequest, "verify code is wrong", nil)
 		return
 	}
 	password := internal.SaltPassword(param.Passwd)
@@ -48,7 +49,7 @@ func UserSignUp(ctx Context, param UserSignUpParam) {
 		param.UserName, password, time.Now(), remember_token, libs.USNormal,
 	)
 	if err != nil {
-		ctx.JSONAPI(400, "username has been used by others", nil)
+		ctx.JSONAPI(http.StatusBadRequest, "username has been used by others", nil)
 		return
 	}
 	sess := sessions.Default(ctx.Context)
@@ -62,7 +63,7 @@ func UserSignUp(ctx Context, param UserSignUpParam) {
 		libs.SetCookie(ctx.Context, "user_id", fmt.Sprint(user_id), true)
 		libs.SetCookie(ctx.Context, "remember_token", remember_token, true)
 	}
-	ctx.JSONAPI(200, "", nil)
+	ctx.JSONAPI(http.StatusOK, "", nil)
 }
 
 type UserLoginParam struct {
@@ -73,7 +74,7 @@ type UserLoginParam struct {
 
 func UserLogin(ctx Context, param UserLoginParam) {
 	if err := validSign(param.UserName, param.Passwd); err != nil {
-		ctx.JSONRPC(400, -32600, err.Error(), nil)
+		ctx.JSONRPC(http.StatusBadRequest, -32600, err.Error(), nil)
 		return
 	}
 	password := internal.SaltPassword(param.Passwd)
@@ -83,11 +84,11 @@ func UserLogin(ctx Context, param UserLoginParam) {
 		param.UserName, password,
 	)
 	if err != nil {
-		ctx.JSONRPC(400, -32600, "username or password is wrong", nil)
+		ctx.JSONRPC(http.StatusBadRequest, -32600, "username or password is wrong", nil)
 		return
 	}
 	if user.Usergroup == libs.USBanned {
-		ctx.JSONRPC(400, -32600, "user is banned", nil)
+		ctx.JSONRPC(http.StatusBadRequest, -32600, "user is banned", nil)
 		return
 	}
 	sess := sessions.Default(ctx.Context)
@@ -101,7 +102,7 @@ func UserLogin(ctx Context, param UserLoginParam) {
 		libs.SetCookie(ctx.Context, "remember_token", remember_token, true)
 		libs.DBUpdate("update user_info set remember_token=? where user_id=?", remember_token, user.Id)
 	}
-	ctx.JSONRPC(200, 0, "", nil)
+	ctx.JSONRPC(http.StatusOK, 0, "", nil)
 }
 
 type UserLogoutParam struct {
@@ -115,7 +116,7 @@ func UserLogout(ctx Context, param UserLogoutParam) {
 	sess.Delete("user_name")
 	sess.Delete("user_group")
 	sess.Save()
-	ctx.JSONRPC(200, 0, "", nil)
+	ctx.JSONRPC(http.StatusOK, 0, "", nil)
 }
 
 type UserInitParam struct {
@@ -127,10 +128,10 @@ func UserInit(ctx Context, param UserInitParam) {
 		fmt.Println(user)
 		if user.Usergroup == libs.USBanned {
 			UserLogout(ctx, UserLogoutParam{})
-			ctx.JSONRPC(400, -32600, "user is banned", nil)
+			ctx.JSONRPC(http.StatusBadRequest, -32600, "user is banned", nil)
 			return
 		}
-		ctx.JSONRPC(200, 0, "", gin.H{
+		ctx.JSONRPC(http.StatusOK, 0, "", gin.H{
 			"user_id":     user.Id,
 			"user_name":   user.Name,
 			"user_group":  user.Usergroup,
@@ -172,7 +173,7 @@ type UserGetParam struct {
 func UserGet(ctx Context, param UserGetParam) {
 	user, err := internal.USQuery(param.UserID)
 	if err != nil {
-		ctx.JSONAPI(400, "no such user id", nil)
+		ctx.JSONAPI(http.StatusBadRequest, "no such user id", nil)
 		return
 	}
 	user.Password, user.RememberToken = "", ""
@@ -180,7 +181,7 @@ func UserGet(ctx Context, param UserGetParam) {
 	if err != nil {
 		ctx.ErrorAPI(err)
 	} else {
-		ctx.JSONAPI(200, "", data)
+		ctx.JSONAPI(http.StatusOK, "", data)
 	}
 }
 
@@ -197,7 +198,7 @@ type UserEditParam struct {
 
 func UserEdit(ctx Context, param UserEditParam) {
 	if param.UserID != param.CurUserID {
-		ctx.JSONAPI(403, "", nil)
+		ctx.JSONAPI(http.StatusForbidden, "", nil)
 		return
 	}
 	password := param.Passwd
@@ -207,7 +208,7 @@ func UserEdit(ctx Context, param UserEditParam) {
 		return
 	}
 	if !ok {
-		ctx.JSONAPI(400, "wrong password", nil)
+		ctx.JSONAPI(http.StatusBadRequest, "wrong password", nil)
 		return
 	}
 	new_password := param.NewPasswd
@@ -231,22 +232,22 @@ type UserGrpEditParam struct {
 
 func UserGrpEdit(ctx Context, param UserGrpEditParam) {
 	if param.CurGrp <= param.UserGrp {
-		ctx.JSONAPI(403, "", nil)
+		ctx.JSONAPI(http.StatusForbidden, "", nil)
 		return
 	}
 	target, err := internal.UserQueryBase(param.UserID)
 	if err != nil {
-		ctx.JSONAPI(400, "no such user id", nil)
+		ctx.JSONAPI(http.StatusBadRequest, "no such user id", nil)
 		return
 	} else if target.Usergroup >= param.CurGrp {
-		ctx.JSONAPI(403, "", nil)
+		ctx.JSONAPI(http.StatusForbidden, "", nil)
 		return
 	}
 	err = internal.USGroupEdit(param.UserID, param.UserGrp)
 	if err != nil {
 		ctx.ErrorAPI(err)
 	} else {
-		ctx.JSONAPI(200, "", nil)
+		ctx.JSONAPI(http.StatusOK, "", nil)
 	}
 }
 
@@ -268,7 +269,7 @@ func UserList(ctx Context, param UserListParam) {
 		if err != nil {
 			ctx.ErrorAPI(err)
 		} else {
-			ctx.JSONAPI(200, "", map[string]any{"data": users, "isfull": isfull})
+			ctx.JSONAPI(http.StatusOK, "", map[string]any{"data": users, "isfull": isfull})
 		}
 	} else {
 		var bound_user_id, bound_rating int
@@ -285,7 +286,7 @@ func UserList(ctx Context, param UserListParam) {
 		if err != nil {
 			ctx.ErrorAPI(err)
 		} else {
-			ctx.JSONAPI(200, "", map[string]any{"data": users, "isfull": isfull})
+			ctx.JSONAPI(http.StatusOK, "", map[string]any{"data": users, "isfull": isfull})
 		}
 	}
 }
@@ -305,6 +306,6 @@ func UserRating(ctx Context, param UserRatingParam) {
 	if err != nil {
 		ctx.ErrorAPI(err)
 	} else {
-		ctx.JSONAPI(200, "", map[string]any{"ratings": ratings})
+		ctx.JSONAPI(http.StatusOK, "", map[string]any{"ratings": ratings})
 	}
 }

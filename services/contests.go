@@ -1,6 +1,7 @@
 package services
 
 import (
+	"net/http"
 	"strings"
 	"time"
 	"yao/internal"
@@ -22,7 +23,7 @@ func CtstList(ctx Context, param CtstListParam) {
 	if err != nil {
 		ctx.ErrorAPI(err)
 	} else {
-		ctx.JSONAPI(200, "", map[string]any{"isfull": isfull, "data": contests})
+		ctx.JSONAPI(http.StatusOK, "", map[string]any{"isfull": isfull, "data": contests})
 	}
 }
 
@@ -35,10 +36,10 @@ func CtstGet(ctx Context, param CtstGetParam) {
 	contest, _ := internal.CTQuery(param.CtstID, param.UserID)
 	can_edit := param.CanEditCtst(param.CtstID)
 	if !param.CanEnterCtst(contest, param.CanEditCtst(contest.Id)) {
-		ctx.JSONAPI(403, "", nil)
+		ctx.JSONAPI(http.StatusForbidden, "", nil)
 		return
 	}
-	ctx.JSONAPI(200, "", map[string]any{"contest": contest, "can_edit": can_edit})
+	ctx.JSONAPI(http.StatusOK, "", map[string]any{"contest": contest, "can_edit": can_edit})
 }
 
 type CtstProbGetParam struct {
@@ -49,14 +50,14 @@ type CtstProbGetParam struct {
 func CtstProbGet(ctx Context, param CtstProbGetParam) {
 	contest, err := internal.CTQuery(param.CtstID, param.UserID)
 	if !param.CanEnterCtst(contest, param.CanEditCtst(contest.Id)) {
-		ctx.JSONAPI(403, "", nil)
+		ctx.JSONAPI(http.StatusForbidden, "", nil)
 		return
 	}
 	problems, err := internal.CTGetProblems(param.CtstID)
 	if err != nil {
 		ctx.ErrorAPI(err)
 	} else {
-		ctx.JSONAPI(200, "", map[string]any{"data": problems})
+		ctx.JSONAPI(http.StatusOK, "", map[string]any{"data": problems})
 	}
 }
 
@@ -68,7 +69,7 @@ type CtstProbAddParam struct {
 
 func CtstProbAdd(ctx Context, param CtstProbAddParam) {
 	if !param.CanEditCtst(param.CtstID) {
-		ctx.JSONAPI(403, "", nil)
+		ctx.JSONAPI(http.StatusForbidden, "", nil)
 		return
 	}
 	err := internal.CTAddProblem(param.CtstID, param.ProbID)
@@ -85,7 +86,7 @@ type CtstProbDelParam struct {
 
 func CtstProbDel(ctx Context, param CtstProbDelParam) {
 	if !param.CanEditCtst(param.CtstID) {
-		ctx.JSONAPI(403, "", nil)
+		ctx.JSONAPI(http.StatusForbidden, "", nil)
 		return
 	}
 	err := internal.CTDeleteProblem(param.CtstID, param.ProbID)
@@ -103,7 +104,7 @@ func CtstCreate(ctx Context, param CtstCreateParam) {
 	if err != nil {
 		ctx.ErrorAPI(err)
 	} else {
-		ctx.JSONAPI(200, "", map[string]any{"id": id})
+		ctx.JSONAPI(http.StatusOK, "", map[string]any{"id": id})
 	}
 }
 
@@ -122,13 +123,13 @@ type CtstEditParam struct {
 func CtstEdit(ctx Context, param CtstEditParam) {
 	ctst, err := internal.CTQuery(param.CtstID, -1)
 	if !param.CanEditCtst(param.CtstID) {
-		ctx.JSONAPI(403, "", nil)
+		ctx.JSONAPI(http.StatusForbidden, "", nil)
 		return
 	}
 	title := strings.TrimSpace(param.Title)
 	start, err := time.Parse("2006-01-02 15:04:05", param.StartTime)
 	if err != nil {
-		ctx.JSONAPI(400, "time format error", nil)
+		ctx.JSONAPI(http.StatusBadRequest, "time format error", nil)
 		return
 	}
 	if ctst.Finished {
@@ -150,14 +151,14 @@ type CtstPermGetParam struct {
 
 func CtstPermGet(ctx Context, param CtstPermGetParam) {
 	if !param.CanEditCtst(param.CtstID) {
-		ctx.JSONAPI(403, "", nil)
+		ctx.JSONAPI(http.StatusForbidden, "", nil)
 		return
 	}
 	perms, err := internal.CTGetPermissions(param.CtstID)
 	if err != nil {
 		ctx.ErrorAPI(err)
 	} else {
-		ctx.JSONAPI(200, "", map[string]any{"data": perms})
+		ctx.JSONAPI(http.StatusOK, "", map[string]any{"data": perms})
 	}
 }
 
@@ -168,14 +169,14 @@ type CtstMgrGetParam struct {
 
 func CtstMgrGet(ctx Context, param CtstMgrGetParam) {
 	if !param.CanEditCtst(param.CtstID) {
-		ctx.JSONAPI(403, "", nil)
+		ctx.JSONAPI(http.StatusForbidden, "", nil)
 		return
 	}
 	users, err := internal.CTGetManagers(param.CtstID)
 	if err != nil {
 		ctx.ErrorAPI(err)
 	} else {
-		ctx.JSONAPI(200, "", map[string]any{"data": users})
+		ctx.JSONAPI(http.StatusOK, "", map[string]any{"data": users})
 	}
 }
 
@@ -187,7 +188,7 @@ type CtstPermAddParam struct {
 
 func CtstPermAdd(ctx Context, param CtstPermAddParam) {
 	if !param.CanEditCtst(param.CtstID) {
-		ctx.JSONAPI(403, "", nil)
+		ctx.JSONAPI(http.StatusForbidden, "", nil)
 		return
 	}
 	err := internal.CTAddPermission(param.CtstID, param.PermID)
@@ -204,15 +205,15 @@ type CtstMgrAddParam struct {
 
 func CtstMgrAdd(ctx Context, param CtstMgrAddParam) {
 	if !param.CanEditCtst(param.CtstID) {
-		ctx.JSONAPI(403, "", nil)
+		ctx.JSONAPI(http.StatusForbidden, "", nil)
 		return
 	}
 	if !internal.USExists(param.MgrUserID) {
-		ctx.JSONAPI(400, "no such user id", nil)
+		ctx.JSONAPI(http.StatusBadRequest, "no such user id", nil)
 		return
 	}
 	if internal.CTRegistered(param.CtstID, param.MgrUserID) {
-		ctx.JSONAPI(400, "user has registered this contest", nil)
+		ctx.JSONAPI(http.StatusBadRequest, "user has registered this contest", nil)
 		return
 	}
 	err := internal.CTAddPermission(param.CtstID, -param.MgrUserID)
@@ -229,7 +230,7 @@ type CtstPermDelParam struct {
 
 func CtstPermDel(ctx Context, param CtstPermDelParam) {
 	if !param.CanEditCtst(param.CtstID) {
-		ctx.JSONAPI(403, "", nil)
+		ctx.JSONAPI(http.StatusForbidden, "", nil)
 		return
 	}
 	err := internal.CTDeletePermission(param.CtstID, param.PermID)
@@ -246,7 +247,7 @@ type CtstMgrDelParam struct {
 
 func CtstMgrDel(ctx Context, param CtstMgrDelParam) {
 	if !param.CanEditCtst(param.CtstID) {
-		ctx.JSONAPI(403, "", nil)
+		ctx.JSONAPI(http.StatusForbidden, "", nil)
 		return
 	}
 	err := internal.CTDeletePermission(param.CtstID, -param.MgrUserID)
@@ -262,14 +263,14 @@ type CtstPtcpGetParam struct {
 
 func CtstPtcpGet(ctx Context, param CtstPtcpGetParam) {
 	if !param.CanSeeCtst(param.CtstID, param.CanEditCtst(param.CtstID)) {
-		ctx.JSONAPI(403, "", nil)
+		ctx.JSONAPI(http.StatusForbidden, "", nil)
 		return
 	}
 	parts, err := internal.CTGetParticipants(param.CtstID)
 	if err != nil {
 		ctx.ErrorAPI(err)
 	} else {
-		ctx.JSONAPI(200, "", map[string]any{"data": parts})
+		ctx.JSONAPI(http.StatusOK, "", map[string]any{"data": parts})
 	}
 }
 
@@ -281,7 +282,7 @@ type CtstSignupParam struct {
 func CtstSignup(ctx Context, param CtstSignupParam) {
 	contest, err := internal.CTQuery(param.CtstID, param.UserID)
 	if !param.CanTakeCtst(contest, param.CanEditCtst(param.CtstID)) {
-		ctx.JSONAPI(403, "", nil)
+		ctx.JSONAPI(http.StatusForbidden, "", nil)
 		return
 	}
 	err = internal.CTAddParticipant(param.CtstID, param.UserID)
@@ -311,7 +312,7 @@ func CtstStanding(ctx Context, param CtstStandingParam) {
 	ctst, err := internal.CTQuery(param.CtstID, -1)
 	can_edit := param.CanEditCtst(param.CtstID)
 	if !param.CanEnterCtst(ctst, param.CanEditCtst(param.CtstID)) {
-		ctx.JSONAPI(403, "", nil)
+		ctx.JSONAPI(http.StatusForbidden, "", nil)
 		return
 	}
 	raw_standing := internal.CTSGet(param.CtstID)
@@ -339,7 +340,7 @@ func CtstStanding(ctx Context, param CtstStandingParam) {
 	if err != nil {
 		ctx.ErrorAPI(err)
 	} else {
-		ctx.JSONAPI(200, "", map[string]any{"standing": standing, "problems": problems})
+		ctx.JSONAPI(http.StatusOK, "", map[string]any{"standing": standing, "problems": problems})
 	}
 }
 
@@ -351,26 +352,46 @@ type CtstFinishParam struct {
 func CtstFinish(ctx Context, param CtstFinishParam) {
 	ctst, err := internal.CTQuery(param.CtstID, -1)
 	if !param.CanEditCtst(param.CtstID) {
-		ctx.JSONRPC(403, -32600, "", nil)
+		ctx.JSONRPC(http.StatusForbidden, -32600, "", nil)
 		return
 	}
 	if ctst.Finished {
-		ctx.JSONRPC(400, -32600, "Contest is already finished.", nil)
+		ctx.JSONRPC(http.StatusBadRequest, -32600, "Contest is already finished.", nil)
 		return
 	}
 	if ctst.EndTime.After(time.Now()) {
-		ctx.JSONRPC(400, -32600, "Contest hasn't finished.", nil)
+		ctx.JSONRPC(http.StatusBadRequest, -32600, "Contest hasn't finished.", nil)
 		return
 	}
 	count, _ := libs.DBSelectSingleInt("select count(*) from submissions where contest_id=? and status>=0 and status<? limit 1", param.CtstID, internal.Finished)
 	if count > 0 {
-		ctx.JSONRPC(400, -32600, "There are still some contest submissions judging, please wait.", nil)
+		ctx.JSONRPC(http.StatusBadRequest, -32600, "There are still some contest submissions judging, please wait.", nil)
 		return
 	}
 	err = internal.CTFinish(param.CtstID)
 	if err != nil {
 		ctx.ErrorRPC(err)
 	} else {
-		ctx.JSONRPC(200, 0, "", nil)
+		ctx.JSONRPC(http.StatusOK, 0, "", nil)
+	}
+}
+
+type CtstGetDashboardParam struct {
+	ContestId int `query:"contest_id" validate:"required, ctstid"`
+}
+
+func CtstGetDashboard(ctx Context, param CtstGetDashboardParam) {
+	ctx.JSONAPI(http.StatusOK, "", map[string]any{ "data": internal.CTDashboard(param.ContestId)})
+}
+
+type CtstAddDashboardParam struct {
+	ContestId int    `body:"contest_id" validate:"required, ctstid"`
+	Dashboard string `query:"contest_id" validate:"required, lte=1, gte=200"`
+}
+
+func CtstAddDashboard(ctx Context, param CtstAddDashboardParam) {
+	err := internal.CTAddDashboard(param.ContestId, param.Dashboard)
+	if err != nil {
+		ctx.ErrorAPI(err)
 	}
 }

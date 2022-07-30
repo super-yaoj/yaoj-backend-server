@@ -1,6 +1,7 @@
 package services
 
 import (
+	"net/http"
 	"yao/internal"
 	"yao/libs"
 )
@@ -12,7 +13,7 @@ type BlogCmntCreateParam struct {
 
 func BlogCmntCreate(ctx Context, param BlogCmntCreateParam) {
 	if !BLCanSee(param.Auth, param.BlogID) {
-		ctx.JSONAPI(403, "", nil)
+		ctx.JSONAPI(http.StatusForbidden, "", nil)
 		return
 	}
 	content := ctx.PostForm("content")
@@ -20,7 +21,7 @@ func BlogCmntCreate(ctx Context, param BlogCmntCreateParam) {
 	if err != nil {
 		ctx.ErrorAPI(err)
 	} else {
-		ctx.JSONAPI(200, "", map[string]any{"id": id})
+		ctx.JSONAPI(http.StatusOK, "", map[string]any{"id": id})
 	}
 }
 
@@ -31,14 +32,14 @@ type BlogCmntGetParam struct {
 
 func BlogCmntGet(ctx Context, param BlogCmntGetParam) {
 	if !BLCanSee(param.Auth, param.BlogID) {
-		ctx.JSONAPI(403, "", nil)
+		ctx.JSONAPI(http.StatusForbidden, "", nil)
 		return
 	}
 	comments, err := internal.BLGetComments(param.BlogID, param.UserID)
 	if err != nil {
 		ctx.ErrorAPI(err)
 	} else {
-		ctx.JSONAPI(200, "", map[string]any{"data": comments})
+		ctx.JSONAPI(http.StatusOK, "", map[string]any{"data": comments})
 	}
 }
 
@@ -51,7 +52,7 @@ func BlogCmntDel(ctx Context, param BlogCmntDelParam) {
 	var comment internal.Comment
 	libs.DBSelectSingle(&comment, "select author, blog_id from blog_comments where comment_id=?", param.CmntID)
 	if !param.IsAdmin() && comment.Author != param.UserID {
-		ctx.JSONAPI(403, "", nil)
+		ctx.JSONAPI(http.StatusForbidden, "", nil)
 	} else {
 		err := internal.BLDeleteComment(param.CmntID, comment.BlogId)
 		if err != nil {

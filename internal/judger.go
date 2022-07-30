@@ -235,14 +235,14 @@ func FinishJudging(ctx *gin.Context) {
 func JudgerLog(ctx *gin.Context) {
 	id := libs.GetIntDefault(ctx, "id", 0)
 	if id >= len(judgers) {
-		libs.APIWriteBack(ctx, 400, "no such judger", nil)
+		libs.APIWriteBack(ctx, http.StatusBadRequest, "no such judger", nil)
 		return
 	}
 	res, err := http.Get(judgers[id].url + "/log")
 	if err != nil {
-		libs.APIWriteBack(ctx, 400, err.Error(), nil)
+		libs.APIWriteBack(ctx, http.StatusBadRequest, err.Error(), nil)
 		return
 	}
 	body, _ := ioutil.ReadAll(res.Body)
-	libs.APIWriteBack(ctx, 200, "", map[string]any{"log": string(body)})
+	libs.APIWriteBack(ctx, http.StatusOK, "", map[string]any{"log": string(body)})
 }

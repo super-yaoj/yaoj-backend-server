@@ -235,3 +235,24 @@ func CTHasFinished(contest_id int) bool {
 	}
 	return finished > 0
 }
+
+type ContestDashboard struct {
+	ContestId  int       `db:"contest_id" json:"contest_id"`
+	Dashboard  string    `db:"dashboard" json:"dashboard"`
+	Time       time.Time `db:"time" json:"time"`
+}
+
+func CTDashboard(contest_id int) []ContestDashboard {
+	var ret []ContestDashboard
+	err := libs.DBSelectAll(&ret, "select * from contest_dashboard where contest_id=?", contest_id)
+	if err != nil {
+		fmt.Println(err)
+		return nil
+	}
+	return ret
+}
+
+func CTAddDashboard(contest_id int, dashboard string) error {
+	_, err := libs.DBUpdate("insert into contest_dashboard values (?, ?, ?)", contest_id, dashboard, time.Now())
+	return err
+}

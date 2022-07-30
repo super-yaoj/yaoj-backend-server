@@ -1,6 +1,7 @@
 package services
 
 import (
+	"net/http"
 	"yao/internal"
 )
 
@@ -23,7 +24,7 @@ type AnceGetParam struct {
 }
 
 func AnceGet(ctx Context, param AnceGetParam) {
-	ctx.JSONAPI(200, "", map[string]any{"data": internal.ANQuery(param.UserID)})
+	ctx.JSONAPI(http.StatusOK, "", map[string]any{"data": internal.ANQuery(param.UserID)})
 }
 
 type AnceDelParam struct {

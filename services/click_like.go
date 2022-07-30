@@ -1,6 +1,7 @@
 package services
 
 import (
+	"net/http"
 	"yao/internal"
 )
 
@@ -15,30 +16,30 @@ func ClickLike(ctx Context, param ClickLikeParam) {
 	switch param.Target {
 	case "blog":
 		if !internal.BLExists(param.BlogID) {
-			ctx.JSONAPI(404, "", nil)
+			ctx.JSONAPI(http.StatusNotFound, "", nil)
 			return
 		}
 		err = internal.ClickLike(internal.BLOG, param.BlogID, param.UserID)
 	case "comment":
 		if !internal.BLCommentExists(param.BlogID) {
-			ctx.JSONAPI(404, "", nil)
+			ctx.JSONAPI(http.StatusNotFound, "", nil)
 			return
 		}
 		err = internal.ClickLike(internal.COMMENT, param.BlogID, param.UserID)
 	case "problem":
 		if !internal.PRExists(param.BlogID) {
-			ctx.JSONAPI(404, "", nil)
+			ctx.JSONAPI(http.StatusNotFound, "", nil)
 			return
 		}
 		err = internal.ClickLike(internal.PROBLEM, param.BlogID, param.UserID)
 	case "contest":
 		if !internal.CTExists(param.BlogID) {
-			ctx.JSONAPI(404, "", nil)
+			ctx.JSONAPI(http.StatusNotFound, "", nil)
 			return
 		}
 		err = internal.ClickLike(internal.CONTEST, param.BlogID, param.UserID)
 	default:
-		ctx.JSONAPI(400, "invalid request", nil)
+		ctx.JSONAPI(http.StatusBadRequest, "invalid request", nil)
 		return
 	}
 	if err != nil {

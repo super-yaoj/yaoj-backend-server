@@ -2,6 +2,7 @@ package services
 
 import (
 	"bytes"
+	"net/http"
 
 	"github.com/dchest/captcha"
 )
@@ -17,11 +18,11 @@ func CaptchaPost(ctx Context, param CaptchaPostParam) {
 	}
 	// len, err := strconv.Atoi(ctx.DefaultPostForm("length", "4"))
 	if param.Length < 1 || param.Length > 10 {
-		ctx.JSONAPI(400, "invalid request", nil)
+		ctx.JSONAPI(http.StatusBadRequest, "invalid request", nil)
 		return
 	}
 	id := captcha.NewLen(param.Length)
-	ctx.JSONAPI(200, "", map[string]any{"id": id})
+	ctx.JSONAPI(http.StatusOK, "", map[string]any{"id": id})
 }
 
 type CaptchaGetParam struct {
@@ -42,10 +43,10 @@ func CaptchaGet(ctx Context, param CaptchaGetParam) {
 	var content bytes.Buffer
 	err := captcha.WriteImage(&content, param.ID, param.Width, param.Height)
 	if err != nil {
-		ctx.JSONAPI(400, err.Error(), nil)
+		ctx.JSONAPI(http.StatusBadRequest, err.Error(), nil)
 		return
 	}
-	ctx.Data(200, "image/png", content.Bytes())
+	ctx.Data(http.StatusOK, "image/png", content.Bytes())
 }
 
 type CaptchaReloadParam struct {
@@ -54,9 +55,9 @@ type CaptchaReloadParam struct {
 
 func CaptchaReload(ctx Context, param CaptchaReloadParam) {
 	if captcha.Reload(param.ID) {
-		ctx.JSONAPI(200, "", nil)
+		ctx.JSONAPI(http.StatusOK, "", nil)
 	} else {
-		ctx.JSONAPI(400, "id doesn't exist", nil)
+		ctx.JSONAPI(http.StatusBadRequest, "id doesn't exist", nil)
 	}
 }
 

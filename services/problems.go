@@ -72,7 +72,7 @@ func ProbGet(ctx Context, param ProbGetParam) {
 			if !can_edit {
 				ret_prob.DataInfo = problem.DataInfo{}
 			}
-			ctx.JSONAPI(200, "", map[string]any{"problem": ret_prob, "can_edit": can_edit, "in_contest": ctstid})
+			ctx.JSONAPI(http.StatusOK, "", map[string]any{"problem": ret_prob, "can_edit": can_edit, "in_contest": ctstid})
 		}).Else(func(ctstid int) {
 			ctx.JSONAPI(http.StatusForbidden, "", nil)
 		})
@@ -86,14 +86,14 @@ type ProbGetPermParam struct {
 
 func ProbGetPerm(ctx Context, param ProbGetPermParam) {
 	if !param.Auth.CanEditProb(param.ProbID) {
-		ctx.JSONAPI(403, "", nil)
+		ctx.JSONAPI(http.StatusForbidden, "", nil)
 		return
 	}
 	pers, err := internal.PRGetPermissions(param.ProbID)
 	if err != nil {
 		ctx.ErrorAPI(err)
 	} else {
-		ctx.JSONAPI(200, "", map[string]any{"data": pers})
+		ctx.JSONAPI(http.StatusOK, "", map[string]any{"data": pers})
 	}
 }
 
@@ -105,11 +105,11 @@ type ProbAddPermParam struct {
 
 func ProbAddPerm(ctx Context, param ProbAddPermParam) {
 	if !param.Auth.CanEditProb(param.ProbID) {
-		ctx.JSONAPI(403, "", nil)
+		ctx.JSONAPI(http.StatusForbidden, "", nil)
 		return
 	}
 	if !internal.PMExists(param.PermID) {
-		ctx.JSONAPI(400, "no such permission id", nil)
+		ctx.JSONAPI(http.StatusBadRequest, "no such permission id", nil)
 		return
 	}
 	err := internal.PRAddPermission(param.ProbID, param.PermID)
@@ -126,7 +126,7 @@ type ProbDelPermParam struct {
 
 func ProbDelPerm(ctx Context, param ProbDelPermParam) {
 	if !param.Auth.CanEditProb(param.ProbID) {
-		ctx.JSONAPI(403, "", nil)
+		ctx.JSONAPI(http.StatusForbidden, "", nil)
 		return
 	}
 	err := internal.PRDeletePermission(param.ProbID, param.PermID)
@@ -142,14 +142,14 @@ type ProbGetMgrParam struct {
 
 func ProbGetMgr(ctx Context, param ProbGetMgrParam) {
 	if !param.Auth.CanEditProb(param.ProbID) {
-		ctx.JSONAPI(403, "", nil)
+		ctx.JSONAPI(http.StatusForbidden, "", nil)
 		return
 	}
 	users, err := internal.PRGetManagers(param.ProbID)
 	if err != nil {
 		ctx.ErrorAPI(err)
 	} else {
-		ctx.JSONAPI(200, "", map[string]any{"data": users})
+		ctx.JSONAPI(http.StatusOK, "", map[string]any{"data": users})
 	}
 }
 
@@ -161,11 +161,11 @@ type ProbAddMgrParam struct {
 
 func ProbAddMgr(ctx Context, param ProbAddMgrParam) {
 	if !param.Auth.CanEditProb(param.ProbID) {
-		ctx.JSONAPI(403, "", nil)
+		ctx.JSONAPI(http.StatusForbidden, "", nil)
 		return
 	}
 	if !internal.USExists(param.MgrUserID) {
-		ctx.JSONAPI(400, "no such user id", nil)
+		ctx.JSONAPI(http.StatusBadRequest, "no such user id", nil)
 		return
 	}
 	err := internal.PRAddPermission(param.ProbID, -param.MgrUserID)
@@ -182,7 +182,7 @@ type ProbDelMgrParam struct {
 
 func ProbDelMgr(ctx Context, param ProbDelMgrParam) {
 	if !param.Auth.CanEditProb(param.ProbID) {
-		ctx.JSONAPI(403, "", nil)
+		ctx.JSONAPI(http.StatusForbidden, "", nil)
 		return
 	}
 	err := internal.PRDeletePermission(param.ProbID, -param.MgrUserID)
@@ -199,12 +199,12 @@ type ProbPutDataParam struct {
 
 func ProbPutData(ctx Context, param ProbPutDataParam) {
 	if !param.Auth.CanEditProb(param.ProbID) {
-		ctx.JSONAPI(403, "", nil)
+		ctx.JSONAPI(http.StatusForbidden, "", nil)
 		return
 	}
 	ext := path.Ext(param.Data.Filename)
 	if ext != ".zip" {
-		ctx.JSONAPI(400, "unsupported file extension "+ext, nil)
+		ctx.JSONAPI(http.StatusBadRequest, "unsupported file extension "+ext, nil)
 		return
 	}
 
@@ -218,7 +218,7 @@ func ProbPutData(ctx Context, param ProbPutDataParam) {
 	log.Printf("file uploaded saves at %s", path.Join(tmpdir, "1.zip"))
 	err = internal.PRPutData(param.ProbID, tmpdir)
 	if err != nil {
-		ctx.JSONAPI(400, err.Error(), nil)
+		ctx.JSONAPI(http.StatusBadRequest, err.Error(), nil)
 	}
 }
 
@@ -234,13 +234,13 @@ func ProbDownData(ctx Context, param ProbDownDataParam) {
 	defer internal.ProblemRWLock.RUnlock(param.ProbID)
 	if param.DataType == "data" {
 		if !param.Auth.CanEditProb(param.ProbID) {
-			ctx.JSONAPI(403, "", nil)
+			ctx.JSONAPI(http.StatusForbidden, "", nil)
 			return
 		}
 		path := internal.PRGetDataZip(param.ProbID)
 		_, err := os.Stat(path)
 		if err != nil {
-			ctx.JSONAPI(400, "no data", nil)
+			ctx.JSONAPI(http.StatusBadRequest, "no data", nil)
 		} else {
 			ctx.FileAttachment(path, fmt.Sprintf("problem_%d.zip", param.ProbID))
 		}
@@ -250,13 +250,13 @@ func ProbDownData(ctx Context, param ProbDownDataParam) {
 				path := internal.PRGetSampleZip(param.ProbID)
 				_, err := os.Stat(path)
 				if err != nil {
-					ctx.JSONAPI(400, "no data", nil)
+					ctx.JSONAPI(http.StatusBadRequest, "no data", nil)
 				} else {
 					ctx.FileAttachment(path, fmt.Sprintf("sample_%d.zip", param.ProbID))
 				}
 			}).
 			Else(func(a int) {
-				ctx.JSONAPI(403, "", nil)
+				ctx.JSONAPI(http.StatusForbidden, "", nil)
 			})
 	}
 }
@@ -272,11 +272,11 @@ type ProbEditParam struct {
 
 func ProbEdit(ctx Context, param ProbEditParam) {
 	if !param.Auth.CanEditProb(param.ProbID) {
-		ctx.JSONAPI(403, "", nil)
+		ctx.JSONAPI(http.StatusForbidden, "", nil)
 		return
 	}
 	if strings.TrimSpace(param.Title) == "" {
-		ctx.JSONAPI(400, "title cannot be blank", nil)
+		ctx.JSONAPI(http.StatusBadRequest, "title cannot be blank", nil)
 		return
 	}
 
@@ -295,7 +295,7 @@ func ProbEdit(ctx Context, param ProbEditParam) {
 	var allow_down string
 	err := libs.DBSelectSingleColumn(&allow_down, "select allow_down from problems where problem_id=?", param.ProbID)
 	if err != nil {
-		ctx.JSONAPI(404, "", nil)
+		ctx.JSONAPI(http.StatusNotFound, "", nil)
 		return
 	}
 	allow_down = fix(allow_down)
@@ -324,30 +324,30 @@ func ProbStatistic(ctx Context, param ProbStatisticParam) {
 	//Users can see statistics if and only if they are out of contest
 	param.TrySeeProb(param.ProbID).Then(func(ctstid int) {
 		if !param.CanBound() {
-			ctx.JSONAPI(400, "both left and right are null", nil)
+			ctx.JSONAPI(http.StatusBadRequest, "both left and right are null", nil)
 			return
 		}
 		subs, isfull := []int{}, false
 		if param.IsLeft() {
 			if param.LeftId == nil {
-				ctx.JSONAPI(400, "left_id is null", nil)
+				ctx.JSONAPI(http.StatusBadRequest, "left_id is null", nil)
 				return
 			}
 			subs, isfull = internal.PRSGetSubmissions(param.ProbID, *param.Left, *param.LeftId, param.PageSize, true, param.Mode)
 		} else {
 			if param.RightId == nil {
-				ctx.JSONAPI(400, "right_id is null", nil)
+				ctx.JSONAPI(http.StatusBadRequest, "right_id is null", nil)
 				return
 			}
 			subs, isfull = internal.PRSGetSubmissions(param.ProbID, *param.Right, *param.RightId, param.PageSize, false, param.Mode)
 		}
 		if subs == nil {
-			ctx.JSONAPI(400, "", nil)
+			ctx.JSONAPI(http.StatusBadRequest, "", nil)
 			return
 		}
 		ret := internal.SMListByIds(subs)
 		acnum, totnum := internal.PRSGetACRatio(param.ProbID)
-		ctx.JSONAPI(200, "", map[string]any{"data": ret, "isfull": isfull, "acnum": acnum, "totnum": totnum})
+		ctx.JSONAPI(http.StatusOK, "", map[string]any{"data": ret, "isfull": isfull, "acnum": acnum, "totnum": totnum})
 	}).Else(func(ctstid int) {
 		ctx.JSONAPI(http.StatusForbidden, "", nil)
 	})

@@ -2,6 +2,7 @@ package services
 
 import (
 	"fmt"
+	"net/http"
 	"sort"
 	"strconv"
 	"strings"
@@ -21,7 +22,7 @@ func PermCreate(ctx Context, param PermCreateParam) {
 	if err != nil {
 		ctx.ErrorAPI(err)
 	} else {
-		ctx.JSONAPI(200, "", gin.H{"permission_id": id})
+		ctx.JSONAPI(http.StatusOK, "", gin.H{"permission_id": id})
 	}
 }
 
@@ -45,7 +46,7 @@ type PermDelParam struct {
 
 func PermDel(ctx Context, param PermDelParam) {
 	if param.PermID == libs.DefaultGroup {
-		ctx.JSONAPI(400, "you cannot modify the default group", nil)
+		ctx.JSONAPI(http.StatusBadRequest, "you cannot modify the default group", nil)
 		return
 	}
 	_, err := internal.PMDelete(param.PermID)
@@ -67,7 +68,7 @@ func PermGet(ctx Context, param PermGetParam) {
 	if err != nil {
 		ctx.ErrorAPI(err)
 	} else {
-		ctx.JSONAPI(200, "", gin.H{"isfull": isfull, "data": p})
+		ctx.JSONAPI(http.StatusOK, "", gin.H{"isfull": isfull, "data": p})
 	}
 }
 
@@ -80,25 +81,25 @@ type PermGetUserParam struct {
 func PermGetUser(ctx Context, param PermGetUserParam) {
 	if param.PermID != nil {
 		if !param.IsAdmin() {
-			ctx.JSONAPI(403, "", nil)
+			ctx.JSONAPI(http.StatusForbidden, "", nil)
 			return
 		}
 		users, err := internal.PMQueryUser(*param.PermID)
 		if err != nil {
 			ctx.ErrorAPI(err)
 		} else {
-			ctx.JSONAPI(200, "", map[string]any{"data": users})
+			ctx.JSONAPI(http.StatusOK, "", map[string]any{"data": users})
 		}
 	} else {
 		if !param.IsAdmin() && *param.PermUserID != param.UserID {
-			ctx.JSONAPI(403, "", nil)
+			ctx.JSONAPI(http.StatusForbidden, "", nil)
 			return
 		}
 		permissions, err := internal.USQueryPermission(*param.PermUserID)
 		if err != nil {
 			ctx.ErrorAPI(err)
 		} else {
-			ctx.JSONAPI(200, "", map[string]any{"data": permissions})
+			ctx.JSONAPI(http.StatusOK, "", map[string]any{"data": permissions})
 		}
 	}
 }
@@ -112,15 +113,15 @@ type PermAddUserParam struct {
 func PermAddUser(ctx Context, param PermAddUserParam) {
 	user_ids := strings.Split(param.UserIDs, ",")
 	if len(user_ids) == 0 {
-		ctx.JSONAPI(400, "there's no user", nil)
+		ctx.JSONAPI(http.StatusBadRequest, "there's no user", nil)
 		return
 	}
 	if param.PermID == libs.DefaultGroup {
-		ctx.JSONAPI(400, "you cannot modify the default group", nil)
+		ctx.JSONAPI(http.StatusBadRequest, "you cannot modify the default group", nil)
 		return
 	}
 	if !internal.PMExists(param.PermID) {
-		ctx.JSONAPI(400, "invalid request: permission id is wrong", nil)
+		ctx.JSONAPI(http.StatusBadRequest, "invalid request: permission id is wrong", nil)
 		return
 	}
 
@@ -129,7 +130,7 @@ func PermAddUser(ctx Context, param PermAddUserParam) {
 	for i, j := range user_ids {
 		num_ids[i], err = strconv.Atoi(j)
 		if err != nil {
-			ctx.JSONAPI(400, "invalid request: meet user id \""+j+"\"", nil)
+			ctx.JSONAPI(http.StatusBadRequest, "invalid request: meet user id \""+j+"\"", nil)
 			return
 		}
 	}
@@ -146,14 +147,14 @@ func PermAddUser(ctx Context, param PermAddUserParam) {
 		}
 	}
 	if len(invalid_ids) != 0 {
-		ctx.JSONAPI(400, "invalid ids exist", gin.H{"invalid_ids": invalid_ids})
+		ctx.JSONAPI(http.StatusBadRequest, "invalid ids exist", gin.H{"invalid_ids": invalid_ids})
 		return
 	}
 	res, err := internal.PMAddUser(real_ids, param.PermID)
 	if err != nil {
 		ctx.ErrorAPI(err)
 	} else {
-		ctx.JSONAPI(200, "", gin.H{"affected": res})
+		ctx.JSONAPI(http.StatusOK, "", gin.H{"affected": res})
 	}
 }
 
@@ -165,7 +166,7 @@ type PermDelUserParam struct {
 
 func PermDelUser(ctx Context, param PermDelUserParam) {
 	if param.PermID == libs.DefaultGroup {
-		ctx.JSONAPI(400, "you cannot modify the default group", nil)
+		ctx.JSONAPI(http.StatusBadRequest, "you cannot modify the default group", nil)
 		return
 	}
 	_, err := internal.PMDeleteUser(param.PermID, param.UserID)

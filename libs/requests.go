@@ -2,6 +2,7 @@ package libs
 
 import (
 	"fmt"
+	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
@@ -45,7 +46,7 @@ func RPCInternalError(ctx *gin.Context, err error) {
 func GetInt(ctx *gin.Context, name string) (int, bool) {
 	ret, err := strconv.Atoi(ctx.Query(name))
 	if err != nil {
-		APIWriteBack(ctx, 400, "invalid request: parameter "+name+" should be int", nil)
+		APIWriteBack(ctx, http.StatusBadRequest, "invalid request: parameter "+name+" should be int", nil)
 		return 0, false
 	}
 	return ret, true
@@ -57,7 +58,7 @@ func GetIntRange(ctx *gin.Context, name string, l, r int) (int, bool) {
 		return 0, false
 	}
 	if ret > r || ret < l {
-		APIWriteBack(ctx, 400, fmt.Sprintf("invalid request: parameter %s should be in [%d, %d]", name, l, r), nil)
+		APIWriteBack(ctx, http.StatusBadRequest, fmt.Sprintf("invalid request: parameter %s should be in [%d, %d]", name, l, r), nil)
 		return 0, false
 	}
 	return ret, true
@@ -74,7 +75,7 @@ func GetIntDefault(ctx *gin.Context, name string, d int) int {
 func PostInt(ctx *gin.Context, name string) (int, bool) {
 	ret, err := strconv.Atoi(ctx.PostForm(name))
 	if err != nil {
-		APIWriteBack(ctx, 400, "invalid request: parameter "+name+" should be int", nil)
+		APIWriteBack(ctx, http.StatusBadRequest, "invalid request: parameter "+name+" should be int", nil)
 		return 0, false
 	}
 	return ret, true
@@ -86,7 +87,7 @@ func PostIntRange(ctx *gin.Context, name string, l, r int) (int, bool) {
 		return 0, false
 	}
 	if ret > r || ret < l {
-		APIWriteBack(ctx, 400, fmt.Sprintf("invalid request: parameter %s should be in [%d, %d]", name, l, r), nil)
+		APIWriteBack(ctx, http.StatusBadRequest, fmt.Sprintf("invalid request: parameter %s should be in [%d, %d]", name, l, r), nil)
 		return 0, false
 	}
 	return ret, true

@@ -42,7 +42,7 @@ func SubmList(ctx Context, param SubmListParam) {
 			internal.SMPretestOnly(&submissions[key])
 		}
 	}
-	ctx.JSONAPI(200, "", map[string]any{"data": submissions, "isfull": isfull})
+	ctx.JSONAPI(http.StatusOK, "", map[string]any{"data": submissions, "isfull": isfull})
 }
 
 type SubmAddParam struct {
@@ -62,7 +62,7 @@ func SubmAdd(ctx Context, param SubmAddParam) {
 	param.Auth.SetCtst(param.CtstID).TrySeeProb(param.ProbID).Then(func(ctstid int) {
 		pro := internal.PRLoad(param.ProbID)
 		if !internal.PRHasData(pro, "tests") {
-			ctx.JSONAPI(400, "problem has no data", nil)
+			ctx.JSONAPI(http.StatusBadRequest, "problem has no data", nil)
 			return
 		}
 		var sub problem.Submission
@@ -104,7 +104,7 @@ func parseZipFile(ctx Context, field string, config internal.SubmConfig) (proble
 		tot_size += int64(val.Length)
 	}
 	if header.Size > tot_size {
-		ctx.JSONAPI(400, "file too large", nil)
+		ctx.JSONAPI(http.StatusBadRequest, "file too large", nil)
 		return nil, nil, 0, 0
 	}
 
@@ -116,7 +116,7 @@ func parseZipFile(ctx Context, field string, config internal.SubmConfig) (proble
 	}
 	ret, err := libs.UnzipMemory(w.Bytes())
 	if err != nil {
-		ctx.JSONAPI(400, "invalid zip file: "+err.Error(), nil)
+		ctx.JSONAPI(http.StatusBadRequest, "invalid zip file: "+err.Error(), nil)
 		return nil, nil, 0, 0
 	}
 	length := 0
@@ -131,7 +131,7 @@ func parseZipFile(ctx Context, field string, config internal.SubmConfig) (proble
 			}
 		}
 		if matched == "" {
-			ctx.JSONAPI(400, "no field matches file name: "+name, nil)
+			ctx.JSONAPI(http.StatusBadRequest, "no field matches file name: "+name, nil)
 			return nil, nil, 0, 0
 		}
 		//TODO: get language by file suffix
@@ -165,7 +165,7 @@ func parseMultiFiles(ctx Context, config internal.SubmConfig) (problem.Submissio
 			//text
 			length += len(str)
 			if len(str) > int(val.Length) {
-				ctx.JSONAPI(400, "file "+key+" too large", nil)
+				ctx.JSONAPI(http.StatusBadRequest, "file "+key+" too large", nil)
 				return nil, nil, 0, 0
 			}
 			byt := []byte(str)
@@ -180,7 +180,7 @@ func parseMultiFiles(ctx Context, config internal.SubmConfig) (problem.Submissio
 			}
 			length += int(header.Size)
 			if header.Size > int64(val.Length) {
-				ctx.JSONAPI(400, "file "+key+" too large", nil)
+				ctx.JSONAPI(http.StatusBadRequest, "file "+key+" too large", nil)
 				return nil, nil, 0, 0
 			}
 			w := bytes.NewBuffer(nil)
@@ -229,14 +229,14 @@ type SubmGetParam struct {
 func SubmGet(ctx Context, param SubmGetParam) {
 	ret, err := internal.SMQuery(param.SubmID)
 	if err != nil {
-		ctx.JSONAPI(404, "", nil)
+		ctx.JSONAPI(http.StatusNotFound, "", nil)
 		return
 	}
 	//user cannot see submission details inside contests
 	by_problem := param.Auth.CanSeeProb(ret.ProblemId)
 	can_edit := SMCanEdit(param.Auth, ret.SubmissionBase)
 	if !can_edit && ret.Submitter != param.UserID && !by_problem {
-		ctx.JSONAPI(403, "", nil)
+		ctx.JSONAPI(http.StatusForbidden, "", nil)
 	} else {
 		if !can_edit && !by_problem {
 			if internal.CTPretestOnly(ret.ContestId) {
@@ -246,7 +246,7 @@ func SubmGet(ctx Context, param SubmGetParam) {
 				ret.Details.ExtraResult = internal.SMRemoveTestDetails(ret.Details.ExtraResult)
 			}
 		}
-		ctx.JSONAPI(200, "", map[string]any{"submission": ret, "can_edit": can_edit})
+		ctx.JSONAPI(http.StatusOK, "", map[string]any{"submission": ret, "can_edit": can_edit})
 	}
 }
 
@@ -272,7 +272,7 @@ func SubmCustom(ctx Context, param SubmCustomParam) {
 			"Title":  "Internal Error",
 		})
 	}
-	ctx.JSONAPI(200, "", map[string]any{"result": string(result)})
+	ctx.JSONAPI(http.StatusOK, "", map[string]any{"result": string(result)})
 }
 
 func SMCanEdit(auth Auth, sub internal.SubmissionBase) bool {
@@ -288,11 +288,11 @@ type SubmDelParam struct {
 func SubmDel(ctx Context, param SubmDelParam) {
 	sub, err := internal.SMGetBaseInfo(param.SubmID)
 	if err != nil {
-		ctx.JSONAPI(404, "", nil)
+		ctx.JSONAPI(http.StatusNotFound, "", nil)
 		return
 	}
 	if !SMCanEdit(param.Auth, sub) {
-		ctx.JSONAPI(403, "", nil)
+		ctx.JSONAPI(http.StatusForbidden, "", nil)
 		return
 	}
 	err = internal.SMDelete(sub)
@@ -310,7 +310,7 @@ type RejudgeParam struct {
 func Rejudge(ctx Context, param RejudgeParam) {
 	if param.ProbID != nil {
 		if !param.Auth.CanEditProb(*param.ProbID) {
-			ctx.JSONRPC(403, -32600, "", nil)
+			ctx.JSONRPC(http.StatusForbidden, -32600, "", nil)
 			return
 		}
 		err := internal.PRRejudge(*param.ProbID)
@@ -320,11 +320,11 @@ func Rejudge(ctx Context, param RejudgeParam) {
 	} else {
 		sub, err := internal.SMGetBaseInfo(param.SubmID)
 		if err != nil {
-			ctx.JSONRPC(404, -32600, "", nil)
+			ctx.JSONRPC(http.StatusNotFound, -32600, "", nil)
 			return
 		}
 		if !SMCanEdit(param.Auth, sub) {
-			ctx.JSONRPC(403, -32600, "", nil)
+			ctx.JSONRPC(http.StatusForbidden, -32600, "", nil)
 			return
 		}
 		err = internal.SMRejudge(param.SubmID)

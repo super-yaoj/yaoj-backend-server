@@ -1,6 +1,7 @@
 package services
 
 import (
+	"net/http"
 	"time"
 	"yao/service"
 
@@ -136,5 +137,5 @@ type GetTimeParam struct {
 }
 
 func GetTime(ctx Context, param GetTimeParam) {
-	ctx.JSONRPC(200, 0, "", map[string]any{"server_time": time.Now()})
+	ctx.JSONRPC(http.StatusOK, 0, "", map[string]any{"server_time": time.Now()})
 }
