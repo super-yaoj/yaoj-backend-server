@@ -3,6 +3,7 @@ package service
 import (
 	"fmt"
 	"log"
+	"net/mail"
 	"reflect"
 	"strconv"
 	"strings"
@@ -118,6 +119,16 @@ func NewValidator() validatorx {
 				return ValFailedErr("required non-false value")
 			}
 			fv.Value.IsNil()
+		}
+		return nil
+	})
+	val.RegisterValidation("email", func(fv FieldValue) error {
+		validEmail := func(email string) bool {
+			_, err := mail.ParseAddress(email)
+			return err == nil
+		}
+		if !validEmail(fv.Value.String()) {
+			return ValFailedErr("invalid email")
 		}
 		return nil
 	})
