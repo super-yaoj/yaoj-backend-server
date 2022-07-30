@@ -123,6 +123,10 @@ var Router map[string][]Request = map[string][]Request{
 	"/contest_standing": {
 		{"GET", service.GinHandler(CtstStanding)},
 	},
+	"/contest_dashboard": {
+		{"GET", service.GinHandler(CtstGetDashboard)},
+		{"POST", service.GinHandler(CtstAddDashboard)},
+	},
 
 	"/submissions": {{"GET", service.GinHandler(SubmList)}},
 	"/submission": {

@@ -2,7 +2,6 @@ package service
 
 import (
 	"fmt"
-	"log"
 	"reflect"
 	"strings"
 )
@@ -52,7 +51,7 @@ func (r FormBinder) Bind(value reflect.Value, field reflect.StructField) (isSet 
 		return false, nil
 	}
 	bindOpt, _ := field.Tag.Lookup("binding")
-	log.Printf("form bind %s %q %q", value.Type(), field.Name, bindOpt)
+	// log.Printf("form bind %s %q %q", value.Type(), field.Name, bindOpt)
 
 	if value.Kind() == reflect.Slice {
 		if !value.CanSet() {

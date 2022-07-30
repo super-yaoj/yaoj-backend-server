@@ -377,7 +377,7 @@ func CtstFinish(ctx Context, param CtstFinishParam) {
 }
 
 type CtstGetDashboardParam struct {
-	ContestId int `query:"contest_id" validate:"required, ctstid"`
+	ContestId int `query:"contest_id" validate:"required,ctstid"`
 }
 
 func CtstGetDashboard(ctx Context, param CtstGetDashboardParam) {
@@ -385,8 +385,8 @@ func CtstGetDashboard(ctx Context, param CtstGetDashboardParam) {
 }
 
 type CtstAddDashboardParam struct {
-	ContestId int    `body:"contest_id" validate:"required, ctstid"`
-	Dashboard string `query:"contest_id" validate:"required, lte=1, gte=200"`
+	ContestId int    `body:"contest_id" validate:"required,ctstid"`
+	Dashboard string `body:"dashboard" validate:"required,gte=1,lte=200"`
 }
 
 func CtstAddDashboard(ctx Context, param CtstAddDashboardParam) {

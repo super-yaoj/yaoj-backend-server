@@ -2,7 +2,6 @@ package service
 
 import (
 	"fmt"
-	"log"
 	"mime/multipart"
 	"reflect"
 	"strings"
@@ -35,7 +34,7 @@ func (r BodyBinder) BindPostForm(value reflect.Value, field reflect.StructField)
 
 	// special type: *multipart.FileHeader
 	if value.Type() == reflect.TypeOf((*multipart.FileHeader)(nil)) {
-		log.Printf("body bind file %s %q", value.Type(), field.Name)
+		// log.Printf("body bind file %s %q", value.Type(), field.Name)
 		if !hasName {
 			return false, nil
 		}
@@ -77,7 +76,7 @@ func (r BodyBinder) BindPostForm(value reflect.Value, field reflect.StructField)
 		}
 		return isSet, nil
 	} else {
-		log.Printf("body bind %s %q", value.Type(), field.Name)
+		// log.Printf("body bind %s %q", value.Type(), field.Name)
 
 		if !hasName {
 			return false, nil

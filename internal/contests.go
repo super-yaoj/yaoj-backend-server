@@ -237,6 +237,7 @@ func CTHasFinished(contest_id int) bool {
 }
 
 type ContestDashboard struct {
+	Id         int       `db:"id" json:"id"`
 	ContestId  int       `db:"contest_id" json:"contest_id"`
 	Dashboard  string    `db:"dashboard" json:"dashboard"`
 	Time       time.Time `db:"time" json:"time"`
@@ -253,6 +254,6 @@ func CTDashboard(contest_id int) []ContestDashboard {
 }
 
 func CTAddDashboard(contest_id int, dashboard string) error {
-	_, err := libs.DBUpdate("insert into contest_dashboard values (?, ?, ?)", contest_id, dashboard, time.Now())
+	_, err := libs.DBUpdate("insert into contest_dashboard values (?, ?, ?, null)", contest_id, dashboard, time.Now())
 	return err
 }

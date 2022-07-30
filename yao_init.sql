@@ -517,5 +517,7 @@ CREATE TABLE `contest_dashboard` (
   `contest_id` int(11) DEFAULT NULL,
   `dashboard` varchar(400) DEFAULT NULL,
   `time` datetime DEFAULT NULL,
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  PRIMARY KEY (`id`),
   KEY `contest_id` (`contest_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci

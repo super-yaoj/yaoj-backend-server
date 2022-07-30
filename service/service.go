@@ -9,7 +9,6 @@ import (
 	"yao/internal"
 
 	"github.com/gin-gonic/gin"
-	"github.com/k0kubun/pp"
 )
 
 type Context struct {
@@ -18,7 +17,7 @@ type Context struct {
 
 // APIWriteBack
 func (ctx Context) JSONAPI(statusCode int, errorMessage string, data map[string]any) {
-	log.Printf("[api] code=%d, msg=%q", statusCode, errorMessage)
+	// log.Printf("[api] code=%d, msg=%q", statusCode, errorMessage)
 	if data == nil {
 		data = map[string]any{}
 	}
@@ -85,7 +84,7 @@ func GinHandler[T any](handler StdHandlerFunc[T]) gin.HandlerFunc {
 			log.Printf("[bind]: %s", err)
 			return
 		}
-		pp.Println(data)
+		// pp.Println(data)
 		err = defaultValidator.Struct(data)
 		if err != nil {
 			errs := err.(WalkError)
