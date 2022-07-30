@@ -34,7 +34,7 @@ type CtstGetParam struct {
 func CtstGet(ctx Context, param CtstGetParam) {
 	contest, _ := internal.CTQuery(param.CtstID, param.UserID)
 	can_edit := param.CanEditCtst(param.CtstID)
-	if !param.CanEnterCtst(contest) {
+	if !param.CanEnterCtst(contest, param.CanEditCtst(contest.Id)) {
 		ctx.JSONAPI(403, "", nil)
 		return
 	}
@@ -48,7 +48,7 @@ type CtstProbGetParam struct {
 
 func CtstProbGet(ctx Context, param CtstProbGetParam) {
 	contest, err := internal.CTQuery(param.CtstID, param.UserID)
-	if !param.CanEnterCtst(contest) {
+	if !param.CanEnterCtst(contest, param.CanEditCtst(contest.Id)) {
 		ctx.JSONAPI(403, "", nil)
 		return
 	}
@@ -261,7 +261,7 @@ type CtstPtcpGetParam struct {
 }
 
 func CtstPtcpGet(ctx Context, param CtstPtcpGetParam) {
-	if !param.CanSeeCtst(param.CtstID) {
+	if !param.CanSeeCtst(param.CtstID, param.CanEditCtst(param.CtstID)) {
 		ctx.JSONAPI(403, "", nil)
 		return
 	}
@@ -280,7 +280,7 @@ type CtstSignupParam struct {
 
 func CtstSignup(ctx Context, param CtstSignupParam) {
 	contest, err := internal.CTQuery(param.CtstID, param.UserID)
-	if !param.CanTakeCtst(contest) {
+	if !param.CanTakeCtst(contest, param.CanEditCtst(param.CtstID)) {
 		ctx.JSONAPI(403, "", nil)
 		return
 	}
@@ -310,7 +310,7 @@ type CtstStandingParam struct {
 func CtstStanding(ctx Context, param CtstStandingParam) {
 	ctst, err := internal.CTQuery(param.CtstID, -1)
 	can_edit := param.CanEditCtst(param.CtstID)
-	if !param.CanEnterCtst(ctst) {
+	if !param.CanEnterCtst(ctst, param.CanEditCtst(param.CtstID)) {
 		ctx.JSONAPI(403, "", nil)
 		return
 	}

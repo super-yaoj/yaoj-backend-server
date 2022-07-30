@@ -73,7 +73,7 @@ func (auth *Auth) CanSeeProb(problem_id int) bool {
 
 func (auth *Auth) CanSeeProbInCtst(problem_id, contest_id int) bool {
 	contest, _ := internal.CTQuery(contest_id, auth.UserID)
-	if auth.CanEnterCtst(contest) &&
+	if auth.CanEnterCtst(contest, auth.CanEditCtst(contest_id)) &&
 		contest.StartTime.Before(time.Now()) && contest.EndTime.After(time.Now()) {
 		return internal.CTHasProblem(contest_id, problem_id)
 	}
@@ -88,31 +88,34 @@ func (auth *Auth) CanEditCtst(contest_id int) bool {
 	return count > 0
 }
 
-func (auth *Auth) CanSeeCtst(contest_id int) bool {
+func (auth *Auth) CanSeeCtst(contest_id int, can_edit bool) bool {
+	if can_edit {
+		return true
+	}
 	if auth.UserID == 0 {
 		count, _ := libs.DBSelectSingleInt("select count(*) from contest_permissions where contest_id=? and permission_id=?", contest_id, libs.DefaultGroup)
 		return count > 0
-	}
-	if auth.CanEditCtst(contest_id) {
-		return true
 	}
 	count, _ := libs.DBSelectSingleInt("select count(*) from ((select permission_id from contest_permissions where contest_id=?) as a join (select permission_id from user_permissions where user_id=?) as b on a.permission_id=b.permission_id)", contest_id, auth.UserID)
 	return count > 0
 }
 
-func (auth *Auth) CanEnterCtst(contest internal.Contest) bool {
+func (auth *Auth) CanEnterCtst(contest internal.Contest, can_edit bool) bool {
+	if can_edit {
+		return true
+	}
 	if contest.StartTime.After(time.Now()) {
 		return false
 	} else if contest.EndTime.After(time.Now()) {
 		return internal.CTRegistered(contest.Id, auth.UserID)
 	} else {
-		return auth.CanSeeCtst(contest.Id)
+		return auth.CanSeeCtst(contest.Id, can_edit)
 	}
 }
 
-func (auth *Auth) CanTakeCtst(contest internal.Contest) bool {
+func (auth *Auth) CanTakeCtst(contest internal.Contest, can_edit bool) bool {
 	if contest.EndTime.After(time.Now()) {
-		return !auth.CanEditCtst(contest.Id) && auth.CanSeeCtst(contest.Id)
+		return !can_edit && auth.CanSeeCtst(contest.Id, can_edit)
 	}
 	return false
 }
