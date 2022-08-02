@@ -1,6 +1,7 @@
 package services
 
 import (
+	"net/http"
 	"time"
 	"yao/internal"
 	"yao/libs"
@@ -139,6 +140,23 @@ func (r *Permit[T]) Else(callback func(a T)) *Permit[T] {
 	}
 	return r
 }
+func (r *Permit[T]) ElseAPIStatusForbidden(ctx Context) {
+	if !r.status {
+		ctx.JSONAPI(http.StatusForbidden, "", nil)
+	}
+}
+func (r *Permit[T]) ElseRPCStatusForbidden(ctx Context) {
+	if !r.status {
+		ctx.JSONRPC(http.StatusForbidden, -32600, "", nil)
+	}
+}
+
+func (auth *Auth) AsAdmin() *Permit[struct{}] {
+	if auth.IsAdmin() {
+		return &Permit[struct{}]{status: true, data: struct{}{}}
+	}
+	return &Permit[struct{}]{status: false, data: struct{}{}}
+}
 
 // if can't see -> unaccepted
 // if must see from contest, data represents contest id (none zero),
@@ -151,4 +169,48 @@ func (auth *Auth) TrySeeProb(probid int) *Permit[int] {
 		return &Permit[int]{status: true, data: auth.ctstOrigin}
 	}
 	return &Permit[int]{status: false}
+}
+
+func (auth *Auth) TryEditProb(probid int) *Permit[struct{}] {
+	if auth.CanEditProb(probid) {
+		return &Permit[struct{}]{status: true}
+	}
+	return &Permit[struct{}]{status: false}
+}
+
+type PermitCtst struct {
+	*internal.Contest
+	CanEdit bool
+}
+func (auth *Auth) TryEnterCtst(ctstid int) *Permit[PermitCtst] {
+	ctst, _ := internal.CTQuery(ctstid, auth.UserID)
+	can_edit := auth.CanEditCtst(ctstid)
+	if auth.CanEnterCtst(ctst, can_edit) {
+		return &Permit[PermitCtst]{status: true, data: PermitCtst{&ctst, can_edit}}
+	}
+	return &Permit[PermitCtst]{status: false, data: PermitCtst{&ctst, can_edit}}
+}
+
+func (auth *Auth) TryEditCtst(ctstid int) *Permit[struct{}] {
+	if auth.CanEditCtst(ctstid) {
+		return &Permit[struct{}]{status: true}
+	}
+	return &Permit[struct{}]{status: false}
+}
+
+func (auth *Auth) TryTakeCtst(ctstid int) *Permit[PermitCtst] {
+	ctst, _ := internal.CTQuery(ctstid, auth.UserID)
+	can_edit := auth.CanEditCtst(ctstid)
+	if auth.CanTakeCtst(ctst, can_edit) {
+		return &Permit[PermitCtst]{status: true, data: PermitCtst{&ctst, can_edit}}
+	}
+	return &Permit[PermitCtst]{status: false, data: PermitCtst{&ctst, can_edit}}
+}
+
+func (auth *Auth) TrySeeCtst(ctstid int) *Permit[bool] {
+	can_edit := auth.CanEditCtst(ctstid)
+	if auth.CanSeeCtst(ctstid, can_edit) {
+		return &Permit[bool]{status: true, data: can_edit}
+	}
+	return &Permit[bool]{status: false, data: can_edit}
 }

@@ -84,9 +84,7 @@ func SubmAdd(ctx Context, param SubmAddParam) {
 		if err != nil {
 			ctx.ErrorAPI(err)
 		}
-	}).Else(func(int) {
-		ctx.JSONAPI(http.StatusForbidden, "", nil)
-	})
+	}).ElseAPIStatusForbidden(ctx)
 }
 
 // When the submitted file is a zip file

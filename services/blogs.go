@@ -105,8 +105,7 @@ func BlogGet(ctx Context, param BlogGetParam) {
 	if err != nil {
 		ctx.ErrorAPI(err)
 	} else {
-		ret, _ := libs.Struct2Map(blog)
-		ctx.JSONAPI(http.StatusOK, "", ret)
+		ctx.JSONAPI(http.StatusOK, "", map[string]any{"blog": blog})
 	}
 }
 

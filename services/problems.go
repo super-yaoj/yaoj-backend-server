@@ -73,9 +73,7 @@ func ProbGet(ctx Context, param ProbGetParam) {
 				ret_prob.DataInfo = problem.DataInfo{}
 			}
 			ctx.JSONAPI(http.StatusOK, "", map[string]any{"problem": ret_prob, "can_edit": can_edit, "in_contest": ctstid})
-		}).Else(func(ctstid int) {
-			ctx.JSONAPI(http.StatusForbidden, "", nil)
-		})
+		}).ElseAPIStatusForbidden(ctx)
 }
 
 // 获取题目权限
@@ -255,9 +253,7 @@ func ProbDownData(ctx Context, param ProbDownDataParam) {
 					ctx.FileAttachment(path, fmt.Sprintf("sample_%d.zip", param.ProbID))
 				}
 			}).
-			Else(func(a int) {
-				ctx.JSONAPI(http.StatusForbidden, "", nil)
-			})
+			ElseAPIStatusForbidden(ctx)
 	}
 }
 
@@ -348,7 +344,5 @@ func ProbStatistic(ctx Context, param ProbStatisticParam) {
 		ret := internal.SMListByIds(subs)
 		acnum, totnum := internal.PRSGetACRatio(param.ProbID)
 		ctx.JSONAPI(http.StatusOK, "", map[string]any{"data": ret, "isfull": isfull, "acnum": acnum, "totnum": totnum})
-	}).Else(func(ctstid int) {
-		ctx.JSONAPI(http.StatusForbidden, "", nil)
-	})
+	}).ElseAPIStatusForbidden(ctx)
 }
