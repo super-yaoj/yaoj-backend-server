@@ -171,4 +171,16 @@ func init() {
 		}
 		return nil
 	})
+	// authentication
+	defaultValidator.RegisterValidation("pagecanbound", func(fv FieldValue) error {
+		page, ok := fv.Value.Interface().(Page)
+		if !ok {
+			return ValFailedErr("invalid Page struct")
+		}
+		// pp.Print(page, page.CanBound())
+		if !page.CanBound() {
+			return HttpStatErr(http.StatusBadRequest)
+		}
+		return nil
+	})
 }

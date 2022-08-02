@@ -9,7 +9,7 @@ import (
 )
 
 type CtstListParam struct {
-	Page
+	Page `validate:"pagecanbound"`
 	Auth
 }
 
@@ -35,7 +35,7 @@ type CtstGetParam struct {
 func CtstGet(ctx Context, param CtstGetParam) {
 	param.TryEnterCtst(param.CtstID).Then(func(ctst PermitCtst) {
 		ctx.JSONAPI(http.StatusOK, "", map[string]any{
-			"contest": ctst.Contest,
+			"contest":  ctst.Contest,
 			"can_edit": ctst.CanEdit,
 		})
 	}).ElseAPIStatusForbidden(ctx)
