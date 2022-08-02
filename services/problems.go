@@ -10,7 +10,6 @@ import (
 	"strings"
 	"yao/internal"
 	"yao/libs"
-	"yao/service"
 
 	"github.com/gin-gonic/gin"
 	"github.com/super-yaoj/yaoj-core/pkg/problem"
@@ -256,8 +255,6 @@ func ProbDownData(ctx Context, param ProbDownDataParam) {
 			ElseAPIStatusForbidden(ctx)
 	}
 }
-
-type Context = service.Context
 
 type ProbEditParam struct {
 	ProbID    int    `body:"problem_id" binding:"required" validate:"probid"`
