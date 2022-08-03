@@ -1,120 +1,81 @@
 package services
 
 import (
-	"fmt"
 	"net/http"
 	"yao/internal"
 	"yao/libs"
 )
 
-// 1. blog exist
-// 2. user registered
-// 3. admin or author or blog is public
-func BLCanSee(auth Auth, blog_id int) bool {
-	var blog internal.Blog
-	err := libs.DBSelectSingle(&blog, "select blog_id, author, private from blogs where blog_id=?", blog_id)
-	if err != nil {
-		return false
-	} else if auth.UserID == 0 { // unregistered
-		return false
-	} else {
-		return auth.IsAdmin() || auth.UserID == blog.Author || !blog.Private
-	}
-}
-
-func BLCanEdit(auth Auth, blog_id int) bool {
-	var blog internal.Blog
-	err := libs.DBSelectSingle(&blog, "select blog_id, author from blogs where blog_id=?", blog_id)
-	if err != nil {
-		return false
-	} else {
-		return auth.IsAdmin() || auth.UserID == blog.Author
-	}
-}
-
 type BlogCreateParam struct {
+	Auth
 	UserID  int    `session:"user_id" validate:"gte=0"`
-	Private int    `body:"private" binding:"required"`
-	Title   string `body:"title"`
+	Private int    `body:"private" validate:"required,gte=0,lte=1"`
+	Title   string `body:"title" validate:"required,gte=1,lte=190"`
 	Content string `body:"content"`
 }
 
 func BlogCreate(ctx Context, param BlogCreateParam) {
-	if !internal.BLValidTitle(param.Title) {
-		ctx.JSONAPI(http.StatusBadRequest, "invalid title", nil)
-		return
-	}
-	id, err := internal.BLCreate(param.UserID, param.Private, param.Title, param.Content)
-	if err != nil {
-		ctx.ErrorAPI(err)
-	} else {
-		ctx.JSONAPI(http.StatusOK, "", map[string]any{"id": id})
-	}
+	param.NewPermit().AsNormalUser().Success(func(any) {
+		id, err := internal.BLCreate(param.UserID, param.Private, param.Title, param.Content)
+		if err != nil {
+			ctx.ErrorAPI(err)
+		} else {
+			ctx.JSONAPI(http.StatusOK, "", map[string]any{"id": id})
+		}
+	}).FailAPIStatusForbidden(ctx)
 }
 
 type BlogEditParam struct {
-	BlogID  int    `body:"blog_id" binding:"required" validate:"blogid"`
-	Private int    `body:"private" binding:"required" validate:"gte=0,lte=1"`
-	Title   string `body:"title"`
-	Content string `body:"content"`
 	Auth
+	BlogID  int    `body:"blog_id" validate:"required,blogid"`
+	Private int    `body:"private" validate:"required,gte=0,lte=1"`
+	Title   string `body:"title" validate:"gte=1,lte=190"`
+	Content string `body:"content"`
 }
 
 func BlogEdit(ctx Context, param BlogEditParam) {
-	if !BLCanEdit(param.Auth, param.BlogID) {
-		ctx.JSONAPI(http.StatusForbidden, "", nil)
-		return
-	}
-	if !internal.BLValidTitle(param.Title) {
-		ctx.JSONAPI(http.StatusBadRequest, "invalid title", nil)
-		return
-	}
-	err := internal.BLEdit(param.BlogID, param.Private, param.Title, param.Content)
-	if err != nil {
-		ctx.ErrorAPI(err)
-	}
+	param.NewPermit().TryEditBlog(param.BlogID).Success(func(any) {
+		err := internal.BLEdit(param.BlogID, param.Private, param.Title, param.Content)
+		if err != nil {
+			ctx.ErrorAPI(err)
+		}
+	}).FailAPIStatusForbidden(ctx)
 }
 
 type BlogDelParam struct {
-	BlogID int `query:"blog_id" binding:"required" validate:"blogid"`
 	Auth
+	BlogID int `query:"blog_id" validate:"required,blogid"`
 }
 
 func BlogDel(ctx Context, param BlogDelParam) {
-	if !BLCanEdit(param.Auth, param.BlogID) {
-		ctx.JSONAPI(http.StatusForbidden, "", nil)
-		return
-	}
-	err := internal.BLDelete(param.BlogID)
-	if err != nil {
-		ctx.ErrorAPI(err)
-	}
+	param.NewPermit().TryEditBlog(param.BlogID).Success(func(any) {
+		err := internal.BLDelete(param.BlogID)
+		if err != nil {
+			ctx.ErrorAPI(err)
+		}
+	}).FailAPIStatusForbidden(ctx)
 }
 
 type BlogGetParam struct {
-	BlogID int `query:"blog_id" binding:"required" validate:"blogid"`
 	Auth
+	BlogID int `query:"blog_id" validate:"required,blogid"`
 }
 
 func BlogGet(ctx Context, param BlogGetParam) {
-	if !BLCanSee(param.Auth, param.BlogID) {
-		ctx.JSONAPI(http.StatusForbidden, "", nil)
-		return
-	}
-	blog, err := internal.BLQuery(param.BlogID, param.UserID)
-	if err != nil {
-		ctx.ErrorAPI(err)
-	} else {
-		ctx.JSONAPI(http.StatusOK, "", map[string]any{"blog": blog})
-	}
+	param.NewPermit().TrySeeBlog(param.BlogID).Success(func(any) {
+		blog, err := internal.BLQuery(param.BlogID, param.UserID)
+		if err != nil {
+			ctx.ErrorAPI(err)
+		} else {
+			ctx.JSONAPI(http.StatusOK, "", map[string]any{"blog": blog})
+		}
+	}).FailAPIStatusForbidden(ctx)
 }
 
 type BlogListParam struct {
-	BlogUserID *int `query:"user_id" validate:"userid"`
-	Left       *int `query:"left"`
-	Right      *int `query:"right"`
-	PageSize   *int `query:"pagesize"`
 	Auth
+	Page
+	BlogUserID *int `query:"user_id" validate:"userid"`
 }
 
 func BlogList(ctx Context, param BlogListParam) {
@@ -126,20 +87,12 @@ func BlogList(ctx Context, param BlogListParam) {
 			ctx.JSONAPI(http.StatusOK, "", map[string]any{"data": blogs})
 		}
 	} else {
-		if param.PageSize == nil || *param.PageSize > 100 || *param.PageSize < 1 {
-			ctx.JSONAPI(http.StatusBadRequest, fmt.Sprintf("invalid request: parameter pagesize should be in [%d, %d]", 1, 100), nil)
-			return
-		}
-		var bound int
-		if param.Left != nil {
-			bound = *param.Left
-		} else if param.Right != nil {
-			bound = *param.Right
-		} else {
+		if !param.CanBound() {
+			ctx.JSONAPI(http.StatusBadRequest, "", nil)
 			return
 		}
 		blogs, isfull, err := internal.BLListAll(
-			bound, *param.PageSize, param.UserID, param.Left != nil, libs.IsAdmin(param.UserGrp),
+			param.Bound(), *param.PageSize, param.UserID, param.IsLeft(), libs.IsAdmin(param.UserGrp),
 		)
 		if err != nil {
 			ctx.ErrorAPI(err)

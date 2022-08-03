@@ -17,7 +17,7 @@ import (
 
 var (
 	ProblemRWLock = libs.NewMappedMultiRWMutex()
-	ProblemCache  = libs.NewMemoryCache(time.Hour, 100)
+	ProblemCache  = libs.NewMemoryCache[*Problem](time.Hour, 100)
 )
 
 func PRGetDir(problem_id int) string {
@@ -77,9 +77,9 @@ func PRLoad(problem_id int) *Problem {
 		pp.Print(pro)
 		PRSetCache(problem_id, pro)
 		ret, _ := ProblemCache.Get(problem_id)
-		return ret.(*Problem)
+		return ret
 	} else {
-		return val.(*Problem)
+		return val
 	}
 }
 

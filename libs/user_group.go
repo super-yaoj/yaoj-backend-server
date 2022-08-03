@@ -10,3 +10,7 @@ const (
 func IsAdmin(user_group int) bool {
 	return (user_group == USAdmin || user_group == USRoot)
 }
+
+func IsBanned(user_group int) bool {
+	return user_group == USBanned
+}

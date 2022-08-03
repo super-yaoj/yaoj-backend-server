@@ -442,3 +442,8 @@ func SMRemoveTestDetails(js string) string {
 	}
 	return ret
 }
+
+func SMExists(subm_id int) bool {
+	cnt, _ := libs.DBSelectSingleInt("select count(*) from submissions where submission_id=?", subm_id)
+	return cnt > 0
+}

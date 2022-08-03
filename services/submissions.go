@@ -17,18 +17,15 @@ import (
 
 type SubmListParam struct {
 	Auth
-	Page
+	Page 		 `validate:"pagecanbound"`
 	ProbID   int `query:"problem_id"`
 	CtstID   int `query:"contest_id"`
 	Submtter int `query:"submitter"`
 }
 
 func SubmList(ctx Context, param SubmListParam) {
-	if !param.CanBound() {
-		return
-	}
 	submissions, isfull, err := internal.SMList(
-		param.Bound(), param.PageSize, param.UserID, param.Submtter, param.ProbID, param.CtstID,
+		param.Bound(), *param.PageSize, param.UserID, param.Submtter, param.ProbID, param.CtstID,
 		param.IsLeft(), param.IsAdmin(),
 	)
 	if err != nil {
@@ -47,7 +44,7 @@ func SubmList(ctx Context, param SubmListParam) {
 
 type SubmAddParam struct {
 	Auth
-	ProbID  int     `body:"problem_id" binding:"required"`
+	ProbID  int     `body:"problem_id" validate:"required"`
 	CtstID  int     `body:"contest_id"`
 	SubmAll *string `body:"submit_all"`
 }
@@ -55,11 +52,8 @@ type SubmAddParam struct {
 // users can submit from a contest if and only if the contest is running and
 // he takes part in the contest (only these submissions are contest submissions)
 func SubmAdd(ctx Context, param SubmAddParam) {
-	if param.UserID == 0 {
-		ctx.JSONAPI(401, "", nil)
-		return
-	}
-	param.Auth.SetCtst(param.CtstID).TrySeeProb(param.ProbID).Then(func(ctstid int) {
+	param.NewPermit().AsNormalUser().TrySeeProb(param.ProbID, param.CtstID).Success(func(a any) {
+		ctstid := a.(int)
 		pro := internal.PRLoad(param.ProbID)
 		if !internal.PRHasData(pro, "tests") {
 			ctx.JSONAPI(http.StatusBadRequest, "problem has no data", nil)
@@ -84,7 +78,7 @@ func SubmAdd(ctx Context, param SubmAddParam) {
 		if err != nil {
 			ctx.ErrorAPI(err)
 		}
-	}).ElseAPIStatusForbidden(ctx)
+	}).FailAPIStatusForbidden(ctx)
 }
 
 // When the submitted file is a zip file
@@ -218,116 +212,91 @@ func getPreview(val []byte, mode utils.CtntType, lang utils.LangTag) internal.Co
 }
 
 type SubmGetParam struct {
-	SubmID int `query:"submission_id" binding:"required"`
 	Auth
+	SubmID int `query:"submission_id" validate:"required,submid"`
 }
 
 // Query single submission, when user is in contests which score_private=true
 // (i.e. cannot see full result), this function will delete extra information.
 func SubmGet(ctx Context, param SubmGetParam) {
-	ret, err := internal.SMQuery(param.SubmID)
-	if err != nil {
-		ctx.JSONAPI(http.StatusNotFound, "", nil)
-		return
-	}
-	//user cannot see submission details inside contests
-	by_problem := param.Auth.CanSeeProb(ret.ProblemId)
-	can_edit := SMCanEdit(param.Auth, ret.SubmissionBase)
-	if !can_edit && ret.Submitter != param.UserID && !by_problem {
-		ctx.JSONAPI(http.StatusForbidden, "", nil)
-	} else {
-		if !can_edit && !by_problem {
-			if internal.CTPretestOnly(ret.ContestId) {
-				internal.SMPretestOnly(&ret)
+	param.NewPermit().TrySeeSubm(param.SubmID).Success(func(a any) {
+		psubm := a.(PermitSubm)
+		//user cannot see submission details inside contests
+		if !psubm.CanEdit && !psubm.ByProb {
+			if internal.CTPretestOnly(psubm.ContestId) {
+				internal.SMPretestOnly(&psubm.Submission)
 			} else {
-				ret.Details.Result = internal.SMRemoveTestDetails(ret.Details.Result)
-				ret.Details.ExtraResult = internal.SMRemoveTestDetails(ret.Details.ExtraResult)
+				psubm.Details.Result = internal.SMRemoveTestDetails(psubm.Details.Result)
+				psubm.Details.ExtraResult = internal.SMRemoveTestDetails(psubm.Details.ExtraResult)
 			}
 		}
-		ctx.JSONAPI(http.StatusOK, "", map[string]any{"submission": ret, "can_edit": can_edit})
-	}
+		ctx.JSONAPI(http.StatusOK, "", map[string]any{"submission": psubm.Submission, "can_edit": psubm.CanEdit})
+	}).FailAPIStatusForbidden(ctx)
 }
 
 type SubmCustomParam struct {
-}
-
-func SubmCustom(ctx Context, param SubmCustomParam) {
-	config := internal.SubmConfig{
-		"source": {Langs: nil, Accepted: utils.Csource, Length: 64 * 1024},
-		"input":  {Langs: nil, Accepted: utils.Cplain, Length: 10 * 1024 * 1024},
-	}
-	subm, _, _, _ := parseMultiFiles(ctx, config)
-	if subm == nil {
-		return
-	}
-	w := bytes.NewBuffer(nil)
-	subm.DumpTo(w)
-	result := internal.SMJudgeCustomTest(w.Bytes())
-	if len(result) == 0 {
-		result, _ = json.Marshal(map[string]any{
-			"Memory": -1,
-			"Time":   -1,
-			"Title":  "Internal Error",
-		})
-	}
-	ctx.JSONAPI(http.StatusOK, "", map[string]any{"result": string(result)})
-}
-
-func SMCanEdit(auth Auth, sub internal.SubmissionBase) bool {
-	return auth.CanEditProb(sub.ProblemId) ||
-		(sub.ContestId > 0 && auth.CanEditCtst(sub.ContestId))
-}
-
-type SubmDelParam struct {
-	SubmID int `query:"submission_id" binding:"required"`
 	Auth
 }
 
+func SubmCustom(ctx Context, param SubmCustomParam) {
+	param.NewPermit().AsNormalUser().Success(func(any) {
+		config := internal.SubmConfig{
+			"source": {Langs: nil, Accepted: utils.Csource, Length: 64 * 1024},
+			"input":  {Langs: nil, Accepted: utils.Cplain, Length: 10 * 1024 * 1024},
+		}
+		subm, _, _, _ := parseMultiFiles(ctx, config)
+		if subm == nil {
+			return
+		}
+		w := bytes.NewBuffer(nil)
+		subm.DumpTo(w)
+		result := internal.SMJudgeCustomTest(w.Bytes())
+		if len(result) == 0 {
+			result, _ = json.Marshal(map[string]any{
+				"Memory": -1,
+				"Time":   -1,
+				"Title":  "Internal Error",
+			})
+		}
+		ctx.JSONAPI(http.StatusOK, "", map[string]any{"result": string(result)})
+	}).FailAPIStatusForbidden(ctx)
+}
+
+type SubmDelParam struct {
+	Auth
+	SubmID int `query:"submission_id" validate:"required,submid"`
+}
+
 func SubmDel(ctx Context, param SubmDelParam) {
-	sub, err := internal.SMGetBaseInfo(param.SubmID)
-	if err != nil {
-		ctx.JSONAPI(http.StatusNotFound, "", nil)
-		return
-	}
-	if !SMCanEdit(param.Auth, sub) {
-		ctx.JSONAPI(http.StatusForbidden, "", nil)
-		return
-	}
-	err = internal.SMDelete(sub)
-	if err != nil {
-		ctx.ErrorAPI(err)
-	}
+	param.NewPermit().TryEditSubm(param.SubmID).Success(func(a any) {
+		sub := a.(internal.SubmissionBase)
+		err := internal.SMDelete(sub)
+		if err != nil {
+			ctx.ErrorAPI(err)
+		}
+	}).FailAPIStatusForbidden(ctx)
 }
 
 type RejudgeParam struct {
 	ProbID *int `body:"problem_id" validate:"probid"`
-	SubmID int  `body:"submission_id"`
+	SubmID *int  `body:"submission_id" validate:"submid"`
 	Auth
 }
 
 func Rejudge(ctx Context, param RejudgeParam) {
 	if param.ProbID != nil {
-		if !param.Auth.CanEditProb(*param.ProbID) {
-			ctx.JSONRPC(http.StatusForbidden, -32600, "", nil)
-			return
-		}
-		err := internal.PRRejudge(*param.ProbID)
-		if err != nil {
-			ctx.ErrorRPC(err)
-		}
+		param.NewPermit().TryEditProb(*param.ProbID).Success(func(a any) {
+			err := internal.PRRejudge(*param.ProbID)
+			if err != nil {
+				ctx.ErrorRPC(err)
+			}
+		}).FailRPCStatusForbidden(ctx)
 	} else {
-		sub, err := internal.SMGetBaseInfo(param.SubmID)
-		if err != nil {
-			ctx.JSONRPC(http.StatusNotFound, -32600, "", nil)
-			return
-		}
-		if !SMCanEdit(param.Auth, sub) {
-			ctx.JSONRPC(http.StatusForbidden, -32600, "", nil)
-			return
-		}
-		err = internal.SMRejudge(param.SubmID)
-		if err != nil {
-			ctx.ErrorRPC(err)
-		}
+		param.NewPermit().TryEditSubm(*param.SubmID).Success(func(any) {
+			err := internal.SMRejudge(*param.SubmID)
+			if err != nil {
+				ctx.ErrorRPC(err)
+			}
+		})
 	}
 }

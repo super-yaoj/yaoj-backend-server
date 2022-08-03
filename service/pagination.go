@@ -4,11 +4,11 @@ package service
 type Page struct {
 	Left     *int `query:"left"`
 	Right    *int `query:"right"`
-	PageSize int  `query:"pagesize" binding:"required" validate:"gte=1,lte=100"`
+	PageSize *int  `query:"pagesize" validate:"gte=1,lte=100"`
 }
 
 func (r *Page) CanBound() bool {
-	return r.Left != nil || r.Right != nil
+	return r.PageSize != nil && (r.Left != nil || r.Right != nil)
 }
 
 func (r *Page) Bound() int {

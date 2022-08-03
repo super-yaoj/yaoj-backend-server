@@ -6,43 +6,45 @@ import (
 )
 
 type ClickLikeParam struct {
+	Auth
 	Target string `body:"target"`
-	UserID int    `session:"user_id" validate:"gte=0"`
-	BlogID int    `body:"id" binding:"required"`
+	BlogID int    `body:"id" validate:"required"`
 }
 
 func ClickLike(ctx Context, param ClickLikeParam) {
-	var err error
-	switch param.Target {
-	case "blog":
-		if !internal.BLExists(param.BlogID) {
-			ctx.JSONAPI(http.StatusNotFound, "", nil)
+	param.NewPermit().AsNormalUser().Success(func(a any) {
+		var err error
+		switch param.Target {
+		case "blog":
+			if !internal.BLExists(param.BlogID) {
+				ctx.JSONAPI(http.StatusNotFound, "", nil)
+				return
+			}
+			err = internal.ClickLike(internal.BLOG, param.BlogID, param.UserID)
+		case "comment":
+			if !internal.BLCommentExists(param.BlogID) {
+				ctx.JSONAPI(http.StatusNotFound, "", nil)
+				return
+			}
+			err = internal.ClickLike(internal.COMMENT, param.BlogID, param.UserID)
+		case "problem":
+			if !internal.PRExists(param.BlogID) {
+				ctx.JSONAPI(http.StatusNotFound, "", nil)
+				return
+			}
+			err = internal.ClickLike(internal.PROBLEM, param.BlogID, param.UserID)
+		case "contest":
+			if !internal.CTExists(param.BlogID) {
+				ctx.JSONAPI(http.StatusNotFound, "", nil)
+				return
+			}
+			err = internal.ClickLike(internal.CONTEST, param.BlogID, param.UserID)
+		default:
+			ctx.JSONAPI(http.StatusBadRequest, "invalid request", nil)
 			return
 		}
-		err = internal.ClickLike(internal.BLOG, param.BlogID, param.UserID)
-	case "comment":
-		if !internal.BLCommentExists(param.BlogID) {
-			ctx.JSONAPI(http.StatusNotFound, "", nil)
-			return
+		if err != nil {
+			ctx.ErrorAPI(err)
 		}
-		err = internal.ClickLike(internal.COMMENT, param.BlogID, param.UserID)
-	case "problem":
-		if !internal.PRExists(param.BlogID) {
-			ctx.JSONAPI(http.StatusNotFound, "", nil)
-			return
-		}
-		err = internal.ClickLike(internal.PROBLEM, param.BlogID, param.UserID)
-	case "contest":
-		if !internal.CTExists(param.BlogID) {
-			ctx.JSONAPI(http.StatusNotFound, "", nil)
-			return
-		}
-		err = internal.ClickLike(internal.CONTEST, param.BlogID, param.UserID)
-	default:
-		ctx.JSONAPI(http.StatusBadRequest, "invalid request", nil)
-		return
-	}
-	if err != nil {
-		ctx.ErrorAPI(err)
-	}
+	}).FailAPIStatusForbidden(ctx)
 }

@@ -9,16 +9,13 @@ import (
 )
 
 type CtstListParam struct {
-	Page `validate:"pagecanbound"`
 	Auth
+	Page `validate:"pagecanbound"`
 }
 
 func CtstList(ctx Context, param CtstListParam) {
-	if !param.Page.CanBound() {
-		return
-	}
 	contests, isfull, err := internal.CTList(
-		param.Page.Bound(), param.PageSize, param.UserID, param.IsLeft(), libs.IsAdmin(param.UserGrp),
+		param.Page.Bound(), *param.PageSize, param.UserID, param.IsLeft(), libs.IsAdmin(param.UserGrp),
 	)
 	if err != nil {
 		ctx.ErrorAPI(err)
@@ -29,62 +26,63 @@ func CtstList(ctx Context, param CtstListParam) {
 
 type CtstGetParam struct {
 	Auth
-	CtstID int `query:"contest_id" binding:"required" validate:"ctstid"`
+	CtstID int `query:"contest_id" validate:"required,ctstid"`
 }
 
 func CtstGet(ctx Context, param CtstGetParam) {
-	param.TryEnterCtst(param.CtstID).Then(func(ctst PermitCtst) {
+	param.NewPermit().TryEnterCtst(param.CtstID).Success(func(a any) {
+		ctst := a.(PermitCtst)
 		ctx.JSONAPI(http.StatusOK, "", map[string]any{
 			"contest":  ctst.Contest,
 			"can_edit": ctst.CanEdit,
 		})
-	}).ElseAPIStatusForbidden(ctx)
+	}).FailAPIStatusForbidden(ctx)
 }
 
 type CtstProbGetParam struct {
 	Auth
-	CtstID int `query:"contest_id" binding:"required" validate:"ctstid"`
+	CtstID int `query:"contest_id" validate:"required,ctstid"`
 }
 
 func CtstProbGet(ctx Context, param CtstProbGetParam) {
-	param.TryEnterCtst(param.CtstID).Then(func(ctst PermitCtst) {
+	param.NewPermit().TryEnterCtst(param.CtstID).Success(func(any) {
 		problems, err := internal.CTGetProblems(param.CtstID)
 		if err != nil {
 			ctx.ErrorAPI(err)
 		} else {
 			ctx.JSONAPI(http.StatusOK, "", map[string]any{"data": problems})
 		}
-	}).ElseAPIStatusForbidden(ctx)
+	}).FailAPIStatusForbidden(ctx)
 }
 
 type CtstProbAddParam struct {
 	Auth
-	CtstID int `body:"contest_id" binding:"required" validate:"ctstid"`
-	ProbID int `body:"problem_id" binding:"required" validate:"probid"`
+	CtstID int `body:"contest_id" validate:"required,ctstid"`
+	ProbID int `body:"problem_id" validate:"required,probid"`
 }
 
 func CtstProbAdd(ctx Context, param CtstProbAddParam) {
-	param.TryEditCtst(param.CtstID).Then(func(struct{}) {
+	param.NewPermit().TryEditCtst(param.CtstID).Success(func(any) {
 		err := internal.CTAddProblem(param.CtstID, param.ProbID)
 		if err != nil {
 			ctx.ErrorAPI(err)
 		}
-	}).ElseAPIStatusForbidden(ctx)
+	}).FailAPIStatusForbidden(ctx)
 }
 
 type CtstProbDelParam struct {
 	Auth
-	CtstID int `query:"contest_id" binding:"required" validate:"ctstid"`
-	ProbID int `query:"problem_id" binding:"required" validate:"probid"`
+	CtstID int `query:"contest_id" validate:"required,ctstid"`
+	ProbID int `query:"problem_id" validate:"required,probid"`
 }
 
 func CtstProbDel(ctx Context, param CtstProbDelParam) {
-	param.TryEditCtst(param.CtstID).Then(func(struct{}) {
+	param.NewPermit().TryEditCtst(param.CtstID).Success(func(any) {
 		err := internal.CTDeleteProblem(param.CtstID, param.ProbID)
 		if err != nil {
 			ctx.ErrorAPI(err)
 		}
-	}).ElseAPIStatusForbidden(ctx)
+	}).FailAPIStatusForbidden(ctx)
 }
 
 type CtstCreateParam struct {
@@ -92,30 +90,30 @@ type CtstCreateParam struct {
 }
 
 func CtstCreate(ctx Context, param CtstCreateParam) {
-	param.AsAdmin().Then(func(struct{}) {
+	param.NewPermit().AsAdmin().Success(func(any) {
 		id, err := internal.CTCreate()
 		if err != nil {
 			ctx.ErrorAPI(err)
 		} else {
 			ctx.JSONAPI(http.StatusOK, "", map[string]any{"id": id})
 		}
-	}).ElseAPIStatusForbidden(ctx)
+	}).FailAPIStatusForbidden(ctx)
 }
 
 // https://pkg.go.dev/github.com/go-playground/validator/v10#hdr-Greater_Than
 // gte,lte 用在 string 上表示长度限制
 type CtstEditParam struct {
 	Auth
-	CtstID       int    `body:"contest_id" binding:"required" validate:"ctstid"`
-	Title        string `body:"title" validate:"gte=0,lte=190"`
-	StartTime    string `body:"start_time"`
-	Duration     int    `body:"last" binding:"required" validate:"gte=1,lte=1000000"`
-	PrtstOnly    int    `body:"pretest" binding:"required" validate:"gte=0,lte=1"`
-	ScorePrivate int    `body:"score_private" binding:"required" validate:"gte=0,lte=1"`
+	CtstID       int    `body:"contest_id" validate:"required,ctstid"`
+	Title        string `body:"title" validate:"required,gte=1,lte=190"`
+	StartTime    string `body:"start_time" validate:"required"`
+	Duration     int    `body:"last" validate:"required,gte=1,lte=1000000"`
+	PrtstOnly    int    `body:"pretest" validate:"required,gte=0,lte=1"`
+	ScorePrivate int    `body:"score_private" validate:"required,gte=0,lte=1"`
 }
 
 func CtstEdit(ctx Context, param CtstEditParam) {
-	param.TryEditCtst(param.CtstID).Then(func(struct{}) {
+	param.NewPermit().TryEditCtst(param.CtstID).Success(func(any) {
 		ctst, err := internal.CTQuery(param.CtstID, -1)
 		title := strings.TrimSpace(param.Title)
 		start, err := time.Parse("2006-01-02 15:04:05", param.StartTime)
@@ -133,64 +131,64 @@ func CtstEdit(ctx Context, param CtstEditParam) {
 		if err != nil {
 			ctx.ErrorAPI(err)
 		}
-	}).ElseAPIStatusForbidden(ctx)
+	}).FailAPIStatusForbidden(ctx)
 }
 
 type CtstPermGetParam struct {
 	Auth
-	CtstID int `query:"contest_id" binding:"required" validate:"ctstid"`
+	CtstID int `query:"contest_id" validate:"required,ctstid"`
 }
 
 func CtstPermGet(ctx Context, param CtstPermGetParam) {
-	param.TryEditCtst(param.CtstID).Then(func(struct{}) {
+	param.NewPermit().TryEditCtst(param.CtstID).Success(func(any) {
 		perms, err := internal.CTGetPermissions(param.CtstID)
 		if err != nil {
 			ctx.ErrorAPI(err)
 		} else {
 			ctx.JSONAPI(http.StatusOK, "", map[string]any{"data": perms})
 		}
-	}).ElseAPIStatusForbidden(ctx)
+	}).FailAPIStatusForbidden(ctx)
 }
 
 type CtstMgrGetParam struct {
 	Auth
-	CtstID int `query:"contest_id" binding:"required" validate:"ctstid"`
+	CtstID int `query:"contest_id" validate:"required,ctstid"`
 }
 
 func CtstMgrGet(ctx Context, param CtstMgrGetParam) {
-	param.TryEditCtst(param.CtstID).Then(func(struct{}) {
+	param.NewPermit().TryEditCtst(param.CtstID).Success(func(any) {
 		users, err := internal.CTGetManagers(param.CtstID)
 		if err != nil {
 			ctx.ErrorAPI(err)
 		} else {
 			ctx.JSONAPI(http.StatusOK, "", map[string]any{"data": users})
 		}
-	}).ElseAPIStatusForbidden(ctx)
+	}).FailAPIStatusForbidden(ctx)
 }
 
 type CtstPermAddParam struct {
 	Auth
-	CtstID int `body:"contest_id" binding:"required" validate:"ctstid"`
-	PermID int `body:"permission_id" binding:"required" validate:"prmsid"`
+	CtstID int `body:"contest_id" validate:"required,ctstid"`
+	PermID int `body:"permission_id" validate:"required,prmsid"`
 }
 
 func CtstPermAdd(ctx Context, param CtstPermAddParam) {
-	param.TryEditCtst(param.CtstID).Then(func(struct{}) {
+	param.NewPermit().TryEditCtst(param.CtstID).Success(func(any) {
 		err := internal.CTAddPermission(param.CtstID, param.PermID)
 		if err != nil {
 			ctx.ErrorAPI(err)
 		}
-	}).ElseAPIStatusForbidden(ctx)
+	}).FailAPIStatusForbidden(ctx)
 }
 
 type CtstMgrAddParam struct {
 	Auth
-	CtstID    int `body:"contest_id" binding:"required" validate:"ctstid"`
-	MgrUserID int `body:"user_id" binding:"required" validate:"userid"`
+	CtstID    int `body:"contest_id" validate:"required,ctstid"`
+	MgrUserID int `body:"user_id" validate:"required,userid"`
 }
 
 func CtstMgrAdd(ctx Context, param CtstMgrAddParam) {
-	param.TryEditCtst(param.CtstID).Then(func(struct{}) {
+	param.NewPermit().TryEditCtst(param.CtstID).Success(func(any) {
 		if !internal.USExists(param.MgrUserID) {
 			ctx.JSONAPI(http.StatusBadRequest, "no such user id", nil)
 			return
@@ -203,72 +201,72 @@ func CtstMgrAdd(ctx Context, param CtstMgrAddParam) {
 		if err != nil {
 			ctx.ErrorAPI(err)
 		}
-	}).ElseAPIStatusForbidden(ctx)
+	}).FailAPIStatusForbidden(ctx)
 }
 
 type CtstPermDelParam struct {
 	Auth
-	CtstID int `query:"contest_id" binding:"required" validate:"ctstid"`
-	PermID int `query:"permission_id" binding:"required" validate:"prmsid"`
+	CtstID int `query:"contest_id" validate:"required,ctstid"`
+	PermID int `query:"permission_id" validate:"required,prmsid"`
 }
 
 func CtstPermDel(ctx Context, param CtstPermDelParam) {
-	param.TryEditCtst(param.CtstID).Then(func(struct{}) {
+	param.NewPermit().TryEditCtst(param.CtstID).Success(func(any) {
 		err := internal.CTDeletePermission(param.CtstID, param.PermID)
 		if err != nil {
 			ctx.ErrorAPI(err)
 		}
-	}).ElseAPIStatusForbidden(ctx)
+	}).FailAPIStatusForbidden(ctx)
 }
 
 type CtstMgrDelParam struct {
 	Auth
-	CtstID    int `query:"contest_id" binding:"required" validate:"ctstid"`
-	MgrUserID int `query:"user_id" binding:"required" validate:"userid"`
+	CtstID    int `query:"contest_id" validate:"required,ctstid"`
+	MgrUserID int `query:"user_id" validate:"required,userid"`
 }
 
 func CtstMgrDel(ctx Context, param CtstMgrDelParam) {
-	param.TryEditCtst(param.CtstID).Then(func(struct{}) {
+	param.NewPermit().TryEditCtst(param.CtstID).Success(func(any) {
 		err := internal.CTDeletePermission(param.CtstID, -param.MgrUserID)
 		if err != nil {
 			ctx.ErrorAPI(err)
 		}
-	}).ElseAPIStatusForbidden(ctx)
+	}).FailAPIStatusForbidden(ctx)
 }
 
 type CtstPtcpGetParam struct {
 	Auth
-	CtstID int `query:"contest_id" binding:"required" validate:"ctstid"`
+	CtstID int `query:"contest_id" validate:"required,ctstid"`
 }
 
 func CtstPtcpGet(ctx Context, param CtstPtcpGetParam) {
-	param.TrySeeCtst(param.CtstID).Then(func(bool) {
+	param.NewPermit().TrySeeCtst(param.CtstID).Success(func(any) {
 		parts, err := internal.CTGetParticipants(param.CtstID)
 		if err != nil {
 			ctx.ErrorAPI(err)
 		} else {
 			ctx.JSONAPI(http.StatusOK, "", map[string]any{"data": parts})
 		}
-	}).ElseAPIStatusForbidden(ctx)
+	}).FailAPIStatusForbidden(ctx)
 }
 
 type CtstSignupParam struct {
 	Auth
-	CtstID int `body:"contest_id" binding:"required" validate:"ctstid"`
+	CtstID int `body:"contest_id" validate:"required,ctstid"`
 }
 
 func CtstSignup(ctx Context, param CtstSignupParam) {
-	param.TryTakeCtst(param.CtstID).Then(func(ctst PermitCtst) {
+	param.NewPermit().TryTakeCtst(param.CtstID).Success(func(any) {
 		err := internal.CTAddParticipant(param.CtstID, param.UserID)
 		if err != nil {
 			ctx.ErrorAPI(err)
 		}
-	}).ElseAPIStatusForbidden(ctx)
+	}).FailAPIStatusForbidden(ctx)
 }
 
 type CtstSignoutParam struct {
 	Auth
-	CtstID int `query:"contest_id" binding:"required" validate:"ctstid"`
+	CtstID int `query:"contest_id" validate:"required,ctstid"`
 }
 
 func CtstSignout(ctx Context, param CtstSignoutParam) {
@@ -280,11 +278,12 @@ func CtstSignout(ctx Context, param CtstSignoutParam) {
 
 type CtstStandingParam struct {
 	Auth
-	CtstID int `query:"contest_id" binding:"required" validate:"ctstid"`
+	CtstID int `query:"contest_id" validate:"required,ctstid"`
 }
 
 func CtstStanding(ctx Context, param CtstStandingParam) {
-	param.TryEnterCtst(param.CtstID).Then(func(ctst PermitCtst) {
+	param.NewPermit().TryEnterCtst(param.CtstID).Success(func(a any) {
+		ctst := a.(PermitCtst)
 		raw_standing := internal.CTSGet(param.CtstID)
 		standing := []internal.CTStandingEntry{}
 		libs.DeepCopy(&standing, raw_standing)
@@ -312,16 +311,16 @@ func CtstStanding(ctx Context, param CtstStandingParam) {
 		} else {
 			ctx.JSONAPI(http.StatusOK, "", map[string]any{"standing": standing, "problems": problems})
 		}
-	}).ElseAPIStatusForbidden(ctx)
+	}).FailAPIStatusForbidden(ctx)
 }
 
 type CtstFinishParam struct {
 	Auth
-	CtstID int `body:"contest_id" binding:"required" validate:"ctstid"`
+	CtstID int `body:"contest_id" validate:"required,ctstid"`
 }
 
 func CtstFinish(ctx Context, param CtstFinishParam) {
-	param.TryEditCtst(param.CtstID).Then(func(struct{}) {
+	param.NewPermit().TryEditCtst(param.CtstID).Success(func(any) {
 		ctst, err := internal.CTQuery(param.CtstID, -1)
 		if ctst.Finished {
 			ctx.JSONRPC(http.StatusBadRequest, -32600, "Contest is already finished.", nil)
@@ -340,7 +339,7 @@ func CtstFinish(ctx Context, param CtstFinishParam) {
 		if err != nil {
 			ctx.ErrorRPC(err)
 		}
-	}).ElseRPCStatusForbidden(ctx)
+	}).FailRPCStatusForbidden(ctx)
 }
 
 type CtstGetDashboardParam struct {
@@ -349,9 +348,9 @@ type CtstGetDashboardParam struct {
 }
 
 func CtstGetDashboard(ctx Context, param CtstGetDashboardParam) {
-	param.TryEnterCtst(param.ContestId).Then(func(a PermitCtst) {
+	param.NewPermit().TryEnterCtst(param.ContestId).Success(func(any) {
 		ctx.JSONAPI(http.StatusOK, "", map[string]any{"data": internal.CTDashboard(param.ContestId)})
-	}).ElseAPIStatusForbidden(ctx)
+	}).FailAPIStatusForbidden(ctx)
 }
 
 type CtstAddDashboardParam struct {
@@ -361,10 +360,10 @@ type CtstAddDashboardParam struct {
 }
 
 func CtstAddDashboard(ctx Context, param CtstAddDashboardParam) {
-	param.TryEditCtst(param.ContestId).Then(func(struct{}) {
+	param.NewPermit().TryEditCtst(param.ContestId).Success(func(any) {
 		err := internal.CTAddDashboard(param.ContestId, param.Dashboard)
 		if err != nil {
 			ctx.ErrorAPI(err)
 		}
-	}).ElseAPIStatusForbidden(ctx)
+	}).FailAPIStatusForbidden(ctx)
 }

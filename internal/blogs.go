@@ -1,7 +1,6 @@
 package internal
 
 import (
-	"strings"
 	"time"
 	"yao/libs"
 )
@@ -17,10 +16,6 @@ type Blog struct {
 	Comments   int       `db:"comments" json:"comments"`
 	Like       int       `db:"like" json:"like"`
 	Liked      bool      `json:"liked"`
-}
-
-func BLValidTitle(title string) bool {
-	return strings.TrimSpace(title) != "" && len(title) <= 190
 }
 
 func BLCreate(user_id, private int, title, content string) (int64, error) {

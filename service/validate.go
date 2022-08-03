@@ -102,9 +102,6 @@ func NewValidator() validatorx {
 		return ValFailedErr(fv.FieldName)
 	})
 	val.RegisterValidation("required", func(fv FieldValue) error {
-		if fv.Value.CanInt() && fv.Value.Int() == 0 {
-			return ValFailedErr("required non-zero")
-		}
 		switch fv.Value.Kind() {
 		case reflect.String:
 			if fv.Value.String() == "" {
@@ -114,11 +111,6 @@ func NewValidator() validatorx {
 			if fv.Value.IsNil() {
 				return ValFailedErr("required non-nil")
 			}
-		case reflect.Bool:
-			if !fv.Value.Bool() {
-				return ValFailedErr("required non-false value")
-			}
-			fv.Value.IsNil()
 		}
 		return nil
 	})

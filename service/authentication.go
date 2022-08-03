@@ -11,18 +11,10 @@ import (
 type Auth struct {
 	UserID  int `session:"user_id" validate:"gte=0"`
 	UserGrp int `session:"user_group" validate:"gte=0,lte=3"`
-
-	// if from contest
-	ctstOrigin int
 }
 
 func (auth *Auth) IsAdmin() bool {
 	return libs.IsAdmin(auth.UserGrp)
-}
-
-func (r *Auth) SetCtst(ctstid int) *Auth {
-	r.ctstOrigin = ctstid
-	return r
 }
 
 // 1. valid user_id
@@ -98,96 +90,176 @@ func (auth *Auth) CanTakeCtst(contest internal.Contest, can_edit bool) bool {
 	return false
 }
 
+func (auth *Auth) CanEditSubm(sub internal.SubmissionBase) bool {
+	return auth.CanEditProb(sub.ProblemId) ||
+		(sub.ContestId > 0 && auth.CanEditCtst(sub.ContestId))
+}
+
 // 许可证
-type Permit[DataType any] struct {
-	data DataType
-	// accepted or not accepted
-	status bool
+type Permit struct {
+	*Auth
+	*libs.SyncPromise[any, bool]
 }
 
-func (r *Permit[T]) Then(callback func(a T)) *Permit[T] {
-	if r.status {
-		callback(r.data)
+func (auth *Auth) NewPermit() *Permit {
+	return &Permit{
+		auth,
+		libs.NewSyncPromise(
+			func(p bool) bool { return !p },
+			func() (any, bool) { return nil, true },
+		),
 	}
-	return r
 }
-func (r *Permit[T]) Else(callback func(a T)) *Permit[T] {
-	if !r.status {
-		callback(r.data)
-	}
-	return r
+
+func (p *Permit) Try(callback func() (any, bool)) *Permit {
+	p.SyncPromise.Then(func(t any) (any, bool) { return callback() })
+	return p
 }
-func (r *Permit[T]) ElseAPIStatusForbidden(ctx Context) {
-	if !r.status {
+
+func (p *Permit) Then(callback func(any) (any, bool)) *Permit {
+	p.SyncPromise.Then(callback)
+	return p
+}
+
+func (p *Permit) Success(callback func(any)) *Permit {
+	p.SyncPromise.Then(func(t any) (any, bool) {
+		callback(t)
+		return t, true
+	})
+	return p
+}
+
+func (p *Permit) Fail(callback func()) {
+	p.SyncPromise.Catch(func(b bool) {
+		callback()
+	})
+}
+
+func (p *Permit) FailAPIStatusForbidden(ctx Context) {
+	p.Fail(func()  {
 		ctx.JSONAPI(http.StatusForbidden, "", nil)
-	}
+	})
 }
-func (r *Permit[T]) ElseRPCStatusForbidden(ctx Context) {
-	if !r.status {
+func (p *Permit) FailRPCStatusForbidden(ctx Context) {
+	p.Fail(func() {
 		ctx.JSONRPC(http.StatusForbidden, -32600, "", nil)
-	}
+	})
 }
 
-func (auth *Auth) AsAdmin() *Permit[struct{}] {
-	if auth.IsAdmin() {
-		return &Permit[struct{}]{status: true, data: struct{}{}}
-	}
-	return &Permit[struct{}]{status: false, data: struct{}{}}
+func (p *Permit) AsAdmin() *Permit {
+	return p.Try(func() (any, bool) {
+		return nil, p.IsAdmin()
+	})
 }
 
+//user registered and user group is at least normal user
+func (p *Permit) AsNormalUser() *Permit {
+	return p.Try(func() (any, bool) {
+		return nil, p.UserID > 0 && !libs.IsBanned(p.UserGrp)
+	})
+}
+
+//ctstid=0 means no contest
 // if can't see -> unaccepted
 // if must see from contest, data represents contest id (none zero),
 // otherwise zero.
-func (auth *Auth) TrySeeProb(probid int) *Permit[int] {
-	if auth.CanSeeProb(probid) {
-		return &Permit[int]{status: true, data: 0}
-	}
-	if auth.ctstOrigin > 0 && auth.CanSeeProbInCtst(probid, auth.ctstOrigin) {
-		return &Permit[int]{status: true, data: auth.ctstOrigin}
-	}
-	return &Permit[int]{status: false}
+func (p *Permit) TrySeeProb(probid int, ctstid int) *Permit {
+	return p.Try(func() (a any, b bool) {
+		if p.CanSeeProb(probid) {
+			return 0, true
+		}
+		if ctstid > 0 && p.CanSeeProbInCtst(probid, ctstid) {
+			return ctstid, true
+		}
+		return 0, false
+	})
 }
 
-func (auth *Auth) TryEditProb(probid int) *Permit[struct{}] {
-	if auth.CanEditProb(probid) {
-		return &Permit[struct{}]{status: true}
-	}
-	return &Permit[struct{}]{status: false}
+func (p *Permit) TryEditProb(probid int) *Permit {
+	return p.Try(func() (any, bool) {
+		return nil, p.CanEditProb(probid)
+	})
 }
 
 type PermitCtst struct {
 	*internal.Contest
 	CanEdit bool
 }
-func (auth *Auth) TryEnterCtst(ctstid int) *Permit[PermitCtst] {
-	ctst, _ := internal.CTQuery(ctstid, auth.UserID)
-	can_edit := auth.CanEditCtst(ctstid)
-	if auth.CanEnterCtst(ctst, can_edit) {
-		return &Permit[PermitCtst]{status: true, data: PermitCtst{&ctst, can_edit}}
-	}
-	return &Permit[PermitCtst]{status: false, data: PermitCtst{&ctst, can_edit}}
+
+func (p *Permit) TryEnterCtst(ctstid int) *Permit {
+	return p.Try(func() (any, bool) {
+		ctst, _ := internal.CTQuery(ctstid, p.UserID)
+		can_edit := p.CanEditCtst(ctstid)
+		return PermitCtst{&ctst, can_edit}, p.CanEnterCtst(ctst, can_edit)
+	})
 }
 
-func (auth *Auth) TryEditCtst(ctstid int) *Permit[struct{}] {
-	if auth.CanEditCtst(ctstid) {
-		return &Permit[struct{}]{status: true}
-	}
-	return &Permit[struct{}]{status: false}
+func (p *Permit) TryEditCtst(ctstid int) *Permit {
+	return p.Try(func() (any, bool) {
+		return nil, p.CanEditCtst(ctstid)
+	})
 }
 
-func (auth *Auth) TryTakeCtst(ctstid int) *Permit[PermitCtst] {
-	ctst, _ := internal.CTQuery(ctstid, auth.UserID)
-	can_edit := auth.CanEditCtst(ctstid)
-	if auth.CanTakeCtst(ctst, can_edit) {
-		return &Permit[PermitCtst]{status: true, data: PermitCtst{&ctst, can_edit}}
-	}
-	return &Permit[PermitCtst]{status: false, data: PermitCtst{&ctst, can_edit}}
+func (p *Permit) TryTakeCtst(ctstid int) *Permit {
+	return p.Try(func() (any, bool) {
+		ctst, _ := internal.CTQuery(ctstid, p.UserID)
+		can_edit := p.CanEditCtst(ctstid)
+		return PermitCtst{&ctst, can_edit}, p.CanTakeCtst(ctst, can_edit)
+	})
 }
 
-func (auth *Auth) TrySeeCtst(ctstid int) *Permit[bool] {
-	can_edit := auth.CanEditCtst(ctstid)
-	if auth.CanSeeCtst(ctstid, can_edit) {
-		return &Permit[bool]{status: true, data: can_edit}
-	}
-	return &Permit[bool]{status: false, data: can_edit}
+func (p *Permit) TrySeeCtst(ctstid int) *Permit {
+	return p.Try(func() (any, bool) {
+		can_edit := p.CanEditCtst(ctstid)
+		return can_edit, p.CanSeeCtst(ctstid, can_edit)
+	})
+}
+
+func (p *Permit) TrySeeBlog(blogid int) *Permit {
+	return p.Try(func() (any, bool) {
+		var blog internal.Blog
+		libs.DBSelectSingle(&blog, "select blog_id, author, private from blogs where blog_id=?", blog)
+		return nil, p.IsAdmin() || p.UserID == blog.Author || !blog.Private
+	})
+}
+
+func (p *Permit) TryEditBlog(blogid int) *Permit {
+	return p.Try(func() (any, bool) {
+		var blog internal.Blog
+		libs.DBSelectSingle(&blog, "select blog_id, author from blogs where blog_id=?", blogid)
+		return nil, p.IsAdmin() || p.UserID == blog.Author
+	})
+}
+
+func (p *Permit) TryEditBlogCmnt(cmntid int) *Permit {
+	return p.Try(func() (any, bool) {
+		var comment internal.Comment
+		libs.DBSelectSingle(&comment, "select author, blog_id from blog_comments where comment_id=?", cmntid)
+		return struct{}{}, p.IsAdmin() || comment.Author == p.UserID
+	})
+}
+
+type PermitSubm struct {
+	internal.Submission
+	ByProb  bool
+	CanEdit bool
+}
+
+func (p *Permit) TrySeeSubm(submid int) *Permit {
+	ret, _ := internal.SMQuery(submid)
+	return p.TrySeeProb(ret.ProblemId, ret.ContestId).Then(func(a any) (any, bool) {
+		by_problem := a.(int) > 0
+		can_edit := p.CanEditSubm(ret.SubmissionBase)
+		if !can_edit && ret.Submitter != p.UserID && !by_problem {
+			return nil, false
+		}
+		return PermitSubm{ret, by_problem, can_edit}, true
+	})
+}
+
+func (p *Permit) TryEditSubm(submid int) *Permit {
+	return p.Try(func() (any, bool) {
+		ret, _ := internal.SMGetBaseInfo(submid)
+		return ret, p.CanEditSubm(ret)
+	})
 }

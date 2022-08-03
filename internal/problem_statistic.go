@@ -33,7 +33,7 @@ type statisticSubm struct {
 }
 
 var (
-	allStatistic = libs.NewMemoryCache(time.Hour, 100)
+	allStatistic = libs.NewMemoryCache[*problemStatistic](time.Hour, 100)
 	prsMultiLock = libs.NewMappedMultiRWMutex()
 	statisticCols = "submission_id, submitter, problem_id, time, memory, length"
 )
@@ -117,11 +117,10 @@ func PRSRenew(problem_id int) {
 func PRSAddSubmission(problem_id, sid int) {
 	prsMultiLock.Lock(problem_id)
 	defer prsMultiLock.Unlock(problem_id)
-	raw_statistic, ok := allStatistic.Get(problem_id)
+	statistic, ok := allStatistic.Get(problem_id)
 	if !ok {
 		return
 	}
-	statistic := raw_statistic.(*problemStatistic)
 	fmt.Println(statistic.totSubs)
 	statistic.totSubs++
 	var sub statisticSubm
@@ -137,11 +136,10 @@ func PRSAddSubmission(problem_id, sid int) {
 func PRSDeleteSubmission(sub SubmissionBase) {
 	prsMultiLock.Lock(sub.ProblemId)
 	defer prsMultiLock.Unlock(sub.ProblemId)
-	raw_statistic, ok := allStatistic.Get(sub.ProblemId)
+	statistic, ok := allStatistic.Get(sub.ProblemId)
 	if !ok {
 		return
 	}
-	statistic := raw_statistic.(*problemStatistic)
 	_, ok = statistic.sids[sub.Id]
 	if !ok {//no such ac submission
 		return
@@ -183,17 +181,16 @@ return (submission ids, is full)
 func PRSGetSubmissions(problem_id, bound, bound_id, pagesize int, isleft bool, mode string) ([]int, bool) {
 	prsMultiLock.RLock(problem_id)
 	defer prsMultiLock.RUnlock(problem_id)
-	raw_statistic, ok := allStatistic.Get(problem_id)
+	statistic, ok := allStatistic.Get(problem_id)
 	if !ok {
 		prsMultiLock.RUnlock(problem_id)
 		PRSRenew(problem_id)
 		prsMultiLock.RLock(problem_id)
-		raw_statistic, ok = allStatistic.Get(problem_id)
+		statistic, ok = allStatistic.Get(problem_id)
 		if !ok {
 			return nil, false
 		}
 	}
-	statistic := raw_statistic.(*problemStatistic)
 	n := len(statistic.uidMap)
 	val := &statistic.time
 	if mode == "memory" {
@@ -223,16 +220,15 @@ func PRSGetSubmissions(problem_id, bound, bound_id, pagesize int, isleft bool, m
 func PRSGetACRatio(problem_id int) (int, int) {
 	prsMultiLock.RLock(problem_id)
 	defer prsMultiLock.RUnlock(problem_id)
-	raw_statistic, ok := allStatistic.Get(problem_id)
+	statistic, ok := allStatistic.Get(problem_id)
 	if !ok {
 		prsMultiLock.RUnlock(problem_id)
 		PRSRenew(problem_id)
 		prsMultiLock.RLock(problem_id)
-		raw_statistic, ok = allStatistic.Get(problem_id)
+		statistic, ok = allStatistic.Get(problem_id)
 		if !ok {
 			return 0, 0
 		}
 	}
-	statistic := raw_statistic.(*problemStatistic)
 	return len(statistic.sids), statistic.totSubs
 }

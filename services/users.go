@@ -124,7 +124,7 @@ type UserInitParam struct {
 
 func UserInit(ctx Context, param UserInitParam) {
 	sess := sessions.Default(ctx.Context)
-	var ret func(internal.UserBase) = func(user internal.UserBase) {
+	ret := func(user internal.UserBase) {
 		fmt.Println(user)
 		if user.Usergroup == libs.USBanned {
 			UserLogout(ctx, UserLogoutParam{})
@@ -167,15 +167,11 @@ func UserInit(ctx Context, param UserInitParam) {
 }
 
 type UserGetParam struct {
-	UserID int `query:"user_id" binding:"required" validate:"userid"`
+	UserID int `query:"user_id" validate:"required,userid"`
 }
 
 func UserGet(ctx Context, param UserGetParam) {
 	user, err := internal.USQuery(param.UserID)
-	if err != nil {
-		ctx.JSONAPI(http.StatusBadRequest, "no such user id", nil)
-		return
-	}
 	user.Password, user.RememberToken = "", ""
 	data, err := libs.Struct2Map(user)
 	if err != nil {
@@ -186,9 +182,9 @@ func UserGet(ctx Context, param UserGetParam) {
 }
 
 type UserEditParam struct {
-	CurUserID int    `session:"user_id"`
-	UserID    int    `body:"user_id" binding:"required" validate:"userid"`
-	Gender    int    `body:"gender" binding:"required" validate:"gte=0,lte=2"`
+	Auth
+	TargetID  int    `body:"user_id" validate:"required,userid"`
+	Gender    int    `body:"gender" validate:"required,gte=0,lte=2"`
 	Passwd    string `body:"password"`
 	NewPasswd string `body:"new_password"`
 	Motto     string `body:"motto" validate:"lte=350"`
@@ -197,92 +193,78 @@ type UserEditParam struct {
 }
 
 func UserEdit(ctx Context, param UserEditParam) {
-	if param.UserID != param.CurUserID {
-		ctx.JSONAPI(http.StatusForbidden, "", nil)
-		return
-	}
-	password := param.Passwd
-	ok, err := internal.CheckPassword(param.UserID, password)
-	if err != nil {
-		ctx.ErrorAPI(err)
-		return
-	}
-	if !ok {
-		ctx.JSONAPI(http.StatusBadRequest, "wrong password", nil)
-		return
-	}
-	new_password := param.NewPasswd
-	if new_password != "" && internal.ValidPassword(new_password) {
-		password = new_password
-	}
-	password = internal.SaltPassword(password)
-	motto, email, organization := param.Motto, param.Email, param.Org
-	err = internal.USModify(password, param.Gender, motto, email, organization, param.UserID)
-	if err != nil {
-		ctx.ErrorAPI(err)
-		return
-	}
+	param.NewPermit().Try(func() (any, bool) {
+		//only user himself can modify profiles
+		return nil, param.TargetID == param.UserID
+	}).Success(func(a any) {
+		password := param.Passwd
+		ok, err := internal.CheckPassword(param.UserID, password)
+		if err != nil {
+			ctx.ErrorAPI(err)
+			return
+		}
+		if !ok {
+			ctx.JSONAPI(http.StatusBadRequest, "wrong password", nil)
+			return
+		}
+		new_password := param.NewPasswd
+		if new_password != "" && internal.ValidPassword(new_password) {
+			password = new_password
+		}
+		password = internal.SaltPassword(password)
+		motto, email, organization := param.Motto, param.Email, param.Org
+		err = internal.USModify(password, param.Gender, motto, email, organization, param.UserID)
+		if err != nil {
+			ctx.ErrorAPI(err)
+			return
+		}
+	}).FailAPIStatusForbidden(ctx)
 }
 
 type UserGrpEditParam struct {
-	UserID  int `body:"user_id" binding:"required" validate:"userid"`
-	UserGrp int `body:"user_group" binding:"required"`
-	CurGrp  int `session:"user_group" validate:"admin"`
+	Auth
+	TargetID  int `body:"user_id" validate:"required,userid"`
+	TargetGrp int `body:"user_group" validate:"required"`
 }
 
 func UserGrpEdit(ctx Context, param UserGrpEditParam) {
-	if param.CurGrp <= param.UserGrp {
-		ctx.JSONAPI(http.StatusForbidden, "", nil)
-		return
-	}
-	target, err := internal.UserQueryBase(param.UserID)
-	if err != nil {
-		ctx.JSONAPI(http.StatusBadRequest, "no such user id", nil)
-		return
-	} else if target.Usergroup >= param.CurGrp {
-		ctx.JSONAPI(http.StatusForbidden, "", nil)
-		return
-	}
-	err = internal.USGroupEdit(param.UserID, param.UserGrp)
-	if err != nil {
-		ctx.ErrorAPI(err)
-	} else {
-		ctx.JSONAPI(http.StatusOK, "", nil)
-	}
+	param.NewPermit().AsAdmin().Try(func() (any, bool) {
+		//user cannot modify others' permissions which are higher or equal than himself
+		return nil, param.UserGrp > param.TargetGrp
+	}).Try(func() (any, bool) {
+		target, _ := internal.UserQueryBase(param.UserID)
+		//users cannot modify others which have permissions higher or equal than himself
+		return target, param.UserGrp > target.Usergroup
+	}).Success(func(a any) {	
+		err := internal.USGroupEdit(param.UserID, param.TargetGrp)
+		if err != nil {
+			ctx.ErrorAPI(err)
+		}
+	}).FailAPIStatusForbidden(ctx)
 }
 
 type UserListParam struct {
 	UserName *string `query:"user_name"`
-	Page
-	LeftUserID  *int `query:"left_user_id"`
-	RightUserID *int `query:"right_user_id"`
-	LeftRating  *int `query:"left_rating"`
-	RightRating *int `query:"right_rating"`
+	Page             `validate:"pagecanbound"`
+	LeftID  *int     `query:"left_user_id"`
+	RightID *int     `query:"right_user_id"`
 }
 
 func UserList(ctx Context, param UserListParam) {
 	if param.UserName != nil {
-		if !param.CanBound() {
-			return
-		}
-		users, isfull, err := internal.USListByName(*param.UserName+"%", param.Bound(), param.PageSize, param.IsLeft())
+		users, isfull, err := internal.USListByName(*param.UserName+"%", param.Bound(), *param.PageSize, param.IsLeft())
 		if err != nil {
 			ctx.ErrorAPI(err)
 		} else {
 			ctx.JSONAPI(http.StatusOK, "", map[string]any{"data": users, "isfull": isfull})
 		}
 	} else {
-		var bound_user_id, bound_rating int
-		if param.LeftUserID != nil {
-			bound_user_id = *param.LeftUserID
-			bound_rating = *param.LeftRating
-		} else if param.RightUserID != nil {
-			bound_user_id = *param.RightUserID
-			bound_rating = *param.RightRating
-		} else {
+		bound_user_id := libs.If(param.IsLeft(), param.LeftID, param.RightID)
+		if bound_user_id == nil {
+			ctx.JSONAPI(http.StatusBadRequest, "", nil)
 			return
 		}
-		users, isfull, err := internal.USList(bound_user_id, bound_rating, param.PageSize, param.LeftUserID != nil)
+		users, isfull, err := internal.USList(*bound_user_id, param.Bound(), *param.PageSize, param.LeftID != nil)
 		if err != nil {
 			ctx.ErrorAPI(err)
 		} else {
@@ -292,7 +274,7 @@ func UserList(ctx Context, param UserListParam) {
 }
 
 type UserRatingParam struct {
-	UserId int `query:"user_id" binding:"required" validate:"userid"`
+	UserId int `query:"user_id" validate:"required,userid"`
 }
 
 func UserRating(ctx Context, param UserRatingParam) {
@@ -308,4 +290,22 @@ func UserRating(ctx Context, param UserRatingParam) {
 	} else {
 		ctx.JSONAPI(http.StatusOK, "", map[string]any{"ratings": ratings})
 	}
+}
+
+type UserGetPermParam struct {
+	Auth
+	PermUserID int `query:"user_id" validate:"required,userid"`
+}
+
+func UserGetPerm(ctx Context, param UserGetPermParam) {
+	param.NewPermit().Try(func() (any, bool) {
+		return nil, param.IsAdmin() || param.PermUserID == param.UserID
+	}).Success(func(a any) {
+		permissions, err := internal.USQueryPermission(param.PermUserID)
+		if err != nil {
+			ctx.ErrorAPI(err)
+		} else {
+			ctx.JSONAPI(http.StatusOK, "", map[string]any{"data": permissions})
+		}
+	}).FailAPIStatusForbidden(ctx)
 }

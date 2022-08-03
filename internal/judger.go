@@ -38,7 +38,7 @@ var judgers = []*Judger{
 	// "http://localhost:8084",
 }
 
-var waitingList = libs.NewBlockPriorityQueue()
+var waitingList = libs.NewBlockPriorityQueue[*JudgeEntry]()
 
 //1 on each bit means that the corresponding status has finished
 const (
@@ -76,7 +76,7 @@ type judgerResponse struct {
 func judgerStart(judger *Judger) {
 	for {
 		//wait for a submission
-		subm := waitingList.Pop().(JudgeEntry)
+		subm := waitingList.Pop()
 		sid, uuid, mode := subm.sid, subm.uuid, subm.mode
 		if mode != "custom_test" {
 			if !judgeSubmission(sid, uuid, mode, judger) {
@@ -210,11 +210,11 @@ func judgeCustomTest(sid int, callback *chan []byte, judger *Judger) {
 }
 
 func InsertSubmission(sid int, uuid int64, priority int, mode string) {
-	waitingList.Push(JudgeEntry{sid, mode, uuid, nil}, priority)
+	waitingList.Push(&JudgeEntry{sid, mode, uuid, nil}, priority)
 }
 
 func InsertCustomTest(sid int, callback *chan []byte) {
-	waitingList.Push(JudgeEntry{sid, "custom_test", 0, callback}, 0)
+	waitingList.Push(&JudgeEntry{sid, "custom_test", 0, callback}, 0)
 }
 
 func FinishJudging(ctx *gin.Context) {

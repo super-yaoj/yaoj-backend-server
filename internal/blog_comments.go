@@ -49,8 +49,12 @@ func BLCommentsGetLike(comments []Comment, user_id int) {
 	}
 }
 
-func BLDeleteComment(id, blog_id int) error {
-	_, err := libs.DBUpdate("delete from blog_comments where comment_id=?", id)
+func BLDeleteComment(id int) error {
+	blog_id, err := libs.DBSelectSingleInt("select blog_id from blog_comments where comment_id=?", id)
+	if err != nil {
+		return err
+	}
+	_, err = libs.DBUpdate("delete from blog_comments where comment_id=?", id)
 	if err != nil {
 		return err
 	}

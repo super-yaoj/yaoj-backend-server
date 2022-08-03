@@ -3,60 +3,51 @@ package services
 import (
 	"net/http"
 	"yao/internal"
-	"yao/libs"
 )
 
 type BlogCmntCreateParam struct {
-	BlogID int `body:"blog_id" binding:"required" validate:"blogid"`
 	Auth
+	BlogID int `body:"blog_id" validate:"required,blogid"`
 }
 
 func BlogCmntCreate(ctx Context, param BlogCmntCreateParam) {
-	if !BLCanSee(param.Auth, param.BlogID) {
-		ctx.JSONAPI(http.StatusForbidden, "", nil)
-		return
-	}
-	content := ctx.PostForm("content")
-	id, err := internal.BLCreateComment(param.BlogID, param.UserID, content)
-	if err != nil {
-		ctx.ErrorAPI(err)
-	} else {
-		ctx.JSONAPI(http.StatusOK, "", map[string]any{"id": id})
-	}
+	param.NewPermit().TrySeeBlog(param.BlogID).Success(func(any) {
+		content := ctx.PostForm("content")
+		id, err := internal.BLCreateComment(param.BlogID, param.UserID, content)
+		if err != nil {
+			ctx.ErrorAPI(err)
+		} else {
+			ctx.JSONAPI(http.StatusOK, "", map[string]any{"id": id})
+		}
+	}).FailAPIStatusForbidden(ctx)
 }
 
 type BlogCmntGetParam struct {
-	BlogID int `query:"blog_id" binding:"required" validate:"blogid"`
 	Auth
+	BlogID int `query:"blog_id" validate:"required,blogid"`
 }
 
 func BlogCmntGet(ctx Context, param BlogCmntGetParam) {
-	if !BLCanSee(param.Auth, param.BlogID) {
-		ctx.JSONAPI(http.StatusForbidden, "", nil)
-		return
-	}
-	comments, err := internal.BLGetComments(param.BlogID, param.UserID)
-	if err != nil {
-		ctx.ErrorAPI(err)
-	} else {
-		ctx.JSONAPI(http.StatusOK, "", map[string]any{"data": comments})
-	}
+	param.NewPermit().TrySeeBlog(param.BlogID).Success(func(any) {
+		comments, err := internal.BLGetComments(param.BlogID, param.UserID)
+		if err != nil {
+			ctx.ErrorAPI(err)
+		} else {
+			ctx.JSONAPI(http.StatusOK, "", map[string]any{"data": comments})
+		}
+	}).FailAPIStatusForbidden(ctx)
 }
 
 type BlogCmntDelParam struct {
-	CmntID int `query:"comment_id" binding:"required" validate:"blogid"`
 	Auth
+	CmntID int `query:"comment_id" validate:"required,cmntid"`
 }
 
 func BlogCmntDel(ctx Context, param BlogCmntDelParam) {
-	var comment internal.Comment
-	libs.DBSelectSingle(&comment, "select author, blog_id from blog_comments where comment_id=?", param.CmntID)
-	if !param.IsAdmin() && comment.Author != param.UserID {
-		ctx.JSONAPI(http.StatusForbidden, "", nil)
-	} else {
-		err := internal.BLDeleteComment(param.CmntID, comment.BlogId)
+	param.NewPermit().TryEditBlogCmnt(param.CmntID).Success(func(any) {
+		err := internal.BLDeleteComment(param.CmntID)
 		if err != nil {
 			ctx.ErrorAPI(err)
 		}
-	}
+	}).FailAPIStatusForbidden(ctx)
 }

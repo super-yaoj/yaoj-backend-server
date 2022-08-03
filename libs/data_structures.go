@@ -7,31 +7,31 @@ import (
 
 //-------memory cached map with a expiring time
 
-type mapEntry struct {
+type mapEntry[T any] struct {
 	last_visit time.Time
-	data       any
+	data       T
 }
 
-type cacheMap struct {
+type MemoryCache[T any] interface {
+	Set(int, T)
+	Get(int) (T, bool)
+	Delete(int)
+}
+
+type cacheMap[T any] struct {
 	mutex           sync.RWMutex
-	mp              map[int]*mapEntry
+	mp              map[int]*mapEntry[T]
 	cacheExpireTime time.Duration
 	maxCheckLength  int
 }
 
-type MemoryCache interface {
-	Set(int, any)
-	Get(int) (any, bool)
-	Delete(int)
+func NewMemoryCache[T any](expire time.Duration, check_length int) MemoryCache[T] {
+	return &cacheMap[T]{sync.RWMutex{}, make(map[int]*mapEntry[T]), expire, check_length}
 }
 
-func NewMemoryCache(expire time.Duration, check_length int) MemoryCache {
-	return &cacheMap{sync.RWMutex{}, make(map[int]*mapEntry), expire, check_length}
-}
-
-func (cm *cacheMap) Set(key int, val any) {
+func (cm *cacheMap[T]) Set(key int, val T) {
 	cm.mutex.Lock()
-	cm.mp[key] = &mapEntry{time.Now(), val}
+	cm.mp[key] = &mapEntry[T]{time.Now(), val}
 	if len(cm.mp) >= cm.maxCheckLength {
 		current := time.Now().Add(-cm.cacheExpireTime)
 		for i := range cm.mp {
@@ -43,18 +43,18 @@ func (cm *cacheMap) Set(key int, val any) {
 	cm.mutex.Unlock()
 }
 
-func (cm *cacheMap) Get(key int) (any, bool) {
+func (cm *cacheMap[T]) Get(key int) (T, bool) {
 	cm.mutex.RLock()
 	defer cm.mutex.RUnlock()
 	a, ok := cm.mp[key]
 	if !ok {
-		return nil, false
+		return *new(T), false
 	}
 	a.last_visit = time.Now()
 	return a.data, true
 }
 
-func (cm *cacheMap) Delete(key int) {
+func (cm *cacheMap[T]) Delete(key int) {
 	cm.mutex.Lock()
 	delete(cm.mp, key)
 	cm.mutex.Unlock()
@@ -62,30 +62,30 @@ func (cm *cacheMap) Delete(key int) {
 
 //-------Blocked priority queue
 
-type queueEntry struct {
-	val      any
+type queueEntry[T any] struct {
+	val      T
 	priority int
 }
 
-type PriorityQueue interface {
+type PriorityQueue[T any] interface {
 	Size() int
-	Push(any, int)
-	Top() any
-	Pop() any
+	Push(T, int)
+	Top() T
+	Pop() T
 }
 
-type binaryHeap []queueEntry
+type binaryHeap[T any] []queueEntry[T]
 
-func NewBinaryHeap() *binaryHeap {
-	return &binaryHeap{}
+func NewBinaryHeap[T any]() PriorityQueue[T] {
+	return &binaryHeap[T]{}
 }
 
-func (bh *binaryHeap) Size() int {
+func (bh *binaryHeap[T]) Size() int {
 	return len(*bh)
 }
 
-func (bh *binaryHeap) Push(x any, p int) {
-	*bh = append(*bh, queueEntry{})
+func (bh *binaryHeap[T]) Push(x T, p int) {
+	*bh = append(*bh, queueEntry[T]{})
 	n := len(*bh) - 1
 	for n > 0 {
 		f := (n - 1) / 2
@@ -96,10 +96,10 @@ func (bh *binaryHeap) Push(x any, p int) {
 		}
 		n = f
 	}
-	(*bh)[n] = queueEntry{x, p}
+	(*bh)[n] = queueEntry[T]{x, p}
 }
 
-func (bh *binaryHeap) Pop() any {
+func (bh *binaryHeap[T]) Pop() T {
 	top := (*bh)[0]
 	n := len(*bh) - 1
 	(*bh)[0], (*bh)[n] = (*bh)[n], (*bh)[0]
@@ -141,32 +141,31 @@ func (bh *binaryHeap) Pop() any {
 	return top.val
 }
 
-func (bh binaryHeap) Top() any {
-	return bh[0].val
+func (bh *binaryHeap[T]) Top() T {
+	return (*bh)[0].val
 }
 
-type blockPriorityQueue struct {
-	queue PriorityQueue
+type blockPriorityQueue[T any] struct {
+	queue PriorityQueue[T]
 	cond  *sync.Cond
 }
 
-func NewBlockPriorityQueue() *blockPriorityQueue {
-	ret := &blockPriorityQueue{&binaryHeap{}, sync.NewCond(&sync.Mutex{})}
-	return ret
+func NewBlockPriorityQueue[T any]() PriorityQueue[T] {
+	return &blockPriorityQueue[T]{&binaryHeap[T]{}, sync.NewCond(&sync.Mutex{})}
 }
 
-func (pq *blockPriorityQueue) Size() int {
+func (pq *blockPriorityQueue[T]) Size() int {
 	return pq.queue.Size()
 }
 
-func (pq *blockPriorityQueue) Push(x any, p int) {
+func (pq *blockPriorityQueue[T]) Push(x T, p int) {
 	pq.cond.L.Lock()
 	pq.queue.Push(x, p)
 	pq.cond.Signal()
 	pq.cond.L.Unlock()
 }
 
-func (pq *blockPriorityQueue) Top() any {
+func (pq *blockPriorityQueue[T]) Top() T {
 	pq.cond.L.Lock()
 	for pq.queue.Size() == 0 {
 		pq.cond.Wait()
@@ -176,7 +175,7 @@ func (pq *blockPriorityQueue) Top() any {
 	return pq.queue.Top()
 }
 
-func (pq *blockPriorityQueue) Pop() any {
+func (pq *blockPriorityQueue[T]) Pop() T {
 	pq.cond.L.Lock()
 	for pq.queue.Size() == 0 {
 		pq.cond.Wait()
@@ -226,4 +225,58 @@ func (mml *mappedMultiRWLock) RUnlock(id int) {
 
 func NewMappedMultiRWMutex() MultiRWLock {
 	return new(mappedMultiRWLock)
+}
+
+//-------Async Promise
+type SyncPromise[Resolve any, Reject any] struct {
+	res      Resolve           // last resolve
+	rej      Reject            // last rejected
+	IsReject func(Reject) bool // judge whether T is rejected data
+}
+
+func NewSyncPromise[Res any, Rej any](isrej func(Rej) bool, callback func() (Res, Rej)) *SyncPromise[Res, Rej] {
+	res, rej := callback()
+	return &SyncPromise[Res, Rej]{res, rej, isrej}
+}
+//give a callback function that accepts data and returns next data
+//data should be able to judge whether it's rejected
+func (p *SyncPromise[Res, Rej]) Then(callback func(Res) (Res, Rej)) *SyncPromise[Res, Rej] {
+	if p.IsReject(p.rej) {
+		return p
+	}
+	p.res, p.rej = callback(p.res)
+	return p
+}
+
+func (p *SyncPromise[Res, Rej]) Catch(callback func(Rej)) {
+	if p.IsReject(p.rej) {
+		callback(p.rej)
+	}
+}
+
+//error promise
+type ErrorPromise struct {
+	*SyncPromise[struct{}, error]
+}
+
+func NewErrorPromise(callback func() error) *ErrorPromise {
+	return &ErrorPromise{
+		NewSyncPromise(
+			func(err error) bool { return err != nil },
+			func() (struct{}, error) {
+				return struct{}{}, callback()
+			},
+		),
+	}
+}
+
+func (p *ErrorPromise) Then(callback func() error) *ErrorPromise {
+	p.SyncPromise.Then(func(struct{}) (struct{}, error) {
+		return struct{}{}, callback()
+	})
+	return p
+}
+
+func (p *ErrorPromise) Catch(callback func(error)) {
+	p.SyncPromise.Catch(callback)
 }

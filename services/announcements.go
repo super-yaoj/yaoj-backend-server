@@ -6,21 +6,23 @@ import (
 )
 
 type AnceCreateParam struct {
-	BlogID   int `body:"blog_id" binding:"required" validate:"blogid"`
-	Priority int `body:"priority" binding:"required" validate:"gte=1,lte=10"`
-	UserGrp  int `session:"user_group" validate:"admin"`
+	Auth
+	BlogID   int `body:"blog_id" validate:"required,blogid"`
+	Priority int `body:"priority" validate:"required,gte=1,lte=10"`
 }
 
 func AnceCreate(ctx Context, param AnceCreateParam) {
-	err := internal.ANCreate(param.BlogID, param.Priority)
-	if err != nil {
-		ctx.ErrorAPI(err)
-		return
-	}
+	param.NewPermit().AsAdmin().Success(func(a any) {
+		err := internal.ANCreate(param.BlogID, param.Priority)
+		if err != nil {
+			ctx.ErrorAPI(err)
+			return
+		}
+	}).FailAPIStatusForbidden(ctx)
 }
 
 type AnceGetParam struct {
-	UserID int `session:"user_id"`
+	Auth
 }
 
 func AnceGet(ctx Context, param AnceGetParam) {
@@ -28,10 +30,12 @@ func AnceGet(ctx Context, param AnceGetParam) {
 }
 
 type AnceDelParam struct {
-	ID      int `query:"id" binding:"required"`
-	UserGrp int `session:"user_group" validate:"admin"`
+	Auth
+	ID      int `query:"id" validate:"required"`
 }
 
 func AnceDel(ctx Context, param AnceDelParam) {
-	internal.ANDelete(param.ID)
+	param.NewPermit().AsAdmin().Success(func(a any) {
+		internal.ANDelete(param.ID)
+	}).FailAPIStatusForbidden(ctx)
 }

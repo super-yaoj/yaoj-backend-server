@@ -45,7 +45,7 @@ type standingUser struct {
 }
 
 var (
-	allStandings = libs.NewMemoryCache(time.Hour, 100)
+	allStandings = libs.NewMemoryCache[*CTStanding](time.Hour, 100)
 	ctsMultiLock = libs.NewMappedMultiRWMutex()
 	standingCols = "submission_id, submitter, problem_id, score, sample_score, accepted, submit_time"
 )
@@ -165,7 +165,7 @@ func CTSUpdateSubmission(contest_id, sid int) {
 		fmt.Println(err)
 		return
 	}
-	updateCTSEntry(standing.(*CTStanding), &sub, true)
+	updateCTSEntry(standing, &sub, true)
 }
 
 func CTSDeleteSubmission(sub SubmissionBase) {
@@ -174,11 +174,10 @@ func CTSDeleteSubmission(sub SubmissionBase) {
 	}
 	ctsMultiLock.Lock(sub.ContestId)
 	defer ctsMultiLock.Unlock(sub.ContestId)
-	raw_standing, ok := allStandings.Get(sub.ContestId)
+	standing, ok := allStandings.Get(sub.ContestId)
 	if !ok {
 		return
 	}
-	standing := raw_standing.(*CTStanding)
 	uid := standing.uidMap[sub.Submitter]
 	pid := standing.pidMap[sub.ProblemId]
 	if standing.entries[uid].SubIds[pid] > sub.Id {//isn't the last commit
@@ -222,7 +221,7 @@ func CTSGet(contest_id int) []CTStandingEntry {
 			return nil
 		}
 	}
-	return standing.(*CTStanding).entries
+	return standing.entries
 }
 
 func (entry *CTStandingEntry) Rate(rating int) {

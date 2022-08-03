@@ -43,10 +43,13 @@ var Router map[string][]Request = map[string][]Request{
 		{"PATCH", service.GinHandler(PermRename)},
 		{"DELETE", service.GinHandler(PermDel)},
 	},
-	"/user_permissions": {
+	"/permission_users": {
 		{"GET", service.GinHandler(PermGetUser)},
 		{"POST", service.GinHandler(PermAddUser)},
 		{"DELETE", service.GinHandler(PermDelUser)},
+	},
+	"/user_permissions": {
+		{"GET", service.GinHandler(UserGetPerm)},
 	},
 	"/users": {{"GET", service.GinHandler(UserList)}},
 	"/ratings": {{"GET", service.GinHandler(UserRating)}},

@@ -135,6 +135,15 @@ func init() {
 		}
 		return nil
 	})
+	defaultValidator.RegisterValidation("submid", func(fv FieldValue) error {
+		if !fv.Value.CanInt() {
+			return HttpStatErr(http.StatusBadRequest)
+		}
+		if !internal.SMExists(int(fv.Value.Int())) {
+			return HttpStatErr(http.StatusNotFound)
+		}
+		return nil
+	})
 	defaultValidator.RegisterValidation("ctstid", func(fv FieldValue) error {
 		if !fv.Value.CanInt() {
 			return HttpStatErr(http.StatusBadRequest)
@@ -167,6 +176,15 @@ func init() {
 			return HttpStatErr(http.StatusBadRequest)
 		}
 		if !internal.BLExists(int(fv.Value.Int())) {
+			return HttpStatErr(http.StatusNotFound)
+		}
+		return nil
+	})
+	defaultValidator.RegisterValidation("cmntid", func(fv FieldValue) error {
+		if !fv.Value.CanInt() {
+			return HttpStatErr(http.StatusBadRequest)
+		}
+		if !internal.BLCommentExists(int(fv.Value.Int())) {
 			return HttpStatErr(http.StatusNotFound)
 		}
 		return nil
