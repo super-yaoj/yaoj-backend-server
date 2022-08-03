@@ -108,8 +108,8 @@ type CtstEditParam struct {
 	Title        string `body:"title" validate:"required,gte=1,lte=190"`
 	StartTime    string `body:"start_time" validate:"required"`
 	Duration     int    `body:"last" validate:"required,gte=1,lte=1000000"`
-	PrtstOnly    int    `body:"pretest" validate:"required,gte=0,lte=1"`
-	ScorePrivate int    `body:"score_private" validate:"required,gte=0,lte=1"`
+	PrtstOnly    int    `body:"pretest" validate:"gte=0,lte=1"`
+	ScorePrivate int    `body:"score_private" validate:"gte=0,lte=1"`
 }
 
 func CtstEdit(ctx Context, param CtstEditParam) {

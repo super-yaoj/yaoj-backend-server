@@ -111,6 +111,15 @@ func NewValidator() validatorx {
 			if fv.Value.IsNil() {
 				return ValFailedErr("required non-nil")
 			}
+		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+			reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+			if fv.Value.Int() == 0 {
+				return ValFailedErr("required non-zero")
+			}
+		case reflect.Bool:
+			if fv.Value.Bool() == false {
+				return ValFailedErr("required non-false")
+			}
 		}
 		return nil
 	})

@@ -184,7 +184,7 @@ func UserGet(ctx Context, param UserGetParam) {
 type UserEditParam struct {
 	Auth
 	TargetID  int    `body:"user_id" validate:"required,userid"`
-	Gender    int    `body:"gender" validate:"required,gte=0,lte=2"`
+	Gender    int    `body:"gender" validate:"gte=0,lte=2"`
 	Passwd    string `body:"password"`
 	NewPasswd string `body:"new_password"`
 	Motto     string `body:"motto" validate:"lte=350"`

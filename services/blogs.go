@@ -8,8 +8,7 @@ import (
 
 type BlogCreateParam struct {
 	Auth
-	UserID  int    `session:"user_id" validate:"gte=0"`
-	Private int    `body:"private" validate:"required,gte=0,lte=1"`
+	Private int    `body:"private" validate:"gte=0,lte=1"`
 	Title   string `body:"title" validate:"required,gte=1,lte=190"`
 	Content string `body:"content"`
 }
@@ -28,7 +27,7 @@ func BlogCreate(ctx Context, param BlogCreateParam) {
 type BlogEditParam struct {
 	Auth
 	BlogID  int    `body:"blog_id" validate:"required,blogid"`
-	Private int    `body:"private" validate:"required,gte=0,lte=1"`
+	Private int    `body:"private" validate:"gte=0,lte=1"`
 	Title   string `body:"title" validate:"gte=1,lte=190"`
 	Content string `body:"content"`
 }
