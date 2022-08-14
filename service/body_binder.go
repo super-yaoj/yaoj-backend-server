@@ -2,6 +2,7 @@ package service
 
 import (
 	"fmt"
+	"log"
 	"mime/multipart"
 	"reflect"
 	"strings"
@@ -11,7 +12,8 @@ import (
 
 // 支持 "required"
 type BodyBinder struct {
-	ctx *gin.Context
+	ctx      *gin.Context
+	jsondata map[string]any
 }
 
 func (r BodyBinder) Bind(value reflect.Value, field reflect.StructField) (isSet bool, err error) {
@@ -24,6 +26,11 @@ func (r BodyBinder) Bind(value reflect.Value, field reflect.StructField) (isSet 
 	}
 	if strings.Contains(ctype, "application/x-www-form-urlencoded") {
 		return r.BindPostForm(value, field)
+	}
+	if strings.Contains(ctype, "application/json") {
+		log.Print("bind json!")
+		r.ctx.BindJSON(&r.jsondata)
+		return r.BindJson(value, field)
 	}
 	return false, fmt.Errorf("unknown content type %q", ctype)
 }
@@ -88,6 +95,64 @@ func (r BodyBinder) BindPostForm(value reflect.Value, field reflect.StructField)
 			isSet, err = false, nil
 		} else {
 			isSet, err = BasicBinder(r.ctx.PostForm(name)).Bind(value)
+		}
+	}
+
+	if err != nil {
+		return
+	}
+	if strings.Contains(bindOpt, "required") && !isSet {
+		err = fmt.Errorf("field %q of type %q required but not binded", field.Name, value.Type())
+	}
+	return
+}
+
+func (r BodyBinder) BindJson(value reflect.Value, field reflect.StructField) (isSet bool, err error) {
+	name, hasName := field.Tag.Lookup("body")
+	bindOpt, _ := field.Tag.Lookup("binding")
+
+	if value.Kind() == reflect.Pointer {
+		isNew := false
+		vptr := value
+		if value.IsNil() {
+			isNew = true
+			vptr = reflect.New(value.Type().Elem())
+		}
+		isSet, err = r.BindJson(vptr.Elem(), field)
+		if err != nil {
+			return
+		}
+		if isNew && isSet {
+			value.Set(vptr)
+		}
+		return isSet, nil
+	} else if value.Kind() == reflect.Struct { // 递归绑定数据，这时结构体的 tag 无意义
+		tVal := value.Type()
+		isSet = false
+		for i := 0; i < tVal.NumField(); i++ {
+			sf := tVal.Field(i)
+			if sf.PkgPath != "" && !sf.Anonymous {
+				continue
+			}
+			isSet, err = r.BindJson(value.Field(i), sf)
+			if err != nil {
+				return
+			}
+		}
+		return isSet, nil
+	} else {
+		if !hasName {
+			return false, nil
+		}
+
+		data, hasData := r.jsondata[name]
+
+		if value.Kind() == reflect.Slice {
+			isSet, err = false, fmt.Errorf("currently can't bind json value to slice")
+		} else if !hasData {
+			isSet, err = false, nil
+		} else {
+			isSet, err = BasicBinder(fmt.Sprint(data)).Bind(value)
 		}
 	}
 

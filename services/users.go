@@ -22,6 +22,7 @@ func validSign(username, password string) error {
 	return nil
 }
 
+// UserSignupParam
 type UserSignUpParam struct {
 	UserName   string `body:"user_name"`
 	Passwd     string `body:"password"`
@@ -235,7 +236,7 @@ func UserGrpEdit(ctx Context, param UserGrpEditParam) {
 		target, _ := internal.UserQueryBase(param.UserID)
 		//users cannot modify others which have permissions higher or equal than himself
 		return target, param.UserGrp > target.Usergroup
-	}).Success(func(a any) {	
+	}).Success(func(a any) {
 		err := internal.USGroupEdit(param.UserID, param.TargetGrp)
 		if err != nil {
 			ctx.ErrorAPI(err)
@@ -245,9 +246,9 @@ func UserGrpEdit(ctx Context, param UserGrpEditParam) {
 
 type UserListParam struct {
 	UserName *string `query:"user_name"`
-	Page             `validate:"pagecanbound"`
-	LeftID  *int     `query:"left_user_id"`
-	RightID *int     `query:"right_user_id"`
+	Page     `validate:"pagecanbound"`
+	LeftID   *int `query:"left_user_id"`
+	RightID  *int `query:"right_user_id"`
 }
 
 func UserList(ctx Context, param UserListParam) {
@@ -279,10 +280,10 @@ type UserRatingParam struct {
 
 func UserRating(ctx Context, param UserRatingParam) {
 	var ratings []struct {
-		Rating 		int 		`db:"rating" json:"rating"`
-		ContestId 	int 		`db:"contest_id" json:"contest_id"`
-		Time 		time.Time 	`db:"time" json:"time"`
-		Title 		string 		`db:"title" json:"title"`
+		Rating    int       `db:"rating" json:"rating"`
+		ContestId int       `db:"contest_id" json:"contest_id"`
+		Time      time.Time `db:"time" json:"time"`
+		Title     string    `db:"title" json:"title"`
 	}
 	err := libs.DBSelectAll(&ratings, "select rating, a.contest_id, title, time from ((select rating, contest_id, time from ratings where user_id=?) as a inner join contests on a.contest_id=contests.contest_id)", param.UserId)
 	if err != nil {

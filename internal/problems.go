@@ -13,7 +13,7 @@ type Statement struct {
 	Path string `json:"path"`
 }
 
-type SubmConfig map[string]problem.SubmLimit
+type SubmConfig = problem.SubmConf // map[string]problem.SubmLimit
 
 type Problem struct {
 	Id    int    `db:"problem_id" json:"problem_id"`
