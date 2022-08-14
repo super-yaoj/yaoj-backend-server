@@ -5,7 +5,11 @@ import (
 	"math"
 	"sort"
 	"time"
-	"yao/libs"
+	"yao/db"
+
+	utils "github.com/super-yaoj/yaoj-utils"
+	"github.com/super-yaoj/yaoj-utils/cache"
+	"github.com/super-yaoj/yaoj-utils/locks"
 )
 
 type statisticValue struct {
@@ -33,8 +37,8 @@ type statisticSubm struct {
 }
 
 var (
-	allStatistic = libs.NewMemoryCache[*problemStatistic](time.Hour, 100)
-	prsMultiLock = libs.NewMappedMultiRWMutex()
+	allStatistic = cache.NewMemoryCache[*problemStatistic](time.Hour, 100)
+	prsMultiLock = locks.NewMappedMultiRWMutex()
 	statisticCols = "submission_id, submitter, problem_id, time, memory, length"
 )
 
@@ -59,7 +63,7 @@ func (val *statisticValue) initEntry(uid int) {
 }
 
 func (val *statisticValue) resortEntry(uid int) {
-	libs.ResortEntry(val.sorted, val.compare(), libs.FindSlice(val.sorted, uid))
+	utils.ResortEntry(val.sorted, val.compare(), utils.FindIndex(val.sorted, uid))
 }
 
 func (val *statisticValue) updateEntry(value int, sid int, uid int, sorts bool) {
@@ -94,7 +98,7 @@ func PRSRenew(problem_id int) {
 	prsMultiLock.Lock(problem_id)
 	defer prsMultiLock.Unlock(problem_id)
 	var subs []statisticSubm
-	err := libs.DBSelectAll(&subs, "select " + statisticCols + " from submissions where problem_id=? and status=? and accepted=?", problem_id, Finished, Accepted)
+	err := db.DBSelectAll(&subs, "select " + statisticCols + " from submissions where problem_id=? and status=? and accepted=?", problem_id, Finished, Accepted)
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -103,7 +107,7 @@ func PRSRenew(problem_id int) {
 	statistic := &problemStatistic{}
 	statistic.uidMap = make(map[int]int)
 	statistic.sids = make(map[int]struct{})
-	statistic.totSubs, err = libs.DBSelectSingleInt("select count(*) from submissions where problem_id=? and status=?", problem_id, Finished)
+	statistic.totSubs, err = db.DBSelectSingleInt("select count(*) from submissions where problem_id=? and status=?", problem_id, Finished)
 	for i := range subs {
 		statistic.sids[subs[i].Id] = struct{}{}
 		statistic.updateEntry(&subs[i], false)
@@ -132,7 +136,7 @@ func PRSUpdateSubmission(problem_id, sid int) {
 		return
 	}
 	var sub statisticSubm
-	err := libs.DBSelectSingle(&sub, "select " + statisticCols + " from submissions where submission_id=? and status=? and accepted=?", sid, Finished, Accepted)
+	err := db.DBSelectSingle(&sub, "select " + statisticCols + " from submissions where submission_id=? and status=? and accepted=?", sid, Finished, Accepted)
 	if err != nil {
 		//this submission isn't ac
 		return
@@ -156,7 +160,7 @@ func PRSDeleteSubmission(sub SubmissionBase) {
 	delete(statistic.sids, sub.Id)
 	uid, ok := statistic.uidMap[sub.Submitter]
 	var subs []statisticSubm
-	err := libs.DBSelectAll(&subs, "select " + statisticCols + " from submissions where problem_id=? and submitter=? and status=? and accepted=?", sub.ProblemId, sub.Submitter, Finished, Accepted)
+	err := db.DBSelectAll(&subs, "select " + statisticCols + " from submissions where problem_id=? and submitter=? and status=? and accepted=?", sub.ProblemId, sub.Submitter, Finished, Accepted)
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -210,7 +214,7 @@ func PRSGetSubmissions(problem_id, bound, bound_id, pagesize int, isleft bool, m
 	
 	start := sort.Search(n, func(i int) bool {
 		uid := val.sorted[i]
-		return val.value[uid] > bound || (val.value[uid] == bound && libs.If(isleft, val.sid[uid] >= bound_id, val.sid[uid] > bound_id))
+		return val.value[uid] > bound || (val.value[uid] == bound && utils.If(isleft, val.sid[uid] >= bound_id, val.sid[uid] > bound_id))
 	})
 	subs := []int{}
 	if isleft {
@@ -219,7 +223,7 @@ func PRSGetSubmissions(problem_id, bound, bound_id, pagesize int, isleft bool, m
 		}
 		return subs, start + pagesize + 1 <= n
 	} else {
-		for i := libs.Max(0, start - pagesize); i < start; i++ {
+		for i := utils.Max(0, start - pagesize); i < start; i++ {
 			subs = append(subs, val.sid[val.sorted[i]])
 		}
 		return subs, start > pagesize

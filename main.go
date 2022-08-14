@@ -5,8 +5,9 @@ import (
 	"log"
 	"os"
 	"time"
+	config "yao/config"
+	"yao/db"
 	"yao/internal"
-	"yao/libs"
 	"yao/services"
 
 	"github.com/dchest/captcha"
@@ -18,7 +19,7 @@ import (
 
 func process(f func(*gin.Context)) func(*gin.Context) {
 	return func(ctx *gin.Context) {
-		ctx.Header("Access-Control-Allow-Origin", libs.FrontDomain)
+		ctx.Header("Access-Control-Allow-Origin", config.Global.FrontDomain)
 		ctx.Header("Access-Control-Allow-Credentials", "true")
 		if ctx.Request.Method == "OPTIONS" {
 			ctx.Header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,PATCH,OPTIONS")
@@ -34,36 +35,29 @@ func process(f func(*gin.Context)) func(*gin.Context) {
 func main() {
 	// parse config
 	flag.Parse()
-	if genConfig {
-		data, _ := yaml.Marshal(config)
+	if config.GenConfig() {
+		data, _ := yaml.Marshal(config.Global)
 		os.WriteFile("config.yaml", data, os.ModePerm)
 		return
 	}
-	if configFile != "" {
-		data, _ := os.ReadFile(configFile)
-		yaml.Unmarshal(data, &config)
+	if config.ConfigFile() != "" {
+		data, _ := os.ReadFile(config.ConfigFile())
+		yaml.Unmarshal(data, &config.Global)
 	}
-	libs.FrontDomain = config.FrontDomain
-	libs.BackDomain = config.BackDomain
-	libs.DataDir = config.DataDir
-	libs.TmpDir = config.TmpDir
-	libs.DataSource = config.DataSource
 
 	// init
-	libs.DirInit()
-	err := libs.DBInit()
+	os.MkdirAll(config.Global.DataDir, os.ModePerm)
+	err := db.DBInit()
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer libs.DBClose()
+	defer db.DBClose()
 	go internal.JudgersInit()
 
 	// server init
 	app := gin.Default()
-	app.POST("/FinishJudging", internal.FinishJudging)
 
 	app.Use(sessions.Sessions("sessionId", cookie.NewStore([]byte("3.1y4a1o5j9"))))
-	app.GET("/judgerlog", process(internal.JudgerLog))
 	captcha.SetCustomStore(captcha.NewMemoryStore(1024, 10*time.Minute))
 	for url, value := range services.Router {
 		app.OPTIONS(url, process(func(ctx *gin.Context) {}))
@@ -82,5 +76,5 @@ func main() {
 			}
 		}
 	}
-	app.Run(config.Listen)
+	app.Run(config.Global.Listen)
 }

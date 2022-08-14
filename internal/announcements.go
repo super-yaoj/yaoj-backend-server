@@ -2,7 +2,9 @@ package internal
 
 import (
 	"time"
-	"yao/libs"
+	"yao/db"
+
+	utils "github.com/super-yaoj/yaoj-utils"
 )
 
 type Announcement struct {
@@ -17,13 +19,13 @@ type Announcement struct {
 }
 
 func ANCreate(blog_id, priority int) error {
-	_, err := libs.DBUpdate("insert into announcements values (?, ?, ?, null)", blog_id, time.Now(), priority)
+	_, err := db.DBUpdate("insert into announcements values (?, ?, ?, null)", blog_id, time.Now(), priority)
 	return err
 }
 
 func ANQuery(user_id int) []Announcement {
 	var ans []Announcement
-	libs.DBSelectAll(&ans, "select id, blogs.blog_id, title, priority, comments, `like`, release_time from (announcements join blogs on announcements.blog_id = blogs.blog_id)")
+	db.DBSelectAll(&ans, "select id, blogs.blog_id, title, priority, comments, `like`, release_time from (announcements join blogs on announcements.blog_id = blogs.blog_id)")
 	ANGetLikes(ans, user_id)
 	return ans
 }
@@ -38,10 +40,10 @@ func ANGetLikes(blogs []Announcement, user_id int) {
 	}
 	ret := GetLikes(BLOG, user_id, ids)
 	for i := range blogs {
-		blogs[i].Liked = libs.HasInt(ret, blogs[i].BlogId)
+		blogs[i].Liked = utils.HasInt(ret, blogs[i].BlogId)
 	}
 }
 
 func ANDelete(id int) {
-	libs.DBUpdate("delete from announcements where id=?", id)
+	db.DBUpdate("delete from announcements where id=?", id)
 }

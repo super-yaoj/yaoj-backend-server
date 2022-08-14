@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"sort"
 	"time"
-	"yao/libs"
+	"yao/db"
+
+	utils "github.com/super-yaoj/yaoj-utils"
 )
 
 type Contest struct {
@@ -27,9 +29,9 @@ func CTList(bound, pagesize, user_id int, isleft, isadmin bool) ([]Contest, bool
 	if isadmin {
 		var err error
 		if isleft {
-			err = libs.DBSelectAll(&cts, "select * from contests where contest_id<=? order by contest_id desc limit ?", bound, pagesize)
+			err = db.DBSelectAll(&cts, "select * from contests where contest_id<=? order by contest_id desc limit ?", bound, pagesize)
 		} else {
-			err = libs.DBSelectAll(&cts, "select * from contests where contest_id>=? order by contest_id limit ?", bound, pagesize)
+			err = db.DBSelectAll(&cts, "select * from contests where contest_id>=? order by contest_id limit ?", bound, pagesize)
 		}
 		if err != nil {
 			return nil, false, err
@@ -39,7 +41,7 @@ func CTList(bound, pagesize, user_id int, isleft, isadmin bool) ([]Contest, bool
 			cts = cts[:pagesize-1]
 		}
 		if !isleft {
-			libs.Reverse(cts)
+			utils.Reverse(cts)
 		}
 		CTGetLikes(cts, user_id)
 		return cts, isfull, nil
@@ -50,11 +52,11 @@ func CTList(bound, pagesize, user_id int, isleft, isadmin bool) ([]Contest, bool
 		}
 
 		var ids []int
-		perm_str := libs.JoinArray(perms)
+		perm_str := utils.JoinArray(perms)
 		if isleft {
-			ids, err = libs.DBSelectInts(fmt.Sprintf("select distinct contest_id from contest_permissions where contest_id<=%d and permission_id in (%s) order by contest_id desc limit %d", bound, perm_str, pagesize))
+			ids, err = db.DBSelectInts(fmt.Sprintf("select distinct contest_id from contest_permissions where contest_id<=%d and permission_id in (%s) order by contest_id desc limit %d", bound, perm_str, pagesize))
 		} else {
-			ids, err = libs.DBSelectInts(fmt.Sprintf("select distinct contest_id from contest_permissions where contest_id>=%d and permission_id in (%s) order by contest_id limit %d", bound, perm_str, pagesize))
+			ids, err = db.DBSelectInts(fmt.Sprintf("select distinct contest_id from contest_permissions where contest_id>=%d and permission_id in (%s) order by contest_id limit %d", bound, perm_str, pagesize))
 		}
 		if err != nil {
 			return nil, false, err
@@ -64,9 +66,9 @@ func CTList(bound, pagesize, user_id int, isleft, isadmin bool) ([]Contest, bool
 		if isfull {
 			ids = ids[:pagesize-1]
 		}
-		id_str := libs.JoinArray(ids)
+		id_str := utils.JoinArray(ids)
 		if len(ids) > 0 {
-			err = libs.DBSelectAll(&cts, "select * from contests where contest_id in (" + id_str + ")")
+			err = db.DBSelectAll(&cts, "select * from contests where contest_id in (" + id_str + ")")
 			if err != nil {
 				return nil, false, err
 			}
@@ -78,23 +80,23 @@ func CTList(bound, pagesize, user_id int, isleft, isadmin bool) ([]Contest, bool
 			for i := range cts {
 				cts[i].RegisterStatus = 1
 			}
-			ids, err = libs.DBSelectInts("select contest_id from contest_permissions where contest_id in ("+id_str+") and permission_id=?", -user_id)
+			ids, err = db.DBSelectInts("select contest_id from contest_permissions where contest_id in ("+id_str+") and permission_id=?", -user_id)
 			if err != nil {
 				return nil, false, err
 			}
 			sort.Ints(ids)
 			for i := range cts {
-				if libs.HasInt(ids, cts[i].Id) {
+				if utils.HasInt(ids, cts[i].Id) {
 					cts[i].RegisterStatus = 0
 				}
 			}
-			ids, err = libs.DBSelectInts("select contest_id from contest_participants where contest_id in ("+id_str+") and user_id=?", user_id)
+			ids, err = db.DBSelectInts("select contest_id from contest_participants where contest_id in ("+id_str+") and user_id=?", user_id)
 			if err != nil {
 				return nil, false, err
 			}
 			sort.Ints(ids)
 			for i := range cts {
-				if libs.HasInt(ids, cts[i].Id) {
+				if utils.HasInt(ids, cts[i].Id) {
 					cts[i].RegisterStatus = 2
 				}
 				if cts[i].RegisterStatus == 1 && cts[i].EndTime.Before(time.Now()) {
@@ -118,13 +120,13 @@ func CTGetLikes(cts []Contest, user_id int) {
 	}
 	ret := GetLikes(CONTEST, user_id, ids)
 	for i := range cts {
-		cts[i].Liked = libs.HasInt(ret, cts[i].Id)
+		cts[i].Liked = utils.HasInt(ret, cts[i].Id)
 	}
 }
 
 func CTQuery(contest_id, user_id int) (Contest, error) {
 	var contest Contest
-	err := libs.DBSelectSingle(&contest, "select * from contests where contest_id=?", contest_id)
+	err := db.DBSelectSingle(&contest, "select * from contests where contest_id=?", contest_id)
 	if err != nil {
 		return contest, err
 	}
@@ -134,102 +136,102 @@ func CTQuery(contest_id, user_id int) (Contest, error) {
 
 func CTGetProblems(contest_id int) ([]Problem, error) {
 	var problems []Problem
-	err := libs.DBSelectAll(&problems, "select a.problem_id, title from ((select problem_id from contest_problems where contest_id=?) as a join problems on a.problem_id=problems.problem_id)", contest_id)
+	err := db.DBSelectAll(&problems, "select a.problem_id, title from ((select problem_id from contest_problems where contest_id=?) as a join problems on a.problem_id=problems.problem_id)", contest_id)
 	sort.Slice(problems, func(i, j int) bool { return problems[i].Id < problems[j].Id })
 	return problems, err
 }
 
 func CTCreate() (int64, error) {
 	start := time.Now().AddDate(0, 0, 1)
-	return libs.DBInsertGetId("insert into contests values (null, \"New Contest\", ?, ?, 0, 0, 0, 0, 0)", start, start.Add(time.Hour))
+	return db.DBInsertGetId("insert into contests values (null, \"New Contest\", ?, ?, 0, 0, 0, 0, 0)", start, start.Add(time.Hour))
 }
 
 func CTModify(contest_id int, title string, start time.Time, last int, pretest int, score_private int) error {
-	_, err := libs.DBUpdate("update contests set title=?, start_time=?, end_time=?, pretest=?, score_private=? where contest_id=?", title, start, start.Add(time.Duration(last)*time.Minute), pretest, score_private, contest_id)
+	_, err := db.DBUpdate("update contests set title=?, start_time=?, end_time=?, pretest=?, score_private=? where contest_id=?", title, start, start.Add(time.Duration(last)*time.Minute), pretest, score_private, contest_id)
 	go CTSRenew(contest_id)
 	return err
 }
 
 func CTGetPermissions(contest_id int) ([]Permission, error) {
 	var p []Permission
-	err := libs.DBSelectAll(&p, "select a.permission_id, permission_name from ((select permission_id from contest_permissions where contest_id=? and permission_id>0) as a join permissions on a.permission_id=permissions.permission_id)", contest_id)
+	err := db.DBSelectAll(&p, "select a.permission_id, permission_name from ((select permission_id from contest_permissions where contest_id=? and permission_id>0) as a join permissions on a.permission_id=permissions.permission_id)", contest_id)
 	return p, err
 }
 
 func CTGetManagers(contest_id int) ([]User, error) {
 	var u []User
-	err := libs.DBSelectAll(&u, "select user_id, user_name from ((select permission_id from contest_permissions where contest_id=? and permission_id<0) as a join user_info on -permission_id=user_id)", contest_id)
+	err := db.DBSelectAll(&u, "select user_id, user_name from ((select permission_id from contest_permissions where contest_id=? and permission_id<0) as a join user_info on -permission_id=user_id)", contest_id)
 	return u, err
 }
 
 func CTGetParticipants(contest_id int) ([]User, error) {
 	var u []User
-	err := libs.DBSelectAll(&u, "select a.user_id, user_name, rating from ((select user_id from contest_participants where contest_id=?) as a join user_info on a.user_id=user_info.user_id)", contest_id)
+	err := db.DBSelectAll(&u, "select a.user_id, user_name, rating from ((select user_id from contest_participants where contest_id=?) as a join user_info on a.user_id=user_info.user_id)", contest_id)
 	return u, err
 }
 
 func CTAddPermission(contest_id, permission_id int) error {
-	_, err := libs.DBUpdate("insert ignore into contest_permissions values (?, ?)", contest_id, permission_id)
+	_, err := db.DBUpdate("insert ignore into contest_permissions values (?, ?)", contest_id, permission_id)
 	return err
 }
 
 func CTDeletePermission(contest_id, permission_id int) error {
-	_, err := libs.DBUpdate("delete from contest_permissions where contest_id=? and permission_id=?", contest_id, permission_id)
+	_, err := db.DBUpdate("delete from contest_permissions where contest_id=? and permission_id=?", contest_id, permission_id)
 	return err
 }
 
 func CTAddProblem(contest_id, problem_id int) error {
-	_, err := libs.DBUpdate("insert ignore into contest_problems values (?, ?)", contest_id, problem_id)
+	_, err := db.DBUpdate("insert ignore into contest_problems values (?, ?)", contest_id, problem_id)
 	go CTSRenew(contest_id)
 	return err
 }
 
 func CTDeleteProblem(contest_id, problem_id int) error {
-	_, err := libs.DBUpdate("delete from contest_problems where contest_id=? and problem_id=?", contest_id, problem_id)
+	_, err := db.DBUpdate("delete from contest_problems where contest_id=? and problem_id=?", contest_id, problem_id)
 	go CTSRenew(contest_id)
 	return err
 }
 
 func CTAddParticipant(contest_id, user_id int) error {
-	affect, err := libs.DBUpdateGetAffected("insert ignore into contest_participants values (?, ?)", contest_id, user_id)
+	affect, err := db.DBUpdateGetAffected("insert ignore into contest_participants values (?, ?)", contest_id, user_id)
 	if err != nil {
 		return err
 	}
-	_, err = libs.DBUpdate("update contests set registrants = registrants + ? where contest_id=?", affect, contest_id)
+	_, err = db.DBUpdate("update contests set registrants = registrants + ? where contest_id=?", affect, contest_id)
 	return err
 }
 
 func CTDeleteParticipant(contest_id, user_id int) error {
-	affect, err := libs.DBUpdateGetAffected("delete from contest_participants where contest_id=? and user_id=?", contest_id, user_id)
+	affect, err := db.DBUpdateGetAffected("delete from contest_participants where contest_id=? and user_id=?", contest_id, user_id)
 	if err != nil {
 		return err
 	}
-	_, err = libs.DBUpdate("update contests set registrants = registrants - ? where contest_id=?", affect, contest_id)
+	_, err = db.DBUpdate("update contests set registrants = registrants - ? where contest_id=?", affect, contest_id)
 	return err
 }
 
 func CTRegistered(contest_id, user_id int) bool {
-	count, err := libs.DBSelectSingleInt("select count(*) from contest_participants where contest_id=? and user_id=?", contest_id, user_id)
+	count, err := db.DBSelectSingleInt("select count(*) from contest_participants where contest_id=? and user_id=?", contest_id, user_id)
 	return err == nil && count > 0
 }
 
 func CTHasProblem(contest_id, problem_id int) bool {
-	count, err := libs.DBSelectSingleInt("select count(*) from contest_problems where contest_id=? and problem_id=?", contest_id, problem_id)
+	count, err := db.DBSelectSingleInt("select count(*) from contest_problems where contest_id=? and problem_id=?", contest_id, problem_id)
 	return err == nil && count > 0
 }
 
 func CTExists(contest_id int) bool {
-	count, err := libs.DBSelectSingleInt("select count(*) from contests where contest_id=?", contest_id)
+	count, err := db.DBSelectSingleInt("select count(*) from contests where contest_id=?", contest_id)
 	return err == nil && count > 0
 }
 
 func CTPretestOnly(contest_id int) bool {
-	pretest, err := libs.DBSelectSingleInt("select pretest from contests where contest_id=?", contest_id)
+	pretest, err := db.DBSelectSingleInt("select pretest from contests where contest_id=?", contest_id)
 	return err != nil || pretest > 0
 }
 
 func CTHasFinished(contest_id int) bool {
-	finished, err := libs.DBSelectSingleInt("select finished from contests where contest_id=?", contest_id)
+	finished, err := db.DBSelectSingleInt("select finished from contests where contest_id=?", contest_id)
 	if err != nil {
 		panic(err)
 	}
@@ -245,7 +247,7 @@ type ContestDashboard struct {
 
 func CTDashboard(contest_id int) []ContestDashboard {
 	var ret []ContestDashboard
-	err := libs.DBSelectAll(&ret, "select * from contest_dashboard where contest_id=?", contest_id)
+	err := db.DBSelectAll(&ret, "select * from contest_dashboard where contest_id=?", contest_id)
 	if err != nil {
 		fmt.Println(err)
 		return nil
@@ -254,6 +256,6 @@ func CTDashboard(contest_id int) []ContestDashboard {
 }
 
 func CTAddDashboard(contest_id int, dashboard string) error {
-	_, err := libs.DBUpdate("insert into contest_dashboard values (?, ?, ?, null)", contest_id, dashboard, time.Now())
+	_, err := db.DBUpdate("insert into contest_dashboard values (?, ?, ?, null)", contest_id, dashboard, time.Now())
 	return err
 }

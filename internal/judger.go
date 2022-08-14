@@ -6,12 +6,16 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
+	"strings"
 	"time"
-	"yao/libs"
+	"yao/config"
+	"yao/db"
 
-	"github.com/gin-gonic/gin"
 	jsoniter "github.com/json-iterator/go"
+	"github.com/super-yaoj/yaoj-core/pkg/utils"
+	"github.com/super-yaoj/yaoj-utils/pq"
 )
 
 type Judger struct {
@@ -29,7 +33,7 @@ type JudgeEntry struct {
 }
 
 func NewJudger(url string) *Judger {
-	return &Judger{url, libs.RandomString(64), make(chan []byte)}
+	return &Judger{url, utils.RandomString(64), make(chan []byte)}
 }
 
 var judgers = []*Judger{
@@ -38,7 +42,7 @@ var judgers = []*Judger{
 	// "http://localhost:8084",
 }
 
-var waitingList = libs.NewBlockPriorityQueue[*JudgeEntry]()
+var waitingList = pq.NewBlockPriorityQueue[*JudgeEntry]()
 
 //1 on each bit means that the corresponding status has finished
 const (
@@ -52,7 +56,7 @@ const (
 
 func JudgersInit() {
 	var sub []Submission
-	err := libs.DBSelectAll(&sub, "select submission_id, problem_id, contest_id, uuid from submissions where status < ? and status >= 0", Finished)
+	err := db.DBSelectAll(&sub, "select submission_id, problem_id, contest_id, uuid from submissions where status < ? and status >= 0", Finished)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -80,8 +84,8 @@ func judgerStart(judger *Judger) {
 		sid, uuid, mode := subm.sid, subm.uuid, subm.mode
 		if mode != "custom_test" {
 			if !judgeSubmission(sid, uuid, mode, judger) {
-				libs.DBUpdate("update submissions set status=? where submission_id=?", InternalError, sid)
-				libs.DBUpdate("update submission_details set result=\"\", pretest_result=\"\", extra_result=\"\" where submission_id=?", sid)
+				db.DBUpdate("update submissions set status=? where submission_id=?", InternalError, sid)
+				db.DBUpdate("update submission_details set result=\"\", pretest_result=\"\", extra_result=\"\" where submission_id=?", sid)
 				sub, _ := SMGetBaseInfo(sid)
 				SMUpdate(sid, sub.ProblemId, subm.mode, []byte{})
 			}
@@ -89,7 +93,7 @@ func judgerStart(judger *Judger) {
 			judgeCustomTest(sid, subm.callback, judger)
 		}
 		//change the judger id to avoid attacks
-		judger.jid = libs.RandomString(64)
+		judger.jid = utils.RandomString(64)
 	}
 }
 
@@ -100,7 +104,7 @@ func judgeSubmission(sid int, uuid int64, mode string, judger *Judger) bool {
 		Uuid int64 `db:"uuid"`
 	}
 	var tinfo TempInfo
-	err := libs.DBSelectSingle(&tinfo, "select problem_id, uuid from submissions where submission_id=?", sid)
+	err := db.DBSelectSingle(&tinfo, "select problem_id, uuid from submissions where submission_id=?", sid)
 	if err != nil {
 		fmt.Println(err)
 		return false
@@ -116,10 +120,10 @@ func judgeSubmission(sid int, uuid int64, mode string, judger *Judger) bool {
 		return true
 	}
 	var content []byte
-	err = libs.DBSelectSingleColumn(&content, "select content from submission_details where submission_id=?", sid)
-	go libs.DBUpdate("update submissions set status=status|? where submission_id=?", Waiting, sid)
+	err = db.DBSelectSingleColumn(&content, "select content from submission_details where submission_id=?", sid)
+	go db.DBUpdate("update submissions set status=status|? where submission_id=?", Waiting, sid)
 	var check_sum string
-	err1 := libs.DBSelectSingleColumn(&check_sum, "select check_sum from problems where problem_id=?", tinfo.Prob)
+	err1 := db.DBSelectSingleColumn(&check_sum, "select check_sum from problems where problem_id=?", tinfo.Prob)
 	if err != nil || err1 != nil {
 		fmt.Println(err, err1)
 		return false
@@ -127,11 +131,11 @@ func judgeSubmission(sid int, uuid int64, mode string, judger *Judger) bool {
 
 	for { //Repeating for data sync
 		//get a new judger id
-		judger.jid = libs.RandomString(64)
-		res, err := http.Post(judger.url+"/judge?"+libs.GetQuerys(map[string]string{
+		judger.jid = utils.RandomString(64)
+		res, err := http.Post(judger.url+"/judge?"+getQuery(map[string]string{
 			"mode": mode,
 			"sum": check_sum,
-			"cb": fmt.Sprintf(libs.BackDomain+"/FinishJudging?jid=%s", judger.jid),
+			"cb": fmt.Sprintf(config.Global.BackDomain+"/FinishJudging?jid=%s", judger.jid),
 		}), "binary", bytes.NewBuffer(content))
 		if err != nil {
 			fmt.Printf("%v\n", err)
@@ -146,7 +150,7 @@ func judgeSubmission(sid int, uuid int64, mode string, judger *Judger) bool {
 		} else if jr.Err_code == 1 {
 			ProblemRWLock.RLock(tinfo.Prob)
 			file, err := os.Open(PRGetDataZip(tinfo.Prob))
-			res, err1 = http.Post(judger.url+"/sync?"+libs.GetQuerys(map[string]string{"sum": check_sum}), "binary", file)
+			res, err1 = http.Post(judger.url+"/sync?"+getQuery(map[string]string{"sum": check_sum}), "binary", file)
 			ProblemRWLock.RUnlock(tinfo.Prob)
 			if err != nil || err1 != nil {
 				fmt.Printf("%v %v\n", err, err1)
@@ -165,7 +169,7 @@ func judgeSubmission(sid int, uuid int64, mode string, judger *Judger) bool {
 	}
 	//Waiting judger finishes
 	ret := <-judger.callback
-	err = libs.DBSelectSingleColumn(&tinfo.Uuid, "select uuid from submissions where submission_id=?", sid)
+	err = db.DBSelectSingleColumn(&tinfo.Uuid, "select uuid from submissions where submission_id=?", sid)
 	if err != nil {
 		fmt.Println(err)
 		return false
@@ -184,14 +188,14 @@ func judgeSubmission(sid int, uuid int64, mode string, judger *Judger) bool {
 
 func judgeCustomTest(sid int, callback *chan []byte, judger *Judger) {
 	var content []byte
-	err := libs.DBSelectSingleColumn(&content, "select content from custom_tests where id=?", sid)
+	err := db.DBSelectSingleColumn(&content, "select content from custom_tests where id=?", sid)
 	if err != nil {
 		fmt.Println(err)
 		*callback <- []byte{}
 		return
 	}
-	res, err := http.Post(judger.url+"/custom?"+libs.GetQuerys(map[string]string{
-		"cb": fmt.Sprintf(libs.BackDomain+"/FinishJudging?jid=%s", judger.jid),
+	res, err := http.Post(judger.url+"/custom?"+getQuery(map[string]string{
+		"cb": fmt.Sprintf(config.Global.BackDomain+"/FinishJudging?jid=%s", judger.jid),
 	}), "binary", bytes.NewBuffer(content))
 	if err != nil {
 		fmt.Println(err)
@@ -217,32 +221,41 @@ func InsertCustomTest(sid int, callback *chan []byte) {
 	waitingList.Push(&JudgeEntry{sid, "custom_test", 0, callback}, 0)
 }
 
-func FinishJudging(ctx *gin.Context) {
-	jid := ctx.Query("jid")
-	result, _ := ioutil.ReadAll(ctx.Request.Body)
+func FinishJudging(jid string, result []byte) error {
 	for i := 0; i < 5; i++ {
 		for key := range judgers {
 			if judgers[key].jid == jid {
 				judgers[key].callback <- result
-				return
+				return nil
 			}
 		}
 		time.Sleep(time.Second)
 	}
-	fmt.Printf("No such judger: judger_id=%s", jid)
+	return fmt.Errorf("No such judger: judger_id=%s", jid)
 }
 
-func JudgerLog(ctx *gin.Context) {
-	id := libs.GetIntDefault(ctx, "id", 0)
+func JudgerLog(id int) string {
 	if id >= len(judgers) {
-		libs.APIWriteBack(ctx, http.StatusBadRequest, "no such judger", nil)
-		return
+		return "No such judger"
 	}
 	res, err := http.Get(judgers[id].url + "/log")
 	if err != nil {
-		libs.APIWriteBack(ctx, http.StatusBadRequest, err.Error(), nil)
-		return
+		return "Internal server error"
 	}
 	body, _ := ioutil.ReadAll(res.Body)
-	libs.APIWriteBack(ctx, http.StatusOK, "", map[string]any{"log": string(body)})
+	return string(body)
+}
+
+func getQuery(query map[string]string) string {
+	first := true
+	ret := strings.Builder{}
+	for key, val := range query {
+		if !first {
+			ret.WriteString("&")
+		} else {
+			first = false
+		}
+		ret.WriteString(key + "=" + url.QueryEscape(val))
+	}
+	return ret.String()
 }

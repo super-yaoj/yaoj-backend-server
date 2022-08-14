@@ -1,8 +1,9 @@
-package libs
+package db
 
 import (
 	"database/sql"
 	"errors"
+	"yao/config"
 
 	"github.com/jmoiron/sqlx"
 
@@ -12,7 +13,7 @@ import (
 var db *sqlx.DB
 
 func DBInit() error {
-	dsn := DataSource
+	dsn := config.Global.DataSource
 	var err error
 	db, err = sqlx.Connect("mysql", dsn)
 	if err != nil {

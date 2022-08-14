@@ -2,7 +2,9 @@ package internal
 
 import (
 	"time"
-	"yao/libs"
+	"yao/db"
+
+	utils "github.com/super-yaoj/yaoj-utils"
 )
 
 type Blog struct {
@@ -19,33 +21,33 @@ type Blog struct {
 }
 
 func BLCreate(user_id, private int, title, content string) (int64, error) {
-	return libs.DBInsertGetId("insert into blogs values (null, ?, ?, ?, ?, ?, 0, 0)", user_id, title, content, private, time.Now())
+	return db.DBInsertGetId("insert into blogs values (null, ?, ?, ?, ?, ?, 0, 0)", user_id, title, content, private, time.Now())
 }
 
 func BLEdit(id, private int, title, content string) error {
-	_, err := libs.DBUpdate("update blogs set title=?, content=?, private=? where blog_id=?", title, content, private, id)
+	_, err := db.DBUpdate("update blogs set title=?, content=?, private=? where blog_id=?", title, content, private, id)
 	return err
 }
 
 func BLDelete(id int) error {
-	_, err := libs.DBUpdate("delete from blogs where blog_id=?", id)
+	_, err := db.DBUpdate("delete from blogs where blog_id=?", id)
 	if err != nil {
 		return err
 	} else {
-		libs.DBUpdate("delete from click_like where target=? and id=?", BLOG, id)
-		libs.DBUpdate("delete from click_like where target=? and id in (select comment_id from blog_comments where blog_id=?)", COMMENT, id)
-		libs.DBUpdate("delete from blog_comments where blog_id=?", id)
+		db.DBUpdate("delete from click_like where target=? and id=?", BLOG, id)
+		db.DBUpdate("delete from click_like where target=? and id in (select comment_id from blog_comments where blog_id=?)", COMMENT, id)
+		db.DBUpdate("delete from blog_comments where blog_id=?", id)
 		return nil
 	}
 }
 
 func BLQuery(id, user_id int) (Blog, error) {
 	var blog Blog
-	err := libs.DBSelectSingle(&blog, "select * from blogs where blog_id=?", id)
+	err := db.DBSelectSingle(&blog, "select * from blogs where blog_id=?", id)
 	if err != nil {
 		return blog, err
 	} else {
-		libs.DBSelectSingle(&blog, "select user_name from user_info where user_id=?", blog.Author)
+		db.DBSelectSingle(&blog, "select user_name from user_info where user_id=?", blog.Author)
 		blog.Liked = GetLike(BLOG, user_id, id)
 		return blog, nil
 	}
@@ -53,7 +55,7 @@ func BLQuery(id, user_id int) (Blog, error) {
 
 func BLListUser(id, user_id int) ([]Blog, error) {
 	var blogs []Blog
-	err := libs.DBSelectAll(&blogs, "select blog_id, title, private, create_time, comments, `like` from blogs where author=?", id)
+	err := db.DBSelectAll(&blogs, "select blog_id, title, private, create_time, comments, `like` from blogs where author=?", id)
 	BLGetLikes(blogs, user_id)
 	return blogs, err
 }
@@ -64,15 +66,15 @@ func BLListAll(bound, pagesize, user_id int, isleft, isadmin bool) ([]Blog, bool
 	var blogs []Blog
 	if isleft {
 		if isadmin {
-			err = libs.DBSelectAll(&blogs, "select blog_id, title, author, create_time, private, user_name, comments, `like` from (user_info join blogs on user_info.user_id=blogs.author) where blog_id<? order by blog_id desc limit ?", bound, pagesize)
+			err = db.DBSelectAll(&blogs, "select blog_id, title, author, create_time, private, user_name, comments, `like` from (user_info join blogs on user_info.user_id=blogs.author) where blog_id<? order by blog_id desc limit ?", bound, pagesize)
 		} else {
-			err = libs.DBSelectAll(&blogs, "select blog_id, title, author, create_time, private, user_name, comments, `like` from (user_info join blogs on user_info.user_id=blogs.author) where blog_id<? and (author=? or private=0) order by blog_id desc limit ?", bound, user_id, pagesize)
+			err = db.DBSelectAll(&blogs, "select blog_id, title, author, create_time, private, user_name, comments, `like` from (user_info join blogs on user_info.user_id=blogs.author) where blog_id<? and (author=? or private=0) order by blog_id desc limit ?", bound, user_id, pagesize)
 		}
 	} else {
 		if isadmin {
-			err = libs.DBSelectAll(&blogs, "select blog_id, title, author, create_time, private, user_name, comments, `like` from (user_info join blogs on user_info.user_id=blogs.author) where blog_id>? order by blog_id limit ?", bound, pagesize)
+			err = db.DBSelectAll(&blogs, "select blog_id, title, author, create_time, private, user_name, comments, `like` from (user_info join blogs on user_info.user_id=blogs.author) where blog_id>? order by blog_id limit ?", bound, pagesize)
 		} else {
-			err = libs.DBSelectAll(&blogs, "select blog_id, title, author, create_time, private, user_name, comments, `like` from (user_info join blogs on user_info.user_id=blogs.author) where blog_id>? and (author=? or private=0) order by blog_id desc limit ?", bound, user_id, pagesize)
+			err = db.DBSelectAll(&blogs, "select blog_id, title, author, create_time, private, user_name, comments, `like` from (user_info join blogs on user_info.user_id=blogs.author) where blog_id>? and (author=? or private=0) order by blog_id desc limit ?", bound, user_id, pagesize)
 		}
 	}
 	if err != nil {
@@ -83,7 +85,7 @@ func BLListAll(bound, pagesize, user_id int, isleft, isadmin bool) ([]Blog, bool
 		blogs = blogs[:pagesize-1]
 	}
 	if !isleft {
-		libs.Reverse(blogs)
+		utils.Reverse(blogs)
 	}
 	BLGetLikes(blogs, user_id)
 	return blogs, isfull, nil
@@ -99,11 +101,11 @@ func BLGetLikes(blogs []Blog, user_id int) {
 	}
 	ret := GetLikes(BLOG, user_id, ids)
 	for i := range blogs {
-		blogs[i].Liked = libs.HasInt(ret, blogs[i].Id)
+		blogs[i].Liked = utils.HasInt(ret, blogs[i].Id)
 	}
 }
 
 func BLExists(blog_id int) bool {
-	count, err := libs.DBSelectSingleInt("select count(*) from blogs where blog_id=?", blog_id)
+	count, err := db.DBSelectSingleInt("select count(*) from blogs where blog_id=?", blog_id)
 	return err == nil && count > 0
 }

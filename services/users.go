@@ -5,11 +5,13 @@ import (
 	"net/http"
 	"strconv"
 	"time"
+	"yao/config"
+	"yao/db"
 	"yao/internal"
-	"yao/libs"
 
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
+	utils "github.com/super-yaoj/yaoj-utils"
 )
 
 func validSign(username, password string) error {
@@ -43,11 +45,11 @@ func UserSignUp(ctx Context, param UserSignUpParam) {
 	password := internal.SaltPassword(param.Passwd)
 	remember_token := ""
 	if param.Memo == "true" {
-		remember_token = libs.RandomString(32)
+		remember_token = utils.RandomString(32)
 	}
-	user_id, err := libs.DBInsertGetId(
+	user_id, err := db.DBInsertGetId(
 		"insert into user_info values (null, ?, ?, \"\", 0, ?, ?, ?, 0, \"\", \"\")",
-		param.UserName, password, time.Now(), remember_token, libs.USNormal,
+		param.UserName, password, time.Now(), remember_token, internal.USNormal,
 	)
 	if err != nil {
 		ctx.JSONAPI(http.StatusBadRequest, "username has been used by others", nil)
@@ -56,13 +58,13 @@ func UserSignUp(ctx Context, param UserSignUpParam) {
 	sess := sessions.Default(ctx.Context)
 	sess.Set("user_id", int(user_id))
 	sess.Set("user_name", param.UserName)
-	sess.Set("user_group", libs.USNormal)
-	libs.DBUpdate("insert into user_permissions values (?, ?)", user_id, libs.DefaultGroup)
-	libs.DBUpdate("update permissions set count = count + 1 where permission_id=1")
+	sess.Set("user_group", internal.USNormal)
+	db.DBUpdate("insert into user_permissions values (?, ?)", user_id, config.Global.DefaultGroup)
+	db.DBUpdate("update permissions set count = count + 1 where permission_id=1")
 	sess.Save()
 	if param.Memo == "true" {
-		libs.SetCookie(ctx.Context, "user_id", fmt.Sprint(user_id), true)
-		libs.SetCookie(ctx.Context, "remember_token", remember_token, true)
+		ctx.SetCookie("user_id", fmt.Sprint(user_id), true)
+		ctx.SetCookie("remember_token", remember_token, true)
 	}
 	ctx.JSONAPI(http.StatusOK, "", nil)
 }
@@ -80,7 +82,7 @@ func UserLogin(ctx Context, param UserLoginParam) {
 	}
 	password := internal.SaltPassword(param.Passwd)
 	user := internal.UserBase{Name: param.UserName}
-	err := libs.DBSelectSingle(
+	err := db.DBSelectSingle(
 		&user, "select user_id, user_group from user_info where user_name=? and password=?",
 		param.UserName, password,
 	)
@@ -88,7 +90,7 @@ func UserLogin(ctx Context, param UserLoginParam) {
 		ctx.JSONRPC(http.StatusBadRequest, -32600, "username or password is wrong", nil)
 		return
 	}
-	if user.Usergroup == libs.USBanned {
+	if user.Usergroup == internal.USBanned {
 		ctx.JSONRPC(http.StatusBadRequest, -32600, "user is banned", nil)
 		return
 	}
@@ -98,10 +100,10 @@ func UserLogin(ctx Context, param UserLoginParam) {
 	sess.Set("user_group", user.Usergroup)
 	sess.Save()
 	if param.Memo == "true" {
-		remember_token := libs.RandomString(32)
-		libs.SetCookie(ctx.Context, "user_id", fmt.Sprint(user.Id), true)
-		libs.SetCookie(ctx.Context, "remember_token", remember_token, true)
-		libs.DBUpdate("update user_info set remember_token=? where user_id=?", remember_token, user.Id)
+		remember_token := utils.RandomString(32)
+		ctx.SetCookie("user_id", fmt.Sprint(user.Id), true)
+		ctx.SetCookie("remember_token", remember_token, true)
+		db.DBUpdate("update user_info set remember_token=? where user_id=?", remember_token, user.Id)
 	}
 	ctx.JSONRPC(http.StatusOK, 0, "", nil)
 }
@@ -110,8 +112,8 @@ type UserLogoutParam struct {
 }
 
 func UserLogout(ctx Context, param UserLogoutParam) {
-	libs.DeleteCookie(ctx.Context, "user_id")
-	libs.DeleteCookie(ctx.Context, "remember_token")
+	ctx.DeleteCookie("user_id")
+	ctx.DeleteCookie("remember_token")
 	sess := sessions.Default(ctx.Context)
 	sess.Delete("user_id")
 	sess.Delete("user_name")
@@ -127,7 +129,7 @@ func UserInit(ctx Context, param UserInitParam) {
 	sess := sessions.Default(ctx.Context)
 	ret := func(user internal.UserBase) {
 		fmt.Println(user)
-		if user.Usergroup == libs.USBanned {
+		if user.Usergroup == internal.USBanned {
 			UserLogout(ctx, UserLogoutParam{})
 			ctx.JSONRPC(http.StatusBadRequest, -32600, "user is banned", nil)
 			return
@@ -137,17 +139,17 @@ func UserInit(ctx Context, param UserInitParam) {
 			"user_name":   user.Name,
 			"user_group":  user.Usergroup,
 			"server_time": time.Now(),
-			"is_admin":    libs.IsAdmin(user.Usergroup),
+			"is_admin":    internal.IsAdmin(user.Usergroup),
 		})
 	}
 
 	tmp, err := ctx.Cookie("user_id")
-	user := internal.UserBase{Id: -1, Name: "", Usergroup: libs.USNormal}
+	user := internal.UserBase{Id: -1, Name: "", Usergroup: internal.USNormal}
 	if err == nil {
 		id, err := strconv.Atoi(tmp)
 		remember_token, err1 := ctx.Cookie("remember_token")
 		if err == nil && err1 == nil {
-			err = libs.DBSelectSingle(&user, "select user_id, user_name, user_group from user_info where user_id=? and remember_token=?", id, remember_token)
+			err = db.DBSelectSingle(&user, "select user_id, user_name, user_group from user_info where user_id=? and remember_token=?", id, remember_token)
 			if err == nil {
 				sess.Set("user_id", id)
 				sess.Set("user_name", user.Name)
@@ -174,11 +176,10 @@ type UserGetParam struct {
 func UserGet(ctx Context, param UserGetParam) {
 	user, err := internal.USQuery(param.UserID)
 	user.Password, user.RememberToken = "", ""
-	data, err := libs.Struct2Map(user)
 	if err != nil {
 		ctx.ErrorAPI(err)
 	} else {
-		ctx.JSONAPI(http.StatusOK, "", data)
+		ctx.JSONAPI(http.StatusOK, "", map[string]any{ "user": user })
 	}
 }
 
@@ -260,7 +261,7 @@ func UserList(ctx Context, param UserListParam) {
 			ctx.JSONAPI(http.StatusOK, "", map[string]any{"data": users, "isfull": isfull})
 		}
 	} else {
-		bound_user_id := libs.If(param.IsLeft(), param.LeftID, param.RightID)
+		bound_user_id := utils.If(param.IsLeft(), param.LeftID, param.RightID)
 		if bound_user_id == nil {
 			ctx.JSONAPI(http.StatusBadRequest, "", nil)
 			return
@@ -285,7 +286,7 @@ func UserRating(ctx Context, param UserRatingParam) {
 		Time      time.Time `db:"time" json:"time"`
 		Title     string    `db:"title" json:"title"`
 	}
-	err := libs.DBSelectAll(&ratings, "select rating, a.contest_id, title, time from ((select rating, contest_id, time from ratings where user_id=?) as a inner join contests on a.contest_id=contests.contest_id)", param.UserId)
+	err := db.DBSelectAll(&ratings, "select rating, a.contest_id, title, time from ((select rating, contest_id, time from ratings where user_id=?) as a inner join contests on a.contest_id=contests.contest_id)", param.UserId)
 	if err != nil {
 		ctx.ErrorAPI(err)
 	} else {

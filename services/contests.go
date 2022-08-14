@@ -4,8 +4,10 @@ import (
 	"net/http"
 	"strings"
 	"time"
+	"yao/db"
 	"yao/internal"
-	"yao/libs"
+
+	utils "github.com/super-yaoj/yaoj-utils"
 )
 
 type CtstListParam struct {
@@ -15,7 +17,7 @@ type CtstListParam struct {
 
 func CtstList(ctx Context, param CtstListParam) {
 	contests, isfull, err := internal.CTList(
-		param.Page.Bound(), *param.PageSize, param.UserID, param.IsLeft(), libs.IsAdmin(param.UserGrp),
+		param.Page.Bound(), *param.PageSize, param.UserID, param.IsLeft(), internal.IsAdmin(param.UserGrp),
 	)
 	if err != nil {
 		ctx.ErrorAPI(err)
@@ -124,8 +126,8 @@ func CtstEdit(ctx Context, param CtstEditParam) {
 		if ctst.Finished {
 			start = ctst.StartTime
 			param.Duration = int(ctst.EndTime.Sub(ctst.StartTime).Minutes())
-			param.PrtstOnly = libs.If(ctst.Pretest, 1, 0)
-			param.ScorePrivate = libs.If(ctst.ScorePrivate, 1, 0)
+			param.PrtstOnly = utils.If(ctst.Pretest, 1, 0)
+			param.ScorePrivate = utils.If(ctst.ScorePrivate, 1, 0)
 		}
 		err = internal.CTModify(param.CtstID, title, start, param.Duration, param.PrtstOnly, param.ScorePrivate)
 		if err != nil {
@@ -286,7 +288,7 @@ func CtstStanding(ctx Context, param CtstStandingParam) {
 		ctst := a.(PermitCtst)
 		raw_standing := internal.CTSGet(param.CtstID)
 		standing := []internal.CTStandingEntry{}
-		libs.DeepCopy(&standing, raw_standing)
+		utils.DeepCopy(&standing, raw_standing)
 		if !ctst.CanEdit && ctst.EndTime.After(time.Now()) {
 			if ctst.ScorePrivate {
 				for _, v := range standing {
@@ -330,7 +332,7 @@ func CtstFinish(ctx Context, param CtstFinishParam) {
 			ctx.JSONRPC(http.StatusBadRequest, -32600, "Contest hasn't finished.", nil)
 			return
 		}
-		count, _ := libs.DBSelectSingleInt("select count(*) from submissions where contest_id=? and status>=0 and status<? limit 1", param.CtstID, internal.Finished)
+		count, _ := db.DBSelectSingleInt("select count(*) from submissions where contest_id=? and status>=0 and status<? limit 1", param.CtstID, internal.Finished)
 		if count > 0 {
 			ctx.JSONRPC(http.StatusBadRequest, -32600, "There are still some contest submissions judging, please wait.", nil)
 			return

@@ -6,13 +6,13 @@ import (
 	"io"
 	"net/http"
 	"time"
+	"yao/db"
 	"yao/internal"
-	"yao/libs"
 
 	"github.com/goccy/go-json"
 	"github.com/super-yaoj/yaoj-core/pkg/problem"
-	"github.com/super-yaoj/yaoj-core/pkg/utils"
 	"github.com/super-yaoj/yaoj-core/pkg/workflow"
+	utils "github.com/super-yaoj/yaoj-utils"
 )
 
 type SubmListParam struct {
@@ -33,9 +33,9 @@ func SubmList(ctx Context, param SubmListParam) {
 		return
 	}
 	//Modify scores to sample_scores when users are in pretest-only contests
-	contest_pretest, _ := libs.DBSelectInts("select a.contest_id from ((select contest_id from contests where start_time<=? and end_time>=? and pretest=1) as a join (select contest_id from contest_participants where user_id=?) as b on a.contest_id=b.contest_id)", time.Now(), time.Now(), param.UserID)
+	contest_pretest, _ := db.DBSelectInts("select a.contest_id from ((select contest_id from contests where start_time<=? and end_time>=? and pretest=1) as a join (select contest_id from contest_participants where user_id=?) as b on a.contest_id=b.contest_id)", time.Now(), time.Now(), param.UserID)
 	for key := range submissions {
-		if libs.HasElement(contest_pretest, submissions[key].ContestId) {
+		if utils.HasElement(contest_pretest, submissions[key].ContestId) {
 			internal.SMPretestOnly(&submissions[key])
 		}
 	}
@@ -106,7 +106,7 @@ func parseZipFile(ctx Context, field string, config internal.SubmConfig) (proble
 		ctx.ErrorAPI(err)
 		return nil, nil, 0, 0
 	}
-	ret, err := libs.UnzipMemory(w.Bytes())
+	ret, err := utils.UnzipMemory(w.Bytes())
 	if err != nil {
 		ctx.JSONAPI(http.StatusBadRequest, "invalid zip file: "+err.Error(), nil)
 		return nil, nil, 0, 0
@@ -117,7 +117,7 @@ func parseZipFile(ctx Context, field string, config internal.SubmConfig) (proble
 		length += len(val)
 		//find corresponding key
 		for key := range config {
-			if key == name || libs.StartsWith(name, key+".") {
+			if key == name || utils.StartsWith(name, key+".") {
 				matched = key
 				break
 			}
@@ -146,12 +146,12 @@ func parseMultiFiles(ctx Context, config internal.SubmConfig) (problem.Submissio
 		name, lang := key, -1
 		//get language
 		if val.Accepted == utils.Csource {
-			lang, ok = libs.PostIntRange(ctx.Context, key+"_lang", 0, len(libs.LangSuf)-1)
-			if !ok || (val.Langs != nil && !libs.HasElement(val.Langs, utils.LangTag(lang))) {
+			lang := utils.AtoiDefault(ctx.PostForm(key + "_lang"), -1)
+			if lang < 0 || (val.Langs != nil && !utils.HasElement(val.Langs, utils.LangTag(lang))) {
 				return nil, nil, 0, 0
 			}
 			language = lang
-			name += libs.LangSuf[lang]
+			name += utils.LangSuf[lang]
 		}
 		if ok {
 			//text

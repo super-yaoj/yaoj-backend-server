@@ -3,9 +3,10 @@ package internal
 import (
 	"fmt"
 	"sort"
-	"yao/libs"
+	"yao/db"
 
 	"github.com/super-yaoj/yaoj-core/pkg/problem"
+	utils "github.com/super-yaoj/yaoj-utils"
 )
 
 type Statement struct {
@@ -43,9 +44,9 @@ func PRList(bound, pagesize, user_id int, isleft, isadmin bool) ([]Problem, bool
 	if isadmin {
 		var err error
 		if isleft {
-			err = libs.DBSelectAll(&problems, "select problem_id, title, `like` from problems where problem_id>=? order by problem_id limit ?", bound, pagesize)
+			err = db.DBSelectAll(&problems, "select problem_id, title, `like` from problems where problem_id>=? order by problem_id limit ?", bound, pagesize)
 		} else {
-			err = libs.DBSelectAll(&problems, "select problem_id, title, `like` from problems where problem_id<=? order by problem_id desc limit ?", bound, pagesize)
+			err = db.DBSelectAll(&problems, "select problem_id, title, `like` from problems where problem_id<=? order by problem_id desc limit ?", bound, pagesize)
 		}
 		if err != nil {
 			return nil, false, err
@@ -55,7 +56,7 @@ func PRList(bound, pagesize, user_id int, isleft, isadmin bool) ([]Problem, bool
 			problems = problems[:pagesize-1]
 		}
 		if !isleft {
-			libs.Reverse(problems)
+			utils.Reverse(problems)
 		}
 		PRGetLikes(problems, user_id)
 		return problems, isfull, nil
@@ -66,11 +67,11 @@ func PRList(bound, pagesize, user_id int, isleft, isadmin bool) ([]Problem, bool
 		}
 
 		var ids []int
-		perm_str := libs.JoinArray(perms)
+		perm_str := utils.JoinArray(perms)
 		if isleft {
-			ids, err = libs.DBSelectInts(fmt.Sprintf("select distinct problem_id from problem_permissions where problem_id>=%d and permission_id in (%s) order by problem_id limit %d", bound, perm_str, pagesize))
+			ids, err = db.DBSelectInts(fmt.Sprintf("select distinct problem_id from problem_permissions where problem_id>=%d and permission_id in (%s) order by problem_id limit %d", bound, perm_str, pagesize))
 		} else {
-			ids, err = libs.DBSelectInts(fmt.Sprintf("select distinct problem_id from problem_permissions where problem_id<=%d and permission_id in (%s) order by problem_id desc limit %d", bound, perm_str, pagesize))
+			ids, err = db.DBSelectInts(fmt.Sprintf("select distinct problem_id from problem_permissions where problem_id<=%d and permission_id in (%s) order by problem_id desc limit %d", bound, perm_str, pagesize))
 		}
 		if err != nil {
 			return nil, false, err
@@ -81,7 +82,7 @@ func PRList(bound, pagesize, user_id int, isleft, isadmin bool) ([]Problem, bool
 			ids = ids[:pagesize-1]
 		}
 		if len(ids) != 0 {
-			err = libs.DBSelectAll(&problems, "select problem_id, title, `like` from problems where problem_id in ("+libs.JoinArray(ids)+")")
+			err = db.DBSelectAll(&problems, "select problem_id, title, `like` from problems where problem_id in (" + utils.JoinArray(ids) + ")")
 			if err != nil {
 				return nil, false, err
 			}
@@ -102,13 +103,13 @@ func PRGetLikes(problems []Problem, user_id int) {
 	}
 	ret := GetLikes(PROBLEM, user_id, ids)
 	for i := range problems {
-		problems[i].Liked = libs.HasInt(ret, problems[i].Id)
+		problems[i].Liked = utils.HasInt(ret, problems[i].Id)
 	}
 }
 
 func PRQuery(problem_id, user_id int) (*Problem, error) {
 	p := PRLoad(problem_id)
-	err := libs.DBSelectSingle(&p, "select problem_id, title, `like`, allow_down from problems where problem_id=?", problem_id)
+	err := db.DBSelectSingle(&p, "select problem_id, title, `like`, allow_down from problems where problem_id=?", problem_id)
 	if err != nil {
 		return p, err
 	}
@@ -118,41 +119,41 @@ func PRQuery(problem_id, user_id int) (*Problem, error) {
 
 func PRGetPermissions(problem_id int) ([]Permission, error) {
 	var p []Permission
-	err := libs.DBSelectAll(&p, "select a.permission_id, permission_name from ((select permission_id from problem_permissions where problem_id=? and permission_id>0) as a join permissions on a.permission_id=permissions.permission_id)", problem_id)
+	err := db.DBSelectAll(&p, "select a.permission_id, permission_name from ((select permission_id from problem_permissions where problem_id=? and permission_id>0) as a join permissions on a.permission_id=permissions.permission_id)", problem_id)
 	return p, err
 }
 
 func PRGetManagers(problem_id int) ([]User, error) {
 	var u []User
-	err := libs.DBSelectAll(&u, "select user_id, user_name from ((select permission_id from problem_permissions where problem_id=? and permission_id<0) as a join user_info on -permission_id=user_id)", problem_id)
+	err := db.DBSelectAll(&u, "select user_id, user_name from ((select permission_id from problem_permissions where problem_id=? and permission_id<0) as a join user_info on -permission_id=user_id)", problem_id)
 	return u, err
 }
 
 func PRAddPermission(problem_id, permission_id int) error {
-	_, err := libs.DBUpdate("insert ignore into problem_permissions values (?, ?)", problem_id, permission_id)
+	_, err := db.DBUpdate("insert ignore into problem_permissions values (?, ?)", problem_id, permission_id)
 	return err
 }
 
 func PRDeletePermission(problem_id, permission_id int) error {
-	_, err := libs.DBUpdate("delete from problem_permissions where problem_id=? and permission_id=?", problem_id, permission_id)
+	_, err := db.DBUpdate("delete from problem_permissions where problem_id=? and permission_id=?", problem_id, permission_id)
 	return err
 }
 
 // 数据库查询是否存在该题目
 func PRExists(problem_id int) bool {
-	count, _ := libs.DBSelectSingleInt("select count(*) from problems where problem_id=?", problem_id)
+	count, _ := db.DBSelectSingleInt("select count(*) from problems where problem_id=?", problem_id)
 	return count > 0
 }
 
 func PRRejudge(problem_id int) error {
-	current := libs.TimeStamp()
+	current := utils.TimeStamp()
 	var sub []SubmissionBase
-	err := libs.DBSelectAll(&sub, "select submission_id, contest_id from submissions where problem_id=?", problem_id)
+	err := db.DBSelectAll(&sub, "select submission_id, contest_id from submissions where problem_id=?", problem_id)
 	if err != nil {
 		return err
 	}
 	//update uuid to current time-stamp
-	_, err = libs.DBUpdate("update submissions set uuid=?, status=0 where problem_id=?", current, problem_id)
+	_, err = db.DBUpdate("update submissions set uuid=?, status=0 where problem_id=?", current, problem_id)
 	if err != nil {
 		return err
 	}

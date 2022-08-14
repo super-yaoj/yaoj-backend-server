@@ -3,8 +3,11 @@ package service
 import (
 	"net/http"
 	"time"
+	"yao/config"
+	"yao/db"
 	"yao/internal"
-	"yao/libs"
+
+	"github.com/super-yaoj/yaoj-utils/promise"
 )
 
 // authorization stored in session
@@ -14,7 +17,7 @@ type Auth struct {
 }
 
 func (auth *Auth) IsAdmin() bool {
-	return libs.IsAdmin(auth.UserGrp)
+	return internal.IsAdmin(auth.UserGrp)
 }
 
 // 1. valid user_id
@@ -23,13 +26,13 @@ func (auth *Auth) CanEditProb(problem_id int) bool {
 	if auth.IsAdmin() {
 		return true
 	}
-	count, _ := libs.DBSelectSingleInt("select count(*) from problem_permissions where problem_id=? and permission_id=?", problem_id, -auth.UserID)
+	count, _ := db.DBSelectSingleInt("select count(*) from problem_permissions where problem_id=? and permission_id=?", problem_id, -auth.UserID)
 	return count > 0
 }
 func (auth *Auth) CanSeeProb(problem_id int) bool {
 	// public problem
 	if auth.UserID == 0 {
-		count, _ := libs.DBSelectSingleInt("select count(*) from problem_permissions where problem_id=? and permission_id=?", problem_id, libs.DefaultGroup)
+		count, _ := db.DBSelectSingleInt("select count(*) from problem_permissions where problem_id=? and permission_id=?", problem_id, config.Global.DefaultGroup)
 		return count > 0
 	}
 	// can edit
@@ -37,7 +40,7 @@ func (auth *Auth) CanSeeProb(problem_id int) bool {
 		return true
 	}
 	// permitted
-	count, _ := libs.DBSelectSingleInt("select count(*) from ((select * from problem_permissions where problem_id=?) as a join (select * from user_permissions where user_id=?) as b on a.permission_id=b.permission_id)", problem_id, auth.UserID)
+	count, _ := db.DBSelectSingleInt("select count(*) from ((select * from problem_permissions where problem_id=?) as a join (select * from user_permissions where user_id=?) as b on a.permission_id=b.permission_id)", problem_id, auth.UserID)
 	return count > 0
 }
 
@@ -54,7 +57,7 @@ func (auth *Auth) CanEditCtst(contest_id int) bool {
 	if auth.IsAdmin() {
 		return true
 	}
-	count, _ := libs.DBSelectSingleInt("select count(*) from contest_permissions where contest_id=? and permission_id=?", contest_id, -auth.UserID)
+	count, _ := db.DBSelectSingleInt("select count(*) from contest_permissions where contest_id=? and permission_id=?", contest_id, -auth.UserID)
 	return count > 0
 }
 
@@ -63,10 +66,10 @@ func (auth *Auth) CanSeeCtst(contest_id int, can_edit bool) bool {
 		return true
 	}
 	if auth.UserID == 0 {
-		count, _ := libs.DBSelectSingleInt("select count(*) from contest_permissions where contest_id=? and permission_id=?", contest_id, libs.DefaultGroup)
+		count, _ := db.DBSelectSingleInt("select count(*) from contest_permissions where contest_id=? and permission_id=?", contest_id, config.Global.DefaultGroup)
 		return count > 0
 	}
-	count, _ := libs.DBSelectSingleInt("select count(*) from ((select permission_id from contest_permissions where contest_id=?) as a join (select permission_id from user_permissions where user_id=?) as b on a.permission_id=b.permission_id)", contest_id, auth.UserID)
+	count, _ := db.DBSelectSingleInt("select count(*) from ((select permission_id from contest_permissions where contest_id=?) as a join (select permission_id from user_permissions where user_id=?) as b on a.permission_id=b.permission_id)", contest_id, auth.UserID)
 	return count > 0
 }
 
@@ -98,13 +101,13 @@ func (auth *Auth) CanEditSubm(sub internal.SubmissionBase) bool {
 // 许可证
 type Permit struct {
 	*Auth
-	*libs.SyncPromise[any, bool]
+	*promise.SyncPromise[any, bool]
 }
 
 func (auth *Auth) NewPermit() *Permit {
 	return &Permit{
 		auth,
-		libs.NewSyncPromise(
+		promise.NewSyncPromise(
 			func(p bool) bool { return !p },
 			func() (any, bool) { return nil, true },
 		),
@@ -155,7 +158,7 @@ func (p *Permit) AsAdmin() *Permit {
 //user registered and user group is at least normal user
 func (p *Permit) AsNormalUser() *Permit {
 	return p.Try(func() (any, bool) {
-		return nil, p.UserID > 0 && !libs.IsBanned(p.UserGrp)
+		return nil, p.UserID > 0 && !internal.IsBanned(p.UserGrp)
 	})
 }
 
@@ -218,7 +221,7 @@ func (p *Permit) TrySeeCtst(ctstid int) *Permit {
 func (p *Permit) TrySeeBlog(blogid int) *Permit {
 	return p.Try(func() (any, bool) {
 		var blog internal.Blog
-		libs.DBSelectSingle(&blog, "select blog_id, author, private from blogs where blog_id=?", blog)
+		db.DBSelectSingle(&blog, "select blog_id, author, private from blogs where blog_id=?", blog)
 		return nil, p.IsAdmin() || p.UserID == blog.Author || !blog.Private
 	})
 }
@@ -226,7 +229,7 @@ func (p *Permit) TrySeeBlog(blogid int) *Permit {
 func (p *Permit) TryEditBlog(blogid int) *Permit {
 	return p.Try(func() (any, bool) {
 		var blog internal.Blog
-		libs.DBSelectSingle(&blog, "select blog_id, author from blogs where blog_id=?", blogid)
+		db.DBSelectSingle(&blog, "select blog_id, author from blogs where blog_id=?", blogid)
 		return nil, p.IsAdmin() || p.UserID == blog.Author
 	})
 }
@@ -234,7 +237,7 @@ func (p *Permit) TryEditBlog(blogid int) *Permit {
 func (p *Permit) TryEditBlogCmnt(cmntid int) *Permit {
 	return p.Try(func() (any, bool) {
 		var comment internal.Comment
-		libs.DBSelectSingle(&comment, "select author, blog_id from blog_comments where comment_id=?", cmntid)
+		db.DBSelectSingle(&comment, "select author, blog_id from blog_comments where comment_id=?", cmntid)
 		return struct{}{}, p.IsAdmin() || comment.Author == p.UserID
 	})
 }

@@ -5,11 +5,11 @@ import (
 	"sort"
 	"sync"
 	"time"
-	"yao/libs"
+	"yao/db"
 
 	jsoniter "github.com/json-iterator/go"
 	"github.com/super-yaoj/yaoj-core/pkg/problem"
-	"github.com/super-yaoj/yaoj-core/pkg/utils"
+	utils "github.com/super-yaoj/yaoj-utils"
 )
 
 type ContentPreview struct {
@@ -70,11 +70,11 @@ func SMPriority(contest, rejudge bool, mode string) int {
 	case "custom_test":
 		return 165
 	case "pretest":
-		return libs.If(contest, 100, 0) + libs.If(rejudge, 0, 50) + 20
+		return utils.If(contest, 100, 0) + utils.If(rejudge, 0, 50) + 20
 	case "tests":
-		return libs.If(contest, 100, 0) + libs.If(rejudge, 0, 50) + 10
+		return utils.If(contest, 100, 0) + utils.If(rejudge, 0, 50) + 10
 	case "extra":
-		return libs.If(contest, 100, 0) + libs.If(rejudge, 0, 50)
+		return utils.If(contest, 100, 0) + utils.If(rejudge, 0, 50)
 	}
 	return 0
 }
@@ -90,8 +90,8 @@ func SMJudge(sub SubmissionBase, rejudge bool, uuid int64) error {
 }
 
 func SMCreate(user_id, problem_id, contest_id int, language utils.LangTag, zipfile []byte, preview map[string]ContentPreview, length int) error {
-	current := libs.TimeStamp()
-	id, err := libs.DBInsertGetId("insert into submissions values (null, ?, ?, ?, ?, 0, -1, -1, ?, ?, 0, 0, ?, ?)", user_id, problem_id, contest_id, Waiting, language, time.Now(), current, length)
+	current := utils.TimeStamp()
+	id, err := db.DBInsertGetId("insert into submissions values (null, ?, ?, ?, ?, 0, -1, -1, ?, ?, 0, 0, ?, ?)", user_id, problem_id, contest_id, Waiting, language, time.Now(), current, length)
 	if err != nil {
 		return err
 	}
@@ -99,7 +99,7 @@ func SMCreate(user_id, problem_id, contest_id int, language utils.LangTag, zipfi
 	if err != nil {
 		return err
 	}
-	_, err = libs.DBUpdate("insert into submission_details values (?, ?, ?, \"\", \"\", \"\")", id, zipfile, js)
+	_, err = db.DBUpdate("insert into submission_details values (?, ?, ?, \"\", \"\", \"\")", id, zipfile, js)
 	if err != nil {
 		return err
 	}
@@ -115,7 +115,7 @@ func SMListByIds(subids []int) []Submission {
 	for i, j := range subids {
 		sidmap[j] = i
 	}
-	rows, err := libs.DBQuery("select " + submColumns + " from submissions where submission_id in (" + libs.JoinArray(subids) + ")")
+	rows, err := db.DBQuery("select " + submColumns + " from submissions where submission_id in (" + utils.JoinArray(subids) + ")")
 	if err != nil {
 		fmt.Println(err)
 		return nil
@@ -149,8 +149,8 @@ func SMGetExtraInfo(subs []Submission) {
 		Rating int    `db:"rating"`
 	}
 	var pname, uname []Name
-	libs.DBSelectAll(&pname, "select problem_id as id, title as name from problems where problem_id in ("+libs.JoinArray(probs)+")")
-	libs.DBSelectAll(&uname, "select user_id as id, user_name as name, rating from user_info where user_id in ("+libs.JoinArray(users)+")")
+	db.DBSelectAll(&pname, "select problem_id as id, title as name from problems where problem_id in (" + utils.JoinArray(probs) + ")")
+	db.DBSelectAll(&uname, "select user_id as id, user_name as name, rating from user_info where user_id in (" + utils.JoinArray(users) + ")")
 	sort.Slice(pname, func(i, j int) bool { return pname[i].Id < pname[j].Id })
 	sort.Slice(uname, func(i, j int) bool { return uname[i].Id < uname[j].Id })
 	for key, val := range subs {
@@ -162,26 +162,26 @@ func SMGetExtraInfo(subs []Submission) {
 
 func SMGetBaseInfo(submission_id int) (SubmissionBase, error) {
 	ret := SubmissionBase{Id: submission_id}
-	err := libs.DBSelectSingle(&ret, "select problem_id, contest_id, submitter from submissions where submission_id=?", submission_id)
+	err := db.DBSelectSingle(&ret, "select problem_id, contest_id, submitter from submissions where submission_id=?", submission_id)
 	return ret, err
 }
 
 func SMQuery(sid int) (Submission, error) {
 	var ret Submission
-	err := libs.DBSelectSingle(&ret, "select * from submissions where submission_id=?", sid)
+	err := db.DBSelectSingle(&ret, "select * from submissions where submission_id=?", sid)
 	if err != nil {
 		fmt.Println(err)
 		return ret, err
 	}
-	err = libs.DBSelectSingle(&ret.Details, "select content_preview, result, pretest_result, extra_result from submission_details where submission_id=?", sid)
+	err = db.DBSelectSingle(&ret.Details, "select content_preview, result, pretest_result, extra_result from submission_details where submission_id=?", sid)
 	if err != nil {
 		return ret, err
 	}
-	err = libs.DBSelectSingle(&ret, "select title as problem_name from problems where problem_id=?", ret.ProblemId)
+	err = db.DBSelectSingle(&ret, "select title as problem_name from problems where problem_id=?", ret.ProblemId)
 	if err != nil {
 		return ret, err
 	}
-	err = libs.DBSelectSingle(&ret, "select user_name as submitter_name from user_info where user_id=?", ret.Submitter)
+	err = db.DBSelectSingle(&ret, "select user_name as submitter_name from user_info where user_id=?", ret.Submitter)
 	return ret, err
 }
 
@@ -190,18 +190,18 @@ For params problem_id, contest_id, submitter, if you do not want to limit them t
 user_id is the current user's id
 */
 func SMList(bound, pagesize, user_id, submitter, problem_id, contest_id int, isleft, isadmin bool) ([]Submission, bool, error) {
-	query := libs.If(problem_id == 0, "", fmt.Sprintf(" and problem_id=%d", problem_id)) +
-		libs.If(contest_id == 0, "", fmt.Sprintf(" and contest_id=%d", contest_id)) +
-		libs.If(submitter == 0, "", fmt.Sprintf(" and submitter=%d", submitter))
+	query := utils.If(problem_id == 0, "", fmt.Sprintf(" and problem_id=%d", problem_id)) +
+		utils.If(contest_id == 0, "", fmt.Sprintf(" and contest_id=%d", contest_id)) +
+		utils.If(submitter == 0, "", fmt.Sprintf(" and submitter=%d", submitter))
 	must := "1"
 	if !isadmin {
 		perms, err := USPermissions(user_id)
 		if err != nil {
 			return nil, false, err
 		}
-		perm_str := libs.JoinArray(perms)
+		perm_str := utils.JoinArray(perms)
 		//problems user can see
-		probs, err := libs.DBSelectInts("select problem_id from problem_permissions where permission_id in (" + perm_str + ")")
+		probs, err := db.DBSelectInts("select problem_id from problem_permissions where permission_id in (" + perm_str + ")")
 		if err != nil {
 			return nil, false, err
 		}
@@ -210,32 +210,32 @@ func SMList(bound, pagesize, user_id, submitter, problem_id, contest_id int, isl
 			For running contests, participants cannnot see other's contest submissions if score_private=1
 			For not started contests, they must contain no contest submissions according to the definition, so we can discard them
 		*/
-		conts, err := libs.DBSelectInts("select contest_id from contest_permissions where permission_id in (" + perm_str + ")")
+		conts, err := db.DBSelectInts("select contest_id from contest_permissions where permission_id in (" + perm_str + ")")
 		if err != nil {
 			return nil, false, err
 		}
 		//remove contests that cannot see(i.e. the running contests with score_private=true)
-		conts_running, err := libs.DBSelectInts("select a.contest_id from ((select contest_id from contests where start_time<=? and end_time>=? and score_private=1) as a join (select contest_id from contest_participants where user_id=?) as b on a.contest_id=b.contest_id)", time.Now(), time.Now(), user_id)
+		conts_running, err := db.DBSelectInts("select a.contest_id from ((select contest_id from contests where start_time<=? and end_time>=? and score_private=1) as a join (select contest_id from contest_participants where user_id=?) as b on a.contest_id=b.contest_id)", time.Now(), time.Now(), user_id)
 		if err != nil {
 			return nil, false, err
 		}
 		for i := range conts {
 			//running contests is few, so brute force is just ok
-			if libs.HasElement(conts_running, conts[i]) {
+			if utils.HasElement(conts_running, conts[i]) {
 				conts[i] = 0
 			}
 		}
 
 		must = "("
 		if problem_id == 0 {
-			must += libs.If(len(probs) == 0, "0", "(problem_id in ("+libs.JoinArray(probs)+"))")
+			must += utils.If(len(probs) == 0, "0", "(problem_id in (" + utils.JoinArray(probs) + "))")
 		} else {
-			must += libs.If(libs.HasElement(probs, problem_id), "1", "0")
+			must += utils.If(utils.HasElement(probs, problem_id), "1", "0")
 		}
 		if contest_id == 0 {
-			must += libs.If(len(conts) == 0, " or 0", " or (contest_id in ("+libs.JoinArray(conts)+"))")
+			must += utils.If(len(conts) == 0, " or 0", " or (contest_id in (" + utils.JoinArray(conts) + "))")
 		} else {
-			must += " or " + libs.If(libs.HasElement(conts, contest_id), "1", "0")
+			must += " or " + utils.If(utils.HasElement(conts, contest_id), "1", "0")
 		}
 		if submitter == 0 {
 			if user_id > 0 {
@@ -244,16 +244,16 @@ func SMList(bound, pagesize, user_id, submitter, problem_id, contest_id int, isl
 				must += ")"
 			}
 		} else {
-			must += libs.If(submitter == user_id, " or 1)", ")")
+			must += utils.If(submitter == user_id, " or 1)", ")")
 		}
 	}
 	pagesize += 1
 	var submissions []Submission
 	var err error
 	if isleft {
-		err = libs.DBSelectAll(&submissions, fmt.Sprintf("select %s from submissions where submission_id<=%d and %s %s order by submission_id desc limit %d", submColumns, bound, must, query, pagesize))
+		err = db.DBSelectAll(&submissions, fmt.Sprintf("select %s from submissions where submission_id<=%d and %s %s order by submission_id desc limit %d", submColumns, bound, must, query, pagesize))
 	} else {
-		err = libs.DBSelectAll(&submissions, fmt.Sprintf("select %s from submissions where submission_id>=%d and %s %s order by submission_id limit %d", submColumns, bound, must, query, pagesize))
+		err = db.DBSelectAll(&submissions, fmt.Sprintf("select %s from submissions where submission_id>=%d and %s %s order by submission_id limit %d", submColumns, bound, must, query, pagesize))
 	}
 	if err != nil {
 		return nil, false, err
@@ -263,7 +263,7 @@ func SMList(bound, pagesize, user_id, submitter, problem_id, contest_id int, isl
 		submissions = submissions[:pagesize-1]
 	}
 	if !isleft {
-		libs.Reverse(submissions)
+		utils.Reverse(submissions)
 	}
 	SMGetExtraInfo(submissions)
 	return submissions, isfull, nil
@@ -312,7 +312,7 @@ func SMUpdate(sid, pid int, mode string, result []byte) error {
 			for _, test := range subtask.(map[string]any)["Testcase"].([]any) {
 				test_score := test.(map[string]any)["Score"].(float64)
 				time_used += test.(map[string]any)["Time"].(float64)
-				memory_used = libs.Max(memory_used, test.(map[string]any)["Memory"].(float64))
+				memory_used = utils.Max(memory_used, test.(map[string]any)["Memory"].(float64))
 				if first {
 					sub_score = test_score
 					first = false
@@ -321,9 +321,9 @@ func SMUpdate(sid, pid int, mode string, result []byte) error {
 				if is_subtask {
 					switch testdata.CalcMethod {
 					case problem.Mmin:
-						sub_score = libs.Min(sub_score, test_score)
+						sub_score = utils.Min(sub_score, test_score)
 					case problem.Mmax:
-						sub_score = libs.Max(sub_score, test_score)
+						sub_score = utils.Max(sub_score, test_score)
 					case problem.Msum:
 						sub_score += test_score
 					}
@@ -340,19 +340,19 @@ func SMUpdate(sid, pid int, mode string, result []byte) error {
 
 	//'and status>=0' means when meets an internal error, we shouldn't update status
 	if mode == "tests" {
-		_, err = libs.DBUpdate("update submissions set status=status|?, accepted=accepted|?, score=?, time=?, memory=? where submission_id=? and status>=0",
-			JudgingTests, libs.If(accepted, TestsAccepted, 0), score, int(time_used/float64(time.Millisecond)), int(memory_used/1024), sid)
+		_, err = db.DBUpdate("update submissions set status=status|?, accepted=accepted|?, score=?, time=?, memory=? where submission_id=? and status>=0",
+			JudgingTests, utils.If(accepted, TestsAccepted, 0), score, int(time_used/float64(time.Millisecond)), int(memory_used/1024), sid)
 	} else if mode == "pretest" {
-		_, err = libs.DBUpdate("update submissions set status=status|?, accepted=accepted|?, sample_score=? where submission_id=? and status>=0",
-			JudgingPretest, libs.If(accepted, PretestAccepted, 0), score, sid)
+		_, err = db.DBUpdate("update submissions set status=status|?, accepted=accepted|?, sample_score=? where submission_id=? and status>=0",
+			JudgingPretest, utils.If(accepted, PretestAccepted, 0), score, sid)
 	} else {
-		_, err = libs.DBUpdate("update submissions set status=status|?, accepted=accepted|? where submission_id=? and status>=0",
-			JudgingExtra, libs.If(accepted, ExtraAccepted, 0), sid)
+		_, err = db.DBUpdate("update submissions set status=status|?, accepted=accepted|? where submission_id=? and status>=0",
+			JudgingExtra, utils.If(accepted, ExtraAccepted, 0), sid)
 	}
 	if err != nil {
 		return err
 	}
-	_, err = libs.DBUpdate("update submission_details set "+column_name+"=? where submission_id=?", result, sid)
+	_, err = db.DBUpdate("update submission_details set "+column_name+"=? where submission_id=?", result, sid)
 	if err != nil {
 		return err
 	}
@@ -360,7 +360,7 @@ func SMUpdate(sid, pid int, mode string, result []byte) error {
 		SubmissionBase
 		Status int `db:"status"`
 	}
-	err = libs.DBSelectSingle(&subinfo, "select submission_id, problem_id, contest_id, status from submissions where submission_id=?", sid)
+	err = db.DBSelectSingle(&subinfo, "select submission_id, problem_id, contest_id, status from submissions where submission_id=?", sid)
 	if err != nil {
 		return err
 	}
@@ -378,23 +378,23 @@ func SMUpdate(sid, pid int, mode string, result []byte) error {
 func SMJudgeCustomTest(content []byte) []byte {
 	callback := make(chan []byte)
 	//find a free submission_id
-	sid, err := libs.DBInsertGetId("insert into custom_tests values (null, ?)", content)
+	sid, err := db.DBInsertGetId("insert into custom_tests values (null, ?)", content)
 	if err != nil {
 		fmt.Println(err)
 		return []byte{}
 	}
 	InsertCustomTest(int(sid), &callback)
 	result := <-callback
-	go libs.DBUpdate("delete from custom_tests where id=?", sid)
+	go db.DBUpdate("delete from custom_tests where id=?", sid)
 	return result
 }
 
 func SMDelete(sub SubmissionBase) error {
-	_, err := libs.DBUpdate("delete from submissions where submission_id=?", sub.Id)
+	_, err := db.DBUpdate("delete from submissions where submission_id=?", sub.Id)
 	if err != nil {
 		return err
 	}
-	_, err = libs.DBUpdate("delete from submission_details where submission_id=?", sub.Id)
+	_, err = db.DBUpdate("delete from submission_details where submission_id=?", sub.Id)
 	if err != nil {
 		return err
 	}
@@ -411,8 +411,8 @@ func SMRejudge(submission_id int) error {
 		return err
 	}
 	//update uuid to cancel other entries in the judging queue
-	current := libs.TimeStamp()
-	_, err = libs.DBUpdate("update submissions set uuid=?, status=0, accepted=0 where submission_id=?", current, submission_id)
+	current := utils.TimeStamp()
+	_, err = db.DBUpdate("update submissions set uuid=?, status=0, accepted=0 where submission_id=?", current, submission_id)
 	if err != nil {
 		return err
 	}
@@ -445,6 +445,6 @@ func SMRemoveTestDetails(js string) string {
 }
 
 func SMExists(subm_id int) bool {
-	cnt, _ := libs.DBSelectSingleInt("select count(*) from submissions where submission_id=?", subm_id)
+	cnt, _ := db.DBSelectSingleInt("select count(*) from submissions where submission_id=?", subm_id)
 	return cnt > 0
 }

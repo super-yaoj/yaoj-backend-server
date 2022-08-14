@@ -3,7 +3,6 @@ package services
 import (
 	"net/http"
 	"yao/internal"
-	"yao/libs"
 )
 
 type BlogCreateParam struct {
@@ -91,7 +90,7 @@ func BlogList(ctx Context, param BlogListParam) {
 			return
 		}
 		blogs, isfull, err := internal.BLListAll(
-			param.Bound(), *param.PageSize, param.UserID, param.IsLeft(), libs.IsAdmin(param.UserGrp),
+			param.Bound(), *param.PageSize, param.UserID, param.IsLeft(), internal.IsAdmin(param.UserGrp),
 		)
 		if err != nil {
 			ctx.ErrorAPI(err)

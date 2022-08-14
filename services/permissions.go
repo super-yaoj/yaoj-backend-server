@@ -6,8 +6,9 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"yao/config"
+	"yao/db"
 	"yao/internal"
-	"yao/libs"
 
 	"github.com/gin-gonic/gin"
 )
@@ -50,7 +51,7 @@ type PermDelParam struct {
 
 func PermDel(ctx Context, param PermDelParam) {
 	param.NewPermit().AsAdmin().Success(func(a any) {
-		if param.PermID == libs.DefaultGroup {
+		if param.PermID == config.Global.DefaultGroup {
 			ctx.JSONAPI(http.StatusBadRequest, "you cannot modify the default group", nil)
 			return
 		}
@@ -106,7 +107,7 @@ func PermAddUser(ctx Context, param PermAddUserParam) {
 			ctx.JSONAPI(http.StatusBadRequest, "there's no user", nil)
 			return
 		}
-		if param.PermID == libs.DefaultGroup {
+		if param.PermID == config.Global.DefaultGroup {
 			ctx.JSONAPI(http.StatusBadRequest, "you cannot modify the default group", nil)
 			return
 		}
@@ -124,7 +125,7 @@ func PermAddUser(ctx Context, param PermAddUserParam) {
 				return
 			}
 		}
-		real_ids, err := libs.DBSelectInts(fmt.Sprintf("select user_id from user_info where user_id in (%s) order by user_id", param.UserIDs))
+		real_ids, err := db.DBSelectInts(fmt.Sprintf("select user_id from user_info where user_id in (%s) order by user_id", param.UserIDs))
 		if err != nil {
 			ctx.ErrorAPI(err)
 			return
@@ -157,7 +158,7 @@ type PermDelUserParam struct {
 
 func PermDelUser(ctx Context, param PermDelUserParam) {
 	param.NewPermit().AsAdmin().Success(func(a any) {
-		if param.PermID == libs.DefaultGroup {
+		if param.PermID == config.Global.DefaultGroup {
 			ctx.JSONAPI(http.StatusBadRequest, "you cannot modify the default group", nil)
 			return
 		}

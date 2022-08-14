@@ -8,11 +8,12 @@ import (
 	"os"
 	"path"
 	"strings"
+	"yao/db"
 	"yao/internal"
-	"yao/libs"
 
 	"github.com/gin-gonic/gin"
 	"github.com/super-yaoj/yaoj-core/pkg/problem"
+	utils "github.com/super-yaoj/yaoj-utils"
 )
 
 type ProbListParam struct {
@@ -37,7 +38,7 @@ type ProbAddParam struct {
 
 func ProbAdd(ctx Context, param ProbAddParam) {
 	param.NewPermit().AsAdmin().Success(func(any) {
-		id, err := libs.DBInsertGetId(`insert into problems values (null, "New Problem", 0, "", "")`)
+		id, err := db.DBInsertGetId(`insert into problems values (null, "New Problem", 0, "", "")`)
 		if err != nil {
 			ctx.ErrorAPI(err)
 		} else {
@@ -180,7 +181,7 @@ func ProbPutData(ctx Context, param ProbPutDataParam) {
 			ctx.JSONAPI(http.StatusBadRequest, "unsupported file extension "+ext, nil)
 			return
 		}
-		tmpdir := libs.GetTempDir()
+		tmpdir := utils.GetTempDir()
 		defer os.RemoveAll(tmpdir)
 		err := ctx.SaveUploadedFile(param.Data, path.Join(tmpdir, "1.zip"))
 		if err != nil {
@@ -255,7 +256,7 @@ func ProbEdit(ctx Context, param ProbEditParam) {
 		}
 
 		var allow_down string
-		err := libs.DBSelectSingleColumn(&allow_down, "select allow_down from problems where problem_id=?", param.ProbID)
+		err := db.DBSelectSingleColumn(&allow_down, "select allow_down from problems where problem_id=?", param.ProbID)
 		if err != nil {
 			ctx.JSONAPI(http.StatusNotFound, "", nil)
 			return
@@ -263,13 +264,13 @@ func ProbEdit(ctx Context, param ProbEditParam) {
 		allow_down = fix(allow_down)
 		new_allow := fix(param.AllowDown)
 		if allow_down != new_allow {
-			libs.DBUpdate("update problems set title=?, allow_down=? where problem_id=?", param.Title, new_allow, param.ProbID)
+			db.DBUpdate("update problems set title=?, allow_down=? where problem_id=?", param.Title, new_allow, param.ProbID)
 			err := internal.PRModifySample(param.ProbID, new_allow)
 			if err != nil {
 				ctx.ErrorAPI(err)
 			}
 		} else {
-			libs.DBUpdate("update problems set title=? where problem_id=?", param.Title, param.ProbID)
+			db.DBUpdate("update problems set title=? where problem_id=?", param.Title, param.ProbID)
 		}
 	}).FailAPIStatusForbidden(ctx)
 }

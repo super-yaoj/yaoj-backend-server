@@ -25,6 +25,8 @@ var Router map[string][]Request = map[string][]Request{
 	"/UserLogout":    {{"POST", service.GinHandler(UserLogout)}},
 	"/Rejudge":       {{"POST", service.GinHandler(Rejudge)}},
 	"/FinishContest": {{"POST", service.GinHandler(CtstFinish)}},
+	"/FinishJudging": {{"POST", service.GinHandler(FinishJudging)}},
+	"/judgerlog":     {{"GET", service.GinHandler(JudgerLog)}},
 
 	"/user": {
 		{"GET", service.GinHandler(UserGet)},

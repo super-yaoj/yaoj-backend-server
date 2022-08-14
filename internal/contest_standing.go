@@ -3,10 +3,13 @@ package internal
 import (
 	"fmt"
 	"time"
-	"yao/libs"
+	"yao/db"
 
 	jsoniter "github.com/json-iterator/go"
-	"github.com/super-yaoj/yaoj-core/pkg/utils"
+	utils "github.com/super-yaoj/yaoj-utils"
+	"github.com/super-yaoj/yaoj-utils/cache"
+	"github.com/super-yaoj/yaoj-utils/locks"
+	"github.com/super-yaoj/yaoj-utils/ratings"
 )
 
 type CTStandingEntry struct {
@@ -45,8 +48,8 @@ type standingUser struct {
 }
 
 var (
-	allStandings = libs.NewMemoryCache[*CTStanding](time.Hour, 100)
-	ctsMultiLock = libs.NewMappedMultiRWMutex()
+	allStandings = cache.NewMemoryCache[*CTStanding](time.Hour, 100)
+	ctsMultiLock = locks.NewMappedMultiRWMutex()
 	standingCols = "submission_id, submitter, problem_id, score, sample_score, accepted, submit_time"
 )
 
@@ -69,7 +72,7 @@ func updateCTSEntry(standing *CTStanding, sub *standingSubm, getRating bool) {
 		standing.uidMap[sub.Submitter] = uid
 		info := standingUser{}
 		if getRating {
-			libs.DBSelectSingle(&info, "select rating, user_name from user_info where user_id=?", sub.Submitter)
+			db.DBSelectSingle(&info, "select rating, user_name from user_info where user_id=?", sub.Submitter)
 		}
 		standing.entries = append(standing.entries, newStandingEntry(sub.Submitter, info.Rating, info.UserName, len(standing.pidMap)))
 	}
@@ -98,7 +101,7 @@ func CTSRenew(contest_id int) {
 		return
 	}
 	var subs []standingSubm
-	err = libs.DBSelectAll(&subs, "select " + standingCols + " from submissions where contest_id=? order by submission_id", contest_id)
+	err = db.DBSelectAll(&subs, "select " + standingCols + " from submissions where contest_id=? order by submission_id", contest_id)
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -127,7 +130,7 @@ func CTSRenew(contest_id int) {
 		for i := range subs {
 			uids[i] = subs[i].Submitter
 		}
-		rows, err := libs.DBQuery("select user_id, rating, user_name from user_info where user_id in (" + libs.JoinArray(uids) + ")")
+		rows, err := db.DBQuery("select user_id, rating, user_name from user_info where user_id in (" + utils.JoinArray(uids) + ")")
 		if err != nil {
 			fmt.Println(err)
 			return
@@ -160,7 +163,7 @@ func CTSUpdateSubmission(contest_id, sid int) {
 		return
 	}
 	var sub standingSubm
-	err := libs.DBSelectSingle(&sub, "select " + standingCols + " from submissions where submission_id=?", sid)
+	err := db.DBSelectSingle(&sub, "select " + standingCols + " from submissions where submission_id=?", sid)
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -185,7 +188,7 @@ func CTSDeleteSubmission(sub SubmissionBase) {
 	}
 	standing.entries[uid].SubIds[pid] = 0
 	var newsub standingSubm
-	err := libs.DBSelectSingle(&sub, "select " + standingCols + " from submissions where problem_id=? and contest_id=? and submitter=? order by submission_id desc limit 1", sub.ProblemId, sub.ContestId, sub.Submitter)
+	err := db.DBSelectSingle(&sub, "select " + standingCols + " from submissions where problem_id=? and contest_id=? and submitter=? order by submission_id desc limit 1", sub.ProblemId, sub.ContestId, sub.Submitter)
 	if err != nil {//no more submissions
 		newsub = standingSubm{Submitter: sub.Submitter, Problem: sub.ProblemId}
 	}
@@ -200,7 +203,7 @@ func CTSGet(contest_id int) []CTStandingEntry {
 		if CTHasFinished(contest_id) {
 			var entries []CTStandingEntry
 			var js []byte
-			err := libs.DBSelectSingleColumn(&js, "select standing from contest_standing where contest_id=?", contest_id)
+			err := db.DBSelectSingleColumn(&js, "select standing from contest_standing where contest_id=?", contest_id)
 			if err != nil {
 				fmt.Println(err)
 				return nil
@@ -239,7 +242,7 @@ func getPastContests(entries []CTStandingEntry) error {
 	for i := range entries {
 		uids = append(uids, entries[i].UserId)
 	}
-	rows, err := libs.DBQuery("select user_id, count(*) from ratings where user_id in (" + libs.JoinArray(uids) + ") group by user_id")
+	rows, err := db.DBQuery("select user_id, count(*) from ratings where user_id in (" + utils.JoinArray(uids) + ") group by user_id")
 	defer rows.Close()
 	if err != nil {
 		return err
@@ -272,7 +275,7 @@ func CTFinish(contest_id int) error {
 		for i := range standing {
 			standing_p[i] = &standing[i]
 		}
-		err = utils.CalcRating(standing_p)
+		err = ratings.CalcRating(standing_p)
 		if err != nil {
 			return err
 		}
@@ -287,7 +290,7 @@ func CTFinish(contest_id int) error {
 		for key, i := range standing {
 			values[key] = fmt.Sprintf("(%d, %d, %d, \"%s\")", i.UserId, i.NewRating, contest_id, current)
 		}
-		_, err = libs.DBUpdate("insert into ratings values " + libs.JoinArray(values))
+		_, err = db.DBUpdate("insert into ratings values " + utils.JoinArray(values))
 		if err != nil {
 			return err
 		}
@@ -295,7 +298,7 @@ func CTFinish(contest_id int) error {
 		for key, i := range standing {
 			values[key] = fmt.Sprintf("(%d, %d)", i.UserId, i.NewRating)
 		}
-		_, err = libs.DBUpdate("insert into user_info (user_id, rating) values " + libs.JoinArray(values) + " on duplicate key update rating=values(rating)")
+		_, err = db.DBUpdate("insert into user_info (user_id, rating) values " + utils.JoinArray(values) + " on duplicate key update rating=values(rating)")
 		if err != nil {
 			return err
 		}
@@ -304,10 +307,10 @@ func CTFinish(contest_id int) error {
 	if err != nil {
 		return err
 	}
-	_, err = libs.DBUpdate("insert into contest_standing values (?, ?)", contest_id, js)
+	_, err = db.DBUpdate("insert into contest_standing values (?, ?)", contest_id, js)
 	if err != nil {
 		return err
 	}
-	_, err = libs.DBUpdate("update contests set finished=1 where contest_id=?", contest_id)
+	_, err = db.DBUpdate("update contests set finished=1 where contest_id=?", contest_id)
 	return err
 }

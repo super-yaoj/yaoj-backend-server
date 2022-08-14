@@ -11,7 +11,8 @@ require (
 	github.com/jmoiron/sqlx v1.3.5
 	github.com/json-iterator/go v1.1.12
 	github.com/k0kubun/pp v2.4.0+incompatible
-	github.com/super-yaoj/yaoj-core v0.0.32
+	github.com/super-yaoj/yaoj-core v0.0.33
+	github.com/super-yaoj/yaoj-utils v0.0.0-20220814153103-4f090f50f9b7
 	gopkg.in/yaml.v3 v3.0.1
 )
 

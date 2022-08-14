@@ -8,28 +8,31 @@ import (
 	"os"
 	"path"
 	"time"
-	"yao/libs"
+	"yao/config"
+	"yao/db"
 
 	"github.com/k0kubun/pp"
 	"github.com/super-yaoj/yaoj-core/pkg/problem"
-	"github.com/super-yaoj/yaoj-core/pkg/utils"
+	utils "github.com/super-yaoj/yaoj-utils"
+	"github.com/super-yaoj/yaoj-utils/cache"
+	"github.com/super-yaoj/yaoj-utils/locks"
 )
 
 var (
-	ProblemRWLock = libs.NewMappedMultiRWMutex()
-	ProblemCache  = libs.NewMemoryCache[*Problem](time.Hour, 100)
+	ProblemRWLock = locks.NewMappedMultiRWMutex()
+	ProblemCache  = cache.NewMemoryCache[*Problem](time.Hour, 100)
 )
 
 func PRGetDir(problem_id int) string {
-	return libs.DataDir + fmt.Sprint(problem_id)
+	return config.Global.DataDir + fmt.Sprint(problem_id)
 }
 
 func PRGetDataZip(problem_id int) string {
-	return libs.DataDir + fmt.Sprint(problem_id) + ".zip"
+	return config.Global.DataDir + fmt.Sprint(problem_id) + ".zip"
 }
 
 func PRGetSampleZip(problem_id int) string {
-	return libs.DataDir + fmt.Sprint(problem_id) + "_sample.zip"
+	return config.Global.DataDir + fmt.Sprint(problem_id) + "_sample.zip"
 }
 
 
@@ -59,7 +62,7 @@ func PRPutData(problem_id int, tmpdir string) error {
 	os.Rename(path.Join(tmpdir, "1"), data_dir)
 
 	ProblemCache.Delete(problem_id)
-	libs.DBUpdate("update problems set check_sum=?, allow_down=\"\" where problem_id=?", utils.FileChecksum(data_zip).String(), problem_id)
+	db.DBUpdate("update problems set check_sum=?, allow_down=\"\" where problem_id=?", utils.FileChecksum(data_zip).String(), problem_id)
 	return err
 }
 
@@ -100,9 +103,9 @@ func PRSetCache(problem_id int, pro problem.Problem) {
 		DataInfo:     pro.DataInfo(),
 		Statements:   stmts,
 		SubmConfig:   pro.Data().Submission,
-		HasSample:    libs.FileExists(PRGetSampleZip(problem_id)),
-		TimeLimit:    libs.AtoiDefault(pro.Data().Statement["_tl"], -1),
-		MemoryLimit:  libs.AtoiDefault(pro.Data().Statement["_ml"], -1),
+		HasSample:    utils.FileExists(PRGetSampleZip(problem_id)),
+		TimeLimit:    utils.AtoiDefault(pro.Data().Statement["_tl"], -1),
+		MemoryLimit:  utils.AtoiDefault(pro.Data().Statement["_ml"], -1),
 	})
 }
 

@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"yao/libs"
 
+	"yao/config"
 	"yao/internal"
 
 	"github.com/gin-gonic/gin"
@@ -43,6 +43,15 @@ func (ctx Context) ErrorAPI(err error) {
 func (ctx Context) ErrorRPC(err error) {
 	ctx.JSON(500, map[string]any{"_error": map[string]any{"code": -32603, "message": err.Error()}})
 }
+
+func (ctx Context) SetCookie(key, value string, security bool) {
+	ctx.Context.SetCookie(key, value, 86400 * 365, "/", config.Global.FrontDomain, security, false)
+}
+
+func (ctx Context) DeleteCookie(key string) {
+	ctx.Context.SetCookie(key, "", -1, "/", config.Global.FrontDomain, false, false)
+}
+
 
 // Universal Web API Parameter Design
 //
@@ -120,7 +129,7 @@ func init() {
 		if !fv.Value.CanInt() {
 			return HttpStatErr(http.StatusBadRequest)
 		}
-		if !libs.IsAdmin(int(fv.Value.Int())) {
+		if !internal.IsAdmin(int(fv.Value.Int())) {
 			return HttpStatErr(http.StatusForbidden)
 		}
 		return nil // ok

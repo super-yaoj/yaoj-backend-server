@@ -3,7 +3,9 @@ package internal
 import (
 	"fmt"
 	"sort"
-	"yao/libs"
+	"yao/db"
+
+	utils "github.com/super-yaoj/yaoj-utils"
 )
 
 const (
@@ -22,21 +24,21 @@ func ClickLike(target, id, user_id int) error {
 	var err error
 	switch target {
 	case BLOG:
-		_, err = libs.DBUpdate("update blogs set `like` = `like` + ? where blog_id=?", val, id)
+		_, err = db.DBUpdate("update blogs set `like` = `like` + ? where blog_id=?", val, id)
 	case COMMENT:
-		_, err = libs.DBUpdate("update blog_comments set `like` = `like` + ? where comment_id=?", val, id)
+		_, err = db.DBUpdate("update blog_comments set `like` = `like` + ? where comment_id=?", val, id)
 	case PROBLEM:
-		_, err = libs.DBUpdate("update problems set `like` = `like` + ? where problem_id=?", val, id)
+		_, err = db.DBUpdate("update problems set `like` = `like` + ? where problem_id=?", val, id)
 	case CONTEST:
-		_, err = libs.DBUpdate("update contests set `like` = `like` + ? where contest_id=?", val, id)
+		_, err = db.DBUpdate("update contests set `like` = `like` + ? where contest_id=?", val, id)
 	}
 	if err != nil {
 		return err
 	}
 	if has {
-		_, err = libs.DBUpdate("delete from click_like where target=? and id=? and user_id=?", target, id, user_id)
+		_, err = db.DBUpdate("delete from click_like where target=? and id=? and user_id=?", target, id, user_id)
 	} else {
-		_, err = libs.DBUpdate("insert into click_like values (?,?,?)", target, id, user_id)
+		_, err = db.DBUpdate("insert into click_like values (?,?,?)", target, id, user_id)
 	}
 	return err
 }
@@ -45,12 +47,12 @@ func GetLikes(target, user_id int, ids []int) []int {
 	if len(ids) == 0 {
 		return []int{}
 	}
-	ret, _ := libs.DBSelectInts(fmt.Sprintf("select id from click_like where target=%d and user_id=%d and id in (%s)", target, user_id, libs.JoinArray(ids)))
+	ret, _ := db.DBSelectInts(fmt.Sprintf("select id from click_like where target=%d and user_id=%d and id in (%s)", target, user_id, utils.JoinArray(ids)))
 	sort.Ints(ret)
 	return ret
 }
 
 func GetLike(target, user_id, id int) bool {
-	val, _ := libs.DBSelectSingleInt("select count(*) from click_like where target=? and id=? and user_id=?", target, id, user_id)
+	val, _ := db.DBSelectSingleInt("select count(*) from click_like where target=? and id=? and user_id=?", target, id, user_id)
 	return val > 0
 }
