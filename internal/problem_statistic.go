@@ -121,8 +121,16 @@ func PRSAddSubmission(problem_id, sid int) {
 	if !ok {
 		return
 	}
-	fmt.Println(statistic.totSubs)
 	statistic.totSubs++
+}
+
+func PRSUpdateSubmission(problem_id, sid int) {
+	prsMultiLock.Lock(problem_id)
+	defer prsMultiLock.Unlock(problem_id)
+	statistic, ok := allStatistic.Get(problem_id)
+	if !ok {
+		return
+	}
 	var sub statisticSubm
 	err := libs.DBSelectSingle(&sub, "select " + statisticCols + " from submissions where submission_id=? and status=? and accepted=?", sid, Finished, Accepted)
 	if err != nil {
@@ -141,13 +149,14 @@ func PRSDeleteSubmission(sub SubmissionBase) {
 		return
 	}
 	_, ok = statistic.sids[sub.Id]
+	statistic.totSubs--
 	if !ok {//no such ac submission
 		return
 	}
 	delete(statistic.sids, sub.Id)
 	uid, ok := statistic.uidMap[sub.Submitter]
 	var subs []statisticSubm
-	err := libs.DBSelectAll(&subs, "select " + statisticCols + " from submissions where sub.ProblemId=? and submitter=? and status=? and accepted=?", sub.ProblemId, sub.Submitter, Finished, Accepted)
+	err := libs.DBSelectAll(&subs, "select " + statisticCols + " from submissions where problem_id=? and submitter=? and status=? and accepted=?", sub.ProblemId, sub.Submitter, Finished, Accepted)
 	if err != nil {
 		fmt.Println(err)
 		return

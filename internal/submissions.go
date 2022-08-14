@@ -103,6 +103,7 @@ func SMCreate(user_id, problem_id, contest_id int, language utils.LangTag, zipfi
 	if err != nil {
 		return err
 	}
+	PRSAddSubmission(problem_id, int(id))
 	return SMJudge(SubmissionBase{int(id), problem_id, contest_id, user_id}, false, current)
 }
 
@@ -366,7 +367,7 @@ func SMUpdate(sid, pid int, mode string, result []byte) error {
 	//we should ensure that each submission will be exactly updated once
 	if subinfo.Status == Finished || (subinfo.Status < 0 && mode == "tests") {
 		//TODO: some corresponding updates
-		PRSAddSubmission(subinfo.ProblemId, subinfo.Id)
+		PRSUpdateSubmission(subinfo.ProblemId, subinfo.Id)
 		if subinfo.ContestId > 0 {
 			CTSUpdateSubmission(subinfo.ContestId, subinfo.Id)
 		}
