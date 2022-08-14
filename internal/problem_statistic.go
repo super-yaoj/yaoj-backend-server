@@ -107,7 +107,7 @@ func PRSRenew(problem_id int) {
 	statistic := &problemStatistic{}
 	statistic.uidMap = make(map[int]int)
 	statistic.sids = make(map[int]struct{})
-	statistic.totSubs, err = db.DBSelectSingleInt("select count(*) from submissions where problem_id=? and status=?", problem_id, Finished)
+	statistic.totSubs, err = db.DBSelectSingleInt("select count(*) from submissions where problem_id=?", problem_id)
 	for i := range subs {
 		statistic.sids[subs[i].Id] = struct{}{}
 		statistic.updateEntry(&subs[i], false)
