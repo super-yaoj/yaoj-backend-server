@@ -9,7 +9,8 @@ import (
 	utils "github.com/super-yaoj/yaoj-utils"
 )
 
-type UserBase struct {
+// 足够用于鉴权和显示 user ID 的元信息
+type UserMeta struct {
 	Id        int    `db:"user_id" json:"user_id"`
 	Name      string `db:"user_name" json:"user_name"`
 	Usergroup int    `db:"user_group" json:"user_group"`
@@ -17,7 +18,7 @@ type UserBase struct {
 }
 
 type User struct {
-	UserBase
+	UserMeta
 	Password      string    `db:"password" json:"password"`
 	Motto         string    `db:"motto" json:"motto"`
 	RegisterTime  time.Time `db:"register_time" json:"register_time"`
@@ -76,8 +77,8 @@ func UserQuery(user_id int) (User, error) {
 	return user, err
 }
 
-func UserQueryBase(user_id int) (UserBase, error) {
-	user := UserBase{Id: user_id}
+func UserQueryBase(user_id int) (UserMeta, error) {
+	user := UserMeta{Id: user_id}
 	err := db.SelectSingle(&user, "select user_name, user_group, rating from user_info where user_id=?", user_id)
 	return user, err
 }
@@ -136,8 +137,8 @@ func UserExists(user_id int) bool {
 	return count > 0
 }
 
-func UserListByName(user_name string, bound, pagesize int, isleft bool) ([]UserBase, bool, error) {
-	var users []UserBase
+func UserListByName(user_name string, bound, pagesize int, isleft bool) ([]UserMeta, bool, error) {
+	var users []UserMeta
 	pagesize += 1
 	var err error
 	if isleft {

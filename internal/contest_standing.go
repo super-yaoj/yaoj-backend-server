@@ -263,7 +263,7 @@ func getPastContests(entries []CTStandingEntry) error {
 	if err != nil {
 		return err
 	}
-	var ratings map[int]int
+	var ratings = map[int]int{}
 	for rows.Next() {
 		var uid, count int
 		rows.Scan(&uid, &count)

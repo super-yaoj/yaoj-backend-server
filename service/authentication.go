@@ -11,6 +11,7 @@ import (
 )
 
 // authorization stored in session
+// 不是完整的 UserMeta
 type Auth struct {
 	UserID  int `session:"user_id" validate:"gte=0"`
 	UserGrp int `session:"user_group" validate:"gte=0,lte=3"`

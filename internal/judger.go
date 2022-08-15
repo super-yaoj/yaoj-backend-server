@@ -3,7 +3,7 @@ package internal
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"net/http"
 	"net/url"
@@ -141,7 +141,7 @@ func judgeSubmission(sid int, uuid int64, mode string, judger *Judger) bool {
 			fmt.Printf("%v\n", err)
 			return false
 		}
-		body, _ := ioutil.ReadAll(res.Body)
+		body, _ := io.ReadAll(res.Body)
 		var jr judgerResponse
 		jsoniter.Unmarshal(body, &jr)
 
@@ -156,7 +156,7 @@ func judgeSubmission(sid int, uuid int64, mode string, judger *Judger) bool {
 				fmt.Printf("%v %v\n", err, err1)
 				return false
 			}
-			body, _ = ioutil.ReadAll(res.Body)
+			body, _ = io.ReadAll(res.Body)
 			jsoniter.Unmarshal(body, &jr)
 			if jr.Msg != "ok" {
 				fmt.Printf("%s\n", jr.Err)
@@ -202,7 +202,7 @@ func judgeCustomTest(sid int, callback *chan []byte, judger *Judger) {
 		*callback <- []byte{}
 		return
 	}
-	body, _ := ioutil.ReadAll(res.Body)
+	body, _ := io.ReadAll(res.Body)
 	var jr judgerResponse
 	jsoniter.Unmarshal(body, &jr)
 	if jr.Msg != "ok" {
@@ -231,7 +231,7 @@ func FinishJudging(jid string, result []byte) error {
 		}
 		time.Sleep(time.Second)
 	}
-	return fmt.Errorf("No such judger: judger_id=%s", jid)
+	return fmt.Errorf("no such judger: judger_id=%s", jid)
 }
 
 func JudgerLog(id int) string {
@@ -242,7 +242,7 @@ func JudgerLog(id int) string {
 	if err != nil {
 		return "Internal server error"
 	}
-	body, _ := ioutil.ReadAll(res.Body)
+	body, _ := io.ReadAll(res.Body)
 	return string(body)
 }
 

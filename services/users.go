@@ -81,7 +81,7 @@ func UserLogin(ctx Context, param UserLoginParam) {
 		return
 	}
 	password := internal.SaltPassword(param.Passwd)
-	user := internal.UserBase{Name: param.UserName}
+	user := internal.UserMeta{Name: param.UserName}
 	err := db.SelectSingle(
 		&user, "select user_id, user_group from user_info where user_name=? and password=?",
 		param.UserName, password,
@@ -127,7 +127,7 @@ type UserInitParam struct {
 
 func UserInit(ctx Context, param UserInitParam) {
 	sess := sessions.Default(ctx.Context)
-	ret := func(user internal.UserBase) {
+	ret := func(user internal.UserMeta) {
 		fmt.Println(user)
 		if user.Usergroup == internal.UserBanned {
 			UserLogout(ctx, UserLogoutParam{})
@@ -144,7 +144,7 @@ func UserInit(ctx Context, param UserInitParam) {
 	}
 
 	tmp, err := ctx.Cookie("user_id")
-	user := internal.UserBase{Id: -1, Name: "", Usergroup: internal.UserNormal}
+	user := internal.UserMeta{Id: -1, Name: "", Usergroup: internal.UserNormal}
 	if err == nil {
 		id, err := strconv.Atoi(tmp)
 		remember_token, err1 := ctx.Cookie("remember_token")

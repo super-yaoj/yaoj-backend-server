@@ -90,7 +90,7 @@ func BlogList(ctx Context, param BlogListParam) {
 			return
 		}
 		blogs, isfull, err := internal.BlogListAll(
-			param.Bound(), *param.PageSize, param.UserID, param.IsLeft(), internal.IsAdmin(param.UserGrp),
+			param.Bound(), *param.PageSize, param.UserID, param.IsLeft(), param.IsAdmin(),
 		)
 		if err != nil {
 			ctx.ErrorAPI(err)

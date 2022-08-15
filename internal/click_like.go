@@ -8,14 +8,16 @@ import (
 	utils "github.com/super-yaoj/yaoj-utils"
 )
 
+type ClickType int
+
 const (
-	BLOG    = 1
-	CONTEST = 2
-	PROBLEM = 3
-	COMMENT = 4
+	BLOG    ClickType = 1
+	CONTEST ClickType = 2
+	PROBLEM ClickType = 3
+	COMMENT ClickType = 4
 )
 
-func ClickLike(target, id, user_id int) error {
+func ClickLike(target ClickType, id, user_id int) error {
 	has := GetLike(target, user_id, id)
 	val := 1
 	if has {
@@ -43,7 +45,7 @@ func ClickLike(target, id, user_id int) error {
 	return err
 }
 
-func GetLikes(target, user_id int, ids []int) []int {
+func GetLikes(target ClickType, user_id int, ids []int) []int {
 	if len(ids) == 0 {
 		return []int{}
 	}
@@ -52,7 +54,7 @@ func GetLikes(target, user_id int, ids []int) []int {
 	return ret
 }
 
-func GetLike(target, user_id, id int) bool {
+func GetLike(target ClickType, user_id, id int) bool {
 	val, _ := db.SelectSingleInt("select count(*) from click_like where target=? and id=? and user_id=?", target, id, user_id)
 	return val > 0
 }

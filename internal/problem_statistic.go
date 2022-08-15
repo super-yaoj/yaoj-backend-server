@@ -126,6 +126,9 @@ func prsRenew(problem_id int) {
 	statistic.uidMap = make(map[int]int)
 	statistic.sids = make(map[int]struct{})
 	statistic.totSubs, err = db.SelectSingleInt("select count(*) from submissions where problem_id=?", problem_id)
+	if err != nil {
+		panic(err)
+	}
 	for i := range subs {
 		statistic.sids[subs[i].Id] = struct{}{}
 		statistic.updateEntry(&subs[i], false)

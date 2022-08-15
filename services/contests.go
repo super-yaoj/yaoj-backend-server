@@ -17,7 +17,7 @@ type CtstListParam struct {
 
 func CtstList(ctx Context, param CtstListParam) {
 	contests, isfull, err := internal.CTList(
-		param.Page.Bound(), *param.PageSize, param.UserID, param.IsLeft(), internal.IsAdmin(param.UserGrp),
+		param.Page.Bound(), *param.PageSize, param.UserID, param.IsLeft(), param.IsAdmin(),
 	)
 	if err != nil {
 		ctx.ErrorAPI(err)
