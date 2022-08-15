@@ -24,21 +24,21 @@ func ClickLike(target, id, user_id int) error {
 	var err error
 	switch target {
 	case BLOG:
-		_, err = db.Update("update blogs set `like` = `like` + ? where blog_id=?", val, id)
+		_, err = db.Exec("update blogs set `like` = `like` + ? where blog_id=?", val, id)
 	case COMMENT:
-		_, err = db.Update("update blog_comments set `like` = `like` + ? where comment_id=?", val, id)
+		_, err = db.Exec("update blog_comments set `like` = `like` + ? where comment_id=?", val, id)
 	case PROBLEM:
-		_, err = db.Update("update problems set `like` = `like` + ? where problem_id=?", val, id)
+		_, err = db.Exec("update problems set `like` = `like` + ? where problem_id=?", val, id)
 	case CONTEST:
-		_, err = db.Update("update contests set `like` = `like` + ? where contest_id=?", val, id)
+		_, err = db.Exec("update contests set `like` = `like` + ? where contest_id=?", val, id)
 	}
 	if err != nil {
 		return err
 	}
 	if has {
-		_, err = db.Update("delete from click_like where target=? and id=? and user_id=?", target, id, user_id)
+		_, err = db.Exec("delete from click_like where target=? and id=? and user_id=?", target, id, user_id)
 	} else {
-		_, err = db.Update("insert into click_like values (?,?,?)", target, id, user_id)
+		_, err = db.Exec("insert into click_like values (?,?,?)", target, id, user_id)
 	}
 	return err
 }

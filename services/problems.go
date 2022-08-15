@@ -264,13 +264,13 @@ func ProbEdit(ctx Context, param ProbEditParam) {
 		allow_down = fix(allow_down)
 		new_allow := fix(param.AllowDown)
 		if allow_down != new_allow {
-			db.Update("update problems set title=?, allow_down=? where problem_id=?", param.Title, new_allow, param.ProbID)
+			db.Exec("update problems set title=?, allow_down=? where problem_id=?", param.Title, new_allow, param.ProbID)
 			err := internal.ProbModifySample(param.ProbID, new_allow)
 			if err != nil {
 				ctx.ErrorAPI(err)
 			}
 		} else {
-			db.Update("update problems set title=? where problem_id=?", param.Title, param.ProbID)
+			db.Exec("update problems set title=? where problem_id=?", param.Title, param.ProbID)
 		}
 	}).FailAPIStatusForbidden(ctx)
 }

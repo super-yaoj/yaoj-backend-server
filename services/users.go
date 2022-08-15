@@ -59,8 +59,8 @@ func UserSignUp(ctx Context, param UserSignUpParam) {
 	sess.Set("user_id", int(user_id))
 	sess.Set("user_name", param.UserName)
 	sess.Set("user_group", internal.UserNormal)
-	db.Update("insert into user_permissions values (?, ?)", user_id, config.Global.DefaultGroup)
-	db.Update("update permissions set count = count + 1 where permission_id=1")
+	db.Exec("insert into user_permissions values (?, ?)", user_id, config.Global.DefaultGroup)
+	db.Exec("update permissions set count = count + 1 where permission_id=1")
 	sess.Save()
 	if param.Memo == "true" {
 		ctx.SetCookie("user_id", fmt.Sprint(user_id), true)
@@ -103,7 +103,7 @@ func UserLogin(ctx Context, param UserLoginParam) {
 		remember_token := utils.RandomString(32)
 		ctx.SetCookie("user_id", fmt.Sprint(user.Id), true)
 		ctx.SetCookie("remember_token", remember_token, true)
-		db.Update("update user_info set remember_token=? where user_id=?", remember_token, user.Id)
+		db.Exec("update user_info set remember_token=? where user_id=?", remember_token, user.Id)
 	}
 	ctx.JSONRPC(http.StatusOK, 0, "", nil)
 }

@@ -83,12 +83,12 @@ func UserQueryBase(user_id int) (UserBase, error) {
 }
 
 func Userubmodify(password string, gender int, motto, email, organization string, user_id int) error {
-	_, err := db.Update("update user_info set password=?, gender=?, motto=?, email=?, organization=? where user_id=?", password, gender, motto, email, organization, user_id)
+	_, err := db.Exec("update user_info set password=?, gender=?, motto=?, email=?, organization=? where user_id=?", password, gender, motto, email, organization, user_id)
 	return err
 }
 
 func UserGroupEdit(user_id, user_group int) error {
-	_, err := db.UpdateGetAffected("update user_info set user_group=? where user_id=?", user_group, user_id)
+	_, err := db.ExecGetAffected("update user_info set user_group=? where user_id=?", user_group, user_id)
 	return err
 }
 

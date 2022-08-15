@@ -60,7 +60,7 @@ func ProbPutData(problem_id int, tmpdir string) error {
 	os.Rename(path.Join(tmpdir, "1"), data_dir)
 
 	ProblemCache.Delete(problem_id)
-	db.Update("update problems set check_sum=?, allow_down=\"\" where problem_id=?", utils.FileChecksum(data_zip).String(), problem_id)
+	db.Exec("update problems set check_sum=?, allow_down=\"\" where problem_id=?", utils.FileChecksum(data_zip).String(), problem_id)
 	return err
 }
 

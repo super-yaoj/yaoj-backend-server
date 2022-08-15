@@ -88,12 +88,12 @@ func SelectSingleColumn(arr any, query string, args ...any) error {
 	return errors.New("no rows read by SelectSingleColumn()")
 }
 
-func Update(query string, args ...any) (sql.Result, error) {
+func Exec(query string, args ...any) (sql.Result, error) {
 	return db.Exec(query, args...)
 }
 
-func UpdateGetAffected(query string, args ...any) (int64, error) {
-	res, err := db.Exec(query, args...)
+func ExecGetAffected(query string, args ...any) (int64, error) {
+	res, err := Exec(query, args...)
 	if err != nil {
 		return 0, err
 	}
@@ -101,7 +101,7 @@ func UpdateGetAffected(query string, args ...any) (int64, error) {
 }
 
 func InsertGetId(query string, args ...any) (int64, error) {
-	res, err := db.Exec(query, args...)
+	res, err := Exec(query, args...)
 	if err != nil {
 		return 0, err
 	}

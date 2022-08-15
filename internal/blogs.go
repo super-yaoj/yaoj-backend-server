@@ -25,18 +25,18 @@ func BlogCreate(user_id, private int, title, content string) (int64, error) {
 }
 
 func BlogEdit(id, private int, title, content string) error {
-	_, err := db.Update("update blogs set title=?, content=?, private=? where blog_id=?", title, content, private, id)
+	_, err := db.Exec("update blogs set title=?, content=?, private=? where blog_id=?", title, content, private, id)
 	return err
 }
 
 func BlogDelete(id int) error {
-	_, err := db.Update("delete from blogs where blog_id=?", id)
+	_, err := db.Exec("delete from blogs where blog_id=?", id)
 	if err != nil {
 		return err
 	} else {
-		db.Update("delete from click_like where target=? and id=?", BLOG, id)
-		db.Update("delete from click_like where target=? and id in (select comment_id from blog_comments where blog_id=?)", COMMENT, id)
-		db.Update("delete from blog_comments where blog_id=?", id)
+		db.Exec("delete from click_like where target=? and id=?", BLOG, id)
+		db.Exec("delete from click_like where target=? and id in (select comment_id from blog_comments where blog_id=?)", COMMENT, id)
+		db.Exec("delete from blog_comments where blog_id=?", id)
 		return nil
 	}
 }

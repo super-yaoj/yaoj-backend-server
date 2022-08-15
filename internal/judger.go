@@ -84,8 +84,8 @@ func judgerStart(judger *Judger) {
 		sid, uuid, mode := subm.sid, subm.uuid, subm.mode
 		if mode != "custom_test" {
 			if !judgeSubmission(sid, uuid, mode, judger) {
-				db.Update("update submissions set status=? where submission_id=?", InternalError, sid)
-				db.Update("update submission_details set result=\"\", pretest_result=\"\", extra_result=\"\" where submission_id=?", sid)
+				db.Exec("update submissions set status=? where submission_id=?", InternalError, sid)
+				db.Exec("update submission_details set result=\"\", pretest_result=\"\", extra_result=\"\" where submission_id=?", sid)
 				sub, _ := SubmGetBaseInfo(sid)
 				SubmUpdate(sid, sub.ProblemId, subm.mode, []byte{})
 			}
@@ -121,7 +121,7 @@ func judgeSubmission(sid int, uuid int64, mode string, judger *Judger) bool {
 	}
 	var content []byte
 	err = db.SelectSingleColumn(&content, "select content from submission_details where submission_id=?", sid)
-	go db.Update("update submissions set status=status|? where submission_id=?", Waiting, sid)
+	go db.Exec("update submissions set status=status|? where submission_id=?", Waiting, sid)
 	var check_sum string
 	err1 := db.SelectSingleColumn(&check_sum, "select check_sum from problems where problem_id=?", tinfo.Prob)
 	if err != nil || err1 != nil {

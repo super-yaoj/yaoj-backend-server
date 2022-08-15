@@ -119,7 +119,7 @@ func SubmCreate(user_id, problem_id, contest_id int, language utils.LangTag, zip
 	if err != nil {
 		return err
 	}
-	_, err = db.Update("insert into submission_details values (?, ?, ?, \"\", \"\", \"\")", id, zipfile, js)
+	_, err = db.Exec("insert into submission_details values (?, ?, ?, \"\", \"\", \"\")", id, zipfile, js)
 	if err != nil {
 		return err
 	}
@@ -361,19 +361,19 @@ func SubmUpdate(sid, pid int, mode string, result []byte) error {
 
 	//'and status>=0' means when meets an internal error, we shouldn't update status
 	if mode == "tests" {
-		_, err = db.Update("update submissions set status=status|?, accepted=accepted|?, score=?, time=?, memory=? where submission_id=? and status>=0",
+		_, err = db.Exec("update submissions set status=status|?, accepted=accepted|?, score=?, time=?, memory=? where submission_id=? and status>=0",
 			JudgingTests, utils.If(accepted, TestsAccepted, 0), score, int(time_used/float64(time.Millisecond)), int(memory_used/1024), sid)
 	} else if mode == "pretest" {
-		_, err = db.Update("update submissions set status=status|?, accepted=accepted|?, sample_score=? where submission_id=? and status>=0",
+		_, err = db.Exec("update submissions set status=status|?, accepted=accepted|?, sample_score=? where submission_id=? and status>=0",
 			JudgingPretest, utils.If(accepted, PretestAccepted, 0), score, sid)
 	} else {
-		_, err = db.Update("update submissions set status=status|?, accepted=accepted|? where submission_id=? and status>=0",
+		_, err = db.Exec("update submissions set status=status|?, accepted=accepted|? where submission_id=? and status>=0",
 			JudgingExtra, utils.If(accepted, ExtraAccepted, 0), sid)
 	}
 	if err != nil {
 		return err
 	}
-	_, err = db.Update("update submission_details set "+column_name+"=? where submission_id=?", result, sid)
+	_, err = db.Exec("update submission_details set "+column_name+"=? where submission_id=?", result, sid)
 	if err != nil {
 		return err
 	}
@@ -402,16 +402,16 @@ func SubmJudgeCustomTest(content []byte) []byte {
 	}
 	InsertCustomTest(int(sid), &callback)
 	result := <-callback
-	go db.Update("delete from custom_tests where id=?", sid)
+	go db.Exec("delete from custom_tests where id=?", sid)
 	return result
 }
 
 func SubmDelete(sub SubmissionBase) error {
-	_, err := db.Update("delete from submissions where submission_id=?", sub.Id)
+	_, err := db.Exec("delete from submissions where submission_id=?", sub.Id)
 	if err != nil {
 		return err
 	}
-	_, err = db.Update("delete from submission_details where submission_id=?", sub.Id)
+	_, err = db.Exec("delete from submission_details where submission_id=?", sub.Id)
 	if err != nil {
 		return err
 	}
@@ -426,7 +426,7 @@ func SubmRejudge(submission_id int) error {
 	}
 	//update uuid to cancel other entries in the judging queue
 	current := utils.TimeStamp()
-	_, err = db.Update("update submissions set uuid=?, status=0, accepted=0 where submission_id=?", current, submission_id)
+	_, err = db.Exec("update submissions set uuid=?, status=0, accepted=0 where submission_id=?", current, submission_id)
 	if err != nil {
 		return err
 	}

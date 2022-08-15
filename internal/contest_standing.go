@@ -307,7 +307,7 @@ func CTFinish(contest_id int) error {
 		for key, i := range standing {
 			values[key] = fmt.Sprintf("(%d, %d, %d, \"%s\")", i.UserId, i.NewRating, contest_id, current)
 		}
-		_, err = db.Update("insert into ratings values " + utils.JoinArray(values))
+		_, err = db.Exec("insert into ratings values " + utils.JoinArray(values))
 		if err != nil {
 			return err
 		}
@@ -315,7 +315,7 @@ func CTFinish(contest_id int) error {
 		for key, i := range standing {
 			values[key] = fmt.Sprintf("(%d, %d)", i.UserId, i.NewRating)
 		}
-		_, err = db.Update("insert into user_info (user_id, rating) values " + utils.JoinArray(values) + " on duplicate key update rating=values(rating)")
+		_, err = db.Exec("insert into user_info (user_id, rating) values " + utils.JoinArray(values) + " on duplicate key update rating=values(rating)")
 		if err != nil {
 			return err
 		}
@@ -324,10 +324,10 @@ func CTFinish(contest_id int) error {
 	if err != nil {
 		return err
 	}
-	_, err = db.Update("insert into contest_standing values (?, ?)", contest_id, js)
+	_, err = db.Exec("insert into contest_standing values (?, ?)", contest_id, js)
 	if err != nil {
 		return err
 	}
-	_, err = db.Update("update contests set finished=1 where contest_id=?", contest_id)
+	_, err = db.Exec("update contests set finished=1 where contest_id=?", contest_id)
 	return err
 }

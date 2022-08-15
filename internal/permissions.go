@@ -19,23 +19,23 @@ func PermCreate(name string) (int64, error) {
 }
 
 func PermChangeName(id int, name string) error {
-	_, err := db.UpdateGetAffected("update permissions set permission_name=? where permission_id=?", name, id)
+	_, err := db.ExecGetAffected("update permissions set permission_name=? where permission_id=?", name, id)
 	return err
 }
 
 func PermDelete(id int) (int64, error) {
-	res, err := db.UpdateGetAffected("delete from permissions where permission_id=?", id)
+	res, err := db.ExecGetAffected("delete from permissions where permission_id=?", id)
 	if err != nil {
 		return res, err
 	}
 	if res == 0 {
 		return res, nil
 	}
-	_, err = db.Update("delete from user_permissions where permission_id=?", id)
+	_, err = db.Exec("delete from user_permissions where permission_id=?", id)
 	if err != nil {
 		return 0, err
 	}
-	_, err = db.Update("delete from problem_permissions where permission_id=?", id)
+	_, err = db.Exec("delete from problem_permissions where permission_id=?", id)
 	if err != nil {
 		return 0, err
 	}
@@ -79,22 +79,22 @@ func PermAddUser(ids []int, id int) (int64, error) {
 			query.WriteString(",")
 		}
 	}
-	res, err := db.UpdateGetAffected("insert ignore into user_permissions values " + query.String())
+	res, err := db.ExecGetAffected("insert ignore into user_permissions values " + query.String())
 	if err != nil {
 		return res, err
 	} else {
-		_, err = db.Update("update permissions set count = count + ? where permission_id=?", res, id)
+		_, err = db.Exec("update permissions set count = count + ? where permission_id=?", res, id)
 		return res, err
 	}
 }
 
 func PermDeleteUser(pid, uid int) (int64, error) {
-	res, err := db.UpdateGetAffected("delete from user_permissions where user_id=? and permission_id=?", uid, pid)
+	res, err := db.ExecGetAffected("delete from user_permissions where user_id=? and permission_id=?", uid, pid)
 	if err != nil {
 		return 0, err
 	}
 	if res == 1 {
-		db.Update("update permissions set count = count - 1 where permission_id=?", pid)
+		db.Exec("update permissions set count = count - 1 where permission_id=?", pid)
 	}
 	return res, err
 }

@@ -23,7 +23,7 @@ func BlogCreateComment(blog_id, user_id int, content string) (int64, error) {
 	if err != nil {
 		return 0, err
 	} else {
-		db.Update("update blogs set comments=comments+1 where blog_id=?", blog_id)
+		db.Exec("update blogs set comments=comments+1 where blog_id=?", blog_id)
 		return id, err
 	}
 }
@@ -56,15 +56,15 @@ func BlogDeleteComment(id int) error {
 	if err != nil {
 		return err
 	}
-	_, err = db.Update("delete from blog_comments where comment_id=?", id)
+	_, err = db.Exec("delete from blog_comments where comment_id=?", id)
 	if err != nil {
 		return err
 	}
-	_, err = db.Update("delete from click_like where target=? and id=?", COMMENT, id)
+	_, err = db.Exec("delete from click_like where target=? and id=?", COMMENT, id)
 	if err != nil {
 		return err
 	}
-	_, err = db.Update("update blogs set comments=comments-1 where blog_id=?", blog_id)
+	_, err = db.Exec("update blogs set comments=comments-1 where blog_id=?", blog_id)
 	return err
 }
 

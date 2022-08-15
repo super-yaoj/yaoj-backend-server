@@ -135,12 +135,12 @@ func ProbGetManagers(problem_id int) ([]User, error) {
 }
 
 func ProbAddPermission(problem_id, permission_id int) error {
-	_, err := db.Update("insert ignore into problem_permissions values (?, ?)", problem_id, permission_id)
+	_, err := db.Exec("insert ignore into problem_permissions values (?, ?)", problem_id, permission_id)
 	return err
 }
 
 func ProbDeletePermission(problem_id, permission_id int) error {
-	_, err := db.Update("delete from problem_permissions where problem_id=? and permission_id=?", problem_id, permission_id)
+	_, err := db.Exec("delete from problem_permissions where problem_id=? and permission_id=?", problem_id, permission_id)
 	return err
 }
 
@@ -158,7 +158,7 @@ func ProbRejudge(problem_id int) error {
 		return err
 	}
 	//update uuid to current time-stamp
-	_, err = db.Update("update submissions set uuid=?, status=0 where problem_id=?", current, problem_id)
+	_, err = db.Exec("update submissions set uuid=?, status=0 where problem_id=?", current, problem_id)
 	if err != nil {
 		return err
 	}

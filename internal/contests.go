@@ -152,7 +152,7 @@ func CTCreate() (int64, error) {
 }
 
 func CTModify(contest_id int, title string, start time.Time, last int, pretest int, score_private int) error {
-	_, err := db.Update("update contests set title=?, start_time=?, end_time=?, pretest=?, score_private=? where contest_id=?", title, start, start.Add(time.Duration(last)*time.Minute), pretest, score_private, contest_id)
+	_, err := db.Exec("update contests set title=?, start_time=?, end_time=?, pretest=?, score_private=? where contest_id=?", title, start, start.Add(time.Duration(last)*time.Minute), pretest, score_private, contest_id)
 	Register("AfterCTModify", contest_id)
 	return err
 }
@@ -176,42 +176,42 @@ func CTGetParticipants(contest_id int) ([]User, error) {
 }
 
 func CTAddPermission(contest_id, permission_id int) error {
-	_, err := db.Update("insert ignore into contest_permissions values (?, ?)", contest_id, permission_id)
+	_, err := db.Exec("insert ignore into contest_permissions values (?, ?)", contest_id, permission_id)
 	return err
 }
 
 func CTDeletePermission(contest_id, permission_id int) error {
-	_, err := db.Update("delete from contest_permissions where contest_id=? and permission_id=?", contest_id, permission_id)
+	_, err := db.Exec("delete from contest_permissions where contest_id=? and permission_id=?", contest_id, permission_id)
 	return err
 }
 
 func CTAddProblem(contest_id, problem_id int) error {
-	_, err := db.Update("insert ignore into contest_problems values (?, ?)", contest_id, problem_id)
+	_, err := db.Exec("insert ignore into contest_problems values (?, ?)", contest_id, problem_id)
 	Register("AfterCTModify", contest_id)
 	return err
 }
 
 func CTDeleteProblem(contest_id, problem_id int) error {
-	_, err := db.Update("delete from contest_problems where contest_id=? and problem_id=?", contest_id, problem_id)
+	_, err := db.Exec("delete from contest_problems where contest_id=? and problem_id=?", contest_id, problem_id)
 	Register("AfterCTModify", contest_id)
 	return err
 }
 
 func CTAddParticipant(contest_id, user_id int) error {
-	affect, err := db.UpdateGetAffected("insert ignore into contest_participants values (?, ?)", contest_id, user_id)
+	affect, err := db.ExecGetAffected("insert ignore into contest_participants values (?, ?)", contest_id, user_id)
 	if err != nil {
 		return err
 	}
-	_, err = db.Update("update contests set registrants = registrants + ? where contest_id=?", affect, contest_id)
+	_, err = db.Exec("update contests set registrants = registrants + ? where contest_id=?", affect, contest_id)
 	return err
 }
 
 func CTDeleteParticipant(contest_id, user_id int) error {
-	affect, err := db.UpdateGetAffected("delete from contest_participants where contest_id=? and user_id=?", contest_id, user_id)
+	affect, err := db.ExecGetAffected("delete from contest_participants where contest_id=? and user_id=?", contest_id, user_id)
 	if err != nil {
 		return err
 	}
-	_, err = db.Update("update contests set registrants = registrants - ? where contest_id=?", affect, contest_id)
+	_, err = db.Exec("update contests set registrants = registrants - ? where contest_id=?", affect, contest_id)
 	return err
 }
 
@@ -261,6 +261,6 @@ func CTDashboard(contest_id int) []ContestDashboard {
 }
 
 func CTAddDashboard(contest_id int, dashboard string) error {
-	_, err := db.Update("insert into contest_dashboard values (?, ?, ?, null)", contest_id, dashboard, time.Now())
+	_, err := db.Exec("insert into contest_dashboard values (?, ?, ?, null)", contest_id, dashboard, time.Now())
 	return err
 }
