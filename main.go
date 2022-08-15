@@ -56,8 +56,9 @@ func main() {
 
 	// server init
 	app := gin.Default()
-
 	app.Use(sessions.Sessions("sessionId", cookie.NewStore([]byte("3.1y4a1o5j9"))))
+	//FinishJuding rpc dooesn't need process function
+	app.POST("/FinishJudging", services.FinishJudging)
 	captcha.SetCustomStore(captcha.NewMemoryStore(1024, 10*time.Minute))
 	for url, value := range services.Router {
 		app.OPTIONS(url, process(func(ctx *gin.Context) {}))

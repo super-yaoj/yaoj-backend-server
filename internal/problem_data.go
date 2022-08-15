@@ -11,7 +11,6 @@ import (
 	"yao/config"
 	"yao/db"
 
-	"github.com/k0kubun/pp"
 	"github.com/super-yaoj/yaoj-core/pkg/problem"
 	utils "github.com/super-yaoj/yaoj-utils"
 	"github.com/super-yaoj/yaoj-utils/cache"
@@ -77,7 +76,6 @@ func PRLoad(problem_id int) *Problem {
 			log.Print("prload", err)
 			return &Problem{}
 		}
-		pp.Print(pro)
 		PRSetCache(problem_id, pro)
 		ret, _ := ProblemCache.Get(problem_id)
 		return ret

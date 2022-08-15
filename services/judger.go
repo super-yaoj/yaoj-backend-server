@@ -4,18 +4,22 @@ import (
 	"io/ioutil"
 	"net/http"
 	"yao/internal"
+
+	"github.com/gin-gonic/gin"
+	"github.com/super-yaoj/yaoj-utils/promise"
 )
 
-type FinishJudingParam struct {
-	JudgerId string `query:"jid" validate:"required"`
-}
-
-func FinishJudging(ctx Context, param FinishJudingParam) {
-	result, err := ioutil.ReadAll(ctx.Request.Body)
-	if err != nil {
-		ctx.ErrorRPC(err)
-	}
-	err = internal.FinishJudging(param.JudgerId, result)
+func FinishJudging(ctx *gin.Context) {
+	var result []byte
+	var err error
+	promise.NewErrorPromise(func () error {
+		result, err = ioutil.ReadAll(ctx.Request.Body)
+		return err
+	}).Then(func() error {
+		return internal.FinishJudging(ctx.Query("jid"), result)
+	}).Catch(func(err error) {
+		Context{Context: ctx}.ErrorRPC(err)
+	})
 }
 
 type JudgerLogParam struct {
