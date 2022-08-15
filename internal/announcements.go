@@ -19,13 +19,13 @@ type Announcement struct {
 }
 
 func AnceCreate(blog_id, priority int) error {
-	_, err := db.DBUpdate("insert into announcements values (?, ?, ?, null)", blog_id, time.Now(), priority)
+	_, err := db.Update("insert into announcements values (?, ?, ?, null)", blog_id, time.Now(), priority)
 	return err
 }
 
 func AnceQuery(user_id int) []Announcement {
 	var ans []Announcement
-	db.DBSelectAll(&ans, "select id, blogs.blog_id, title, priority, comments, `like`, release_time from (announcements join blogs on announcements.blog_id = blogs.blog_id)")
+	db.SelectAll(&ans, "select id, blogs.blog_id, title, priority, comments, `like`, release_time from (announcements join blogs on announcements.blog_id = blogs.blog_id)")
 	AnceGetLikes(ans, user_id)
 	return ans
 }
@@ -45,5 +45,5 @@ func AnceGetLikes(blogs []Announcement, user_id int) {
 }
 
 func AnceDelete(id int) {
-	db.DBUpdate("delete from announcements where id=?", id)
+	db.Update("delete from announcements where id=?", id)
 }

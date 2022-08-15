@@ -17,7 +17,7 @@ import (
 
 type SubmListParam struct {
 	Auth
-	Page 		 `validate:"pagecanbound"`
+	Page     `validate:"pagecanbound"`
 	ProbID   int `query:"problem_id"`
 	CtstID   int `query:"contest_id"`
 	Submtter int `query:"submitter"`
@@ -33,7 +33,7 @@ func SubmList(ctx Context, param SubmListParam) {
 		return
 	}
 	//Modify scores to sample_scores when users are in pretest-only contests
-	contest_pretest, _ := db.DBSelectInts("select a.contest_id from ((select contest_id from contests where start_time<=? and end_time>=? and pretest=1) as a join (select contest_id from contest_participants where user_id=?) as b on a.contest_id=b.contest_id)", time.Now(), time.Now(), param.UserID)
+	contest_pretest, _ := db.SelectInts("select a.contest_id from ((select contest_id from contests where start_time<=? and end_time>=? and pretest=1) as a join (select contest_id from contest_participants where user_id=?) as b on a.contest_id=b.contest_id)", time.Now(), time.Now(), param.UserID)
 	for key := range submissions {
 		if utils.HasElement(contest_pretest, submissions[key].ContestId) {
 			internal.SubmPretestOnly(&submissions[key])
@@ -146,7 +146,7 @@ func parseMultiFiles(ctx Context, config internal.SubmConfig) (problem.Submissio
 		name, lang := key, -1
 		//get language
 		if val.Accepted == utils.Csource {
-			lang := utils.AtoiDefault(ctx.PostForm(key + "_lang"), -1)
+			lang := utils.AtoiDefault(ctx.PostForm(key+"_lang"), -1)
 			if lang < 0 || (val.Langs != nil && !utils.HasElement(val.Langs, utils.LangTag(lang))) {
 				return nil, nil, 0, 0
 			}
@@ -279,7 +279,7 @@ func SubmDel(ctx Context, param SubmDelParam) {
 
 type RejudgeParam struct {
 	ProbID *int `body:"problem_id" validate:"probid"`
-	SubmID *int  `body:"submission_id" validate:"submid"`
+	SubmID *int `body:"submission_id" validate:"submid"`
 	Auth
 }
 

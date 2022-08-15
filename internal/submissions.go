@@ -12,19 +12,22 @@ import (
 	utils "github.com/super-yaoj/yaoj-utils"
 )
 
-//钩子：数据库修改完成后
+// 钩子：数据库修改完成后
 func AfterSubmCreate(f func(SubmissionBase)) {
 	Listen("AfterSubmCreate", f)
 }
-//钩子：数据库修改完成后
+
+// 钩子：数据库修改完成后
 func AfterSubmJudge(f func(SubmissionBase)) {
 	Listen("AfterSubmJudge", f)
 }
-//钩子：数据库修改完成后
+
+// 钩子：数据库修改完成后
 func AfterSubmDelete(f func(SubmissionBase)) {
 	Listen("AfterSubmDelete", f)
 }
-//钩子：数据库修改完成后，重新评测前
+
+// 钩子：数据库修改完成后，重新评测前
 func OnSubmRejudge(f func(SubmissionBase)) {
 	Listen("OnSubmRejudge", f)
 }
@@ -108,7 +111,7 @@ func SubmJudge(sub SubmissionBase, rejudge bool, uuid int64) error {
 
 func SubmCreate(user_id, problem_id, contest_id int, language utils.LangTag, zipfile []byte, preview map[string]ContentPreview, length int) error {
 	current := utils.TimeStamp()
-	id, err := db.DBInsertGetId("insert into submissions values (null, ?, ?, ?, ?, 0, -1, -1, ?, ?, 0, 0, ?, ?)", user_id, problem_id, contest_id, Waiting, language, time.Now(), current, length)
+	id, err := db.InsertGetId("insert into submissions values (null, ?, ?, ?, ?, 0, -1, -1, ?, ?, 0, 0, ?, ?)", user_id, problem_id, contest_id, Waiting, language, time.Now(), current, length)
 	if err != nil {
 		return err
 	}
@@ -116,7 +119,7 @@ func SubmCreate(user_id, problem_id, contest_id int, language utils.LangTag, zip
 	if err != nil {
 		return err
 	}
-	_, err = db.DBUpdate("insert into submission_details values (?, ?, ?, \"\", \"\", \"\")", id, zipfile, js)
+	_, err = db.Update("insert into submission_details values (?, ?, ?, \"\", \"\", \"\")", id, zipfile, js)
 	if err != nil {
 		return err
 	}
@@ -133,7 +136,7 @@ func SubmListByIds(subids []int) []Submission {
 	for i, j := range subids {
 		sidmap[j] = i
 	}
-	rows, err := db.DBQuery("select " + submColumns + " from submissions where submission_id in (" + utils.JoinArray(subids) + ")")
+	rows, err := db.Query("select " + submColumns + " from submissions where submission_id in (" + utils.JoinArray(subids) + ")")
 	if err != nil {
 		fmt.Println(err)
 		return nil
@@ -167,8 +170,8 @@ func SubmGetExtraInfo(subs []Submission) {
 		Rating int    `db:"rating"`
 	}
 	var pname, uname []Name
-	db.DBSelectAll(&pname, "select problem_id as id, title as name from problems where problem_id in (" + utils.JoinArray(probs) + ")")
-	db.DBSelectAll(&uname, "select user_id as id, user_name as name, rating from user_info where user_id in (" + utils.JoinArray(users) + ")")
+	db.SelectAll(&pname, "select problem_id as id, title as name from problems where problem_id in ("+utils.JoinArray(probs)+")")
+	db.SelectAll(&uname, "select user_id as id, user_name as name, rating from user_info where user_id in ("+utils.JoinArray(users)+")")
 	sort.Slice(pname, func(i, j int) bool { return pname[i].Id < pname[j].Id })
 	sort.Slice(uname, func(i, j int) bool { return uname[i].Id < uname[j].Id })
 	for key, val := range subs {
@@ -180,26 +183,26 @@ func SubmGetExtraInfo(subs []Submission) {
 
 func SubmGetBaseInfo(submission_id int) (SubmissionBase, error) {
 	ret := SubmissionBase{Id: submission_id}
-	err := db.DBSelectSingle(&ret, "select problem_id, contest_id, submitter from submissions where submission_id=?", submission_id)
+	err := db.SelectSingle(&ret, "select problem_id, contest_id, submitter from submissions where submission_id=?", submission_id)
 	return ret, err
 }
 
 func SubmQuery(sid int) (Submission, error) {
 	var ret Submission
-	err := db.DBSelectSingle(&ret, "select * from submissions where submission_id=?", sid)
+	err := db.SelectSingle(&ret, "select * from submissions where submission_id=?", sid)
 	if err != nil {
 		fmt.Println(err)
 		return ret, err
 	}
-	err = db.DBSelectSingle(&ret.Details, "select content_preview, result, pretest_result, extra_result from submission_details where submission_id=?", sid)
+	err = db.SelectSingle(&ret.Details, "select content_preview, result, pretest_result, extra_result from submission_details where submission_id=?", sid)
 	if err != nil {
 		return ret, err
 	}
-	err = db.DBSelectSingle(&ret, "select title as problem_name from problems where problem_id=?", ret.ProblemId)
+	err = db.SelectSingle(&ret, "select title as problem_name from problems where problem_id=?", ret.ProblemId)
 	if err != nil {
 		return ret, err
 	}
-	err = db.DBSelectSingle(&ret, "select user_name as submitter_name from user_info where user_id=?", ret.Submitter)
+	err = db.SelectSingle(&ret, "select user_name as submitter_name from user_info where user_id=?", ret.Submitter)
 	return ret, err
 }
 
@@ -219,7 +222,7 @@ func SubmList(bound, pagesize, user_id, submitter, problem_id, contest_id int, i
 		}
 		perm_str := utils.JoinArray(perms)
 		//problems user can see
-		probs, err := db.DBSelectInts("select problem_id from problem_permissions where permission_id in (" + perm_str + ")")
+		probs, err := db.SelectInts("select problem_id from problem_permissions where permission_id in (" + perm_str + ")")
 		if err != nil {
 			return nil, false, err
 		}
@@ -228,12 +231,12 @@ func SubmList(bound, pagesize, user_id, submitter, problem_id, contest_id int, i
 			For running contests, participants cannnot see other's contest submissions if score_private=1
 			For not started contests, they must contain no contest submissions according to the definition, so we can discard them
 		*/
-		conts, err := db.DBSelectInts("select contest_id from contest_permissions where permission_id in (" + perm_str + ")")
+		conts, err := db.SelectInts("select contest_id from contest_permissions where permission_id in (" + perm_str + ")")
 		if err != nil {
 			return nil, false, err
 		}
 		//remove contests that cannot see(i.e. the running contests with score_private=true)
-		conts_running, err := db.DBSelectInts("select a.contest_id from ((select contest_id from contests where start_time<=? and end_time>=? and score_private=1) as a join (select contest_id from contest_participants where user_id=?) as b on a.contest_id=b.contest_id)", time.Now(), time.Now(), user_id)
+		conts_running, err := db.SelectInts("select a.contest_id from ((select contest_id from contests where start_time<=? and end_time>=? and score_private=1) as a join (select contest_id from contest_participants where user_id=?) as b on a.contest_id=b.contest_id)", time.Now(), time.Now(), user_id)
 		if err != nil {
 			return nil, false, err
 		}
@@ -246,12 +249,12 @@ func SubmList(bound, pagesize, user_id, submitter, problem_id, contest_id int, i
 
 		must = "("
 		if problem_id == 0 {
-			must += utils.If(len(probs) == 0, "0", "(problem_id in (" + utils.JoinArray(probs) + "))")
+			must += utils.If(len(probs) == 0, "0", "(problem_id in ("+utils.JoinArray(probs)+"))")
 		} else {
 			must += utils.If(utils.HasElement(probs, problem_id), "1", "0")
 		}
 		if contest_id == 0 {
-			must += utils.If(len(conts) == 0, " or 0", " or (contest_id in (" + utils.JoinArray(conts) + "))")
+			must += utils.If(len(conts) == 0, " or 0", " or (contest_id in ("+utils.JoinArray(conts)+"))")
 		} else {
 			must += " or " + utils.If(utils.HasElement(conts, contest_id), "1", "0")
 		}
@@ -269,9 +272,9 @@ func SubmList(bound, pagesize, user_id, submitter, problem_id, contest_id int, i
 	var submissions []Submission
 	var err error
 	if isleft {
-		err = db.DBSelectAll(&submissions, fmt.Sprintf("select %s from submissions where submission_id<=%d and %s %s order by submission_id desc limit %d", submColumns, bound, must, query, pagesize))
+		err = db.SelectAll(&submissions, fmt.Sprintf("select %s from submissions where submission_id<=%d and %s %s order by submission_id desc limit %d", submColumns, bound, must, query, pagesize))
 	} else {
-		err = db.DBSelectAll(&submissions, fmt.Sprintf("select %s from submissions where submission_id>=%d and %s %s order by submission_id limit %d", submColumns, bound, must, query, pagesize))
+		err = db.SelectAll(&submissions, fmt.Sprintf("select %s from submissions where submission_id>=%d and %s %s order by submission_id limit %d", submColumns, bound, must, query, pagesize))
 	}
 	if err != nil {
 		return nil, false, err
@@ -358,19 +361,19 @@ func SubmUpdate(sid, pid int, mode string, result []byte) error {
 
 	//'and status>=0' means when meets an internal error, we shouldn't update status
 	if mode == "tests" {
-		_, err = db.DBUpdate("update submissions set status=status|?, accepted=accepted|?, score=?, time=?, memory=? where submission_id=? and status>=0",
+		_, err = db.Update("update submissions set status=status|?, accepted=accepted|?, score=?, time=?, memory=? where submission_id=? and status>=0",
 			JudgingTests, utils.If(accepted, TestsAccepted, 0), score, int(time_used/float64(time.Millisecond)), int(memory_used/1024), sid)
 	} else if mode == "pretest" {
-		_, err = db.DBUpdate("update submissions set status=status|?, accepted=accepted|?, sample_score=? where submission_id=? and status>=0",
+		_, err = db.Update("update submissions set status=status|?, accepted=accepted|?, sample_score=? where submission_id=? and status>=0",
 			JudgingPretest, utils.If(accepted, PretestAccepted, 0), score, sid)
 	} else {
-		_, err = db.DBUpdate("update submissions set status=status|?, accepted=accepted|? where submission_id=? and status>=0",
+		_, err = db.Update("update submissions set status=status|?, accepted=accepted|? where submission_id=? and status>=0",
 			JudgingExtra, utils.If(accepted, ExtraAccepted, 0), sid)
 	}
 	if err != nil {
 		return err
 	}
-	_, err = db.DBUpdate("update submission_details set "+column_name+"=? where submission_id=?", result, sid)
+	_, err = db.Update("update submission_details set "+column_name+"=? where submission_id=?", result, sid)
 	if err != nil {
 		return err
 	}
@@ -378,7 +381,7 @@ func SubmUpdate(sid, pid int, mode string, result []byte) error {
 		SubmissionBase
 		Status int `db:"status"`
 	}
-	err = db.DBSelectSingle(&subinfo, "select submission_id, problem_id, contest_id, status from submissions where submission_id=?", sid)
+	err = db.SelectSingle(&subinfo, "select submission_id, problem_id, contest_id, status from submissions where submission_id=?", sid)
 	if err != nil {
 		return err
 	}
@@ -392,23 +395,23 @@ func SubmUpdate(sid, pid int, mode string, result []byte) error {
 func SubmJudgeCustomTest(content []byte) []byte {
 	callback := make(chan []byte)
 	//find a free submission_id
-	sid, err := db.DBInsertGetId("insert into custom_tests values (null, ?)", content)
+	sid, err := db.InsertGetId("insert into custom_tests values (null, ?)", content)
 	if err != nil {
 		fmt.Println(err)
 		return []byte{}
 	}
 	InsertCustomTest(int(sid), &callback)
 	result := <-callback
-	go db.DBUpdate("delete from custom_tests where id=?", sid)
+	go db.Update("delete from custom_tests where id=?", sid)
 	return result
 }
 
 func SubmDelete(sub SubmissionBase) error {
-	_, err := db.DBUpdate("delete from submissions where submission_id=?", sub.Id)
+	_, err := db.Update("delete from submissions where submission_id=?", sub.Id)
 	if err != nil {
 		return err
 	}
-	_, err = db.DBUpdate("delete from submission_details where submission_id=?", sub.Id)
+	_, err = db.Update("delete from submission_details where submission_id=?", sub.Id)
 	if err != nil {
 		return err
 	}
@@ -423,7 +426,7 @@ func SubmRejudge(submission_id int) error {
 	}
 	//update uuid to cancel other entries in the judging queue
 	current := utils.TimeStamp()
-	_, err = db.DBUpdate("update submissions set uuid=?, status=0, accepted=0 where submission_id=?", current, submission_id)
+	_, err = db.Update("update submissions set uuid=?, status=0, accepted=0 where submission_id=?", current, submission_id)
 	if err != nil {
 		return err
 	}
@@ -456,6 +459,6 @@ func SubmRemoveTestDetails(js string) string {
 }
 
 func SubmExists(subm_id int) bool {
-	cnt, _ := db.DBSelectSingleInt("select count(*) from submissions where submission_id=?", subm_id)
+	cnt, _ := db.SelectSingleInt("select count(*) from submissions where submission_id=?", subm_id)
 	return cnt > 0
 }

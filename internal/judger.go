@@ -19,17 +19,17 @@ import (
 )
 
 type Judger struct {
-	url 		string
+	url string
 	//unique random judger id, change after each request
-	jid 		string
-	callback   	chan []byte
+	jid      string
+	callback chan []byte
 }
 
 type JudgeEntry struct {
-	sid 		int
-	mode 		string //one of "pretest", "tests", "extra", "custom_test"
-	uuid 		int64 //if mode != "custom_test"(i.e. normal submission), uuid means whether this submission is the recent entry in the judging queue(set by time-stamp)
-	callback 	*chan []byte //if mode="custom_test", you should give a callback channel which returns the result
+	sid      int
+	mode     string       //one of "pretest", "tests", "extra", "custom_test"
+	uuid     int64        //if mode != "custom_test"(i.e. normal submission), uuid means whether this submission is the recent entry in the judging queue(set by time-stamp)
+	callback *chan []byte //if mode="custom_test", you should give a callback channel which returns the result
 }
 
 func NewJudger(url string) *Judger {
@@ -44,19 +44,19 @@ var judgers = []*Judger{
 
 var waitingList = pq.NewBlockPriorityQueue[*JudgeEntry]()
 
-//1 on each bit means that the corresponding status has finished
+// 1 on each bit means that the corresponding status has finished
 const (
-	InternalError 	= -1
-	Waiting 		= 1
-	JudgingPretest 	= 2
-	JudgingTests	= 4
-	JudgingExtra 	= 8
-	Finished 		= 15
+	InternalError  = -1
+	Waiting        = 1
+	JudgingPretest = 2
+	JudgingTests   = 4
+	JudgingExtra   = 8
+	Finished       = 15
 )
 
 func JudgersInit() {
 	var sub []Submission
-	err := db.DBSelectAll(&sub, "select submission_id, problem_id, contest_id, uuid from submissions where status < ? and status >= 0", Finished)
+	err := db.SelectAll(&sub, "select submission_id, problem_id, contest_id, uuid from submissions where status < ? and status >= 0", Finished)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -84,8 +84,8 @@ func judgerStart(judger *Judger) {
 		sid, uuid, mode := subm.sid, subm.uuid, subm.mode
 		if mode != "custom_test" {
 			if !judgeSubmission(sid, uuid, mode, judger) {
-				db.DBUpdate("update submissions set status=? where submission_id=?", InternalError, sid)
-				db.DBUpdate("update submission_details set result=\"\", pretest_result=\"\", extra_result=\"\" where submission_id=?", sid)
+				db.Update("update submissions set status=? where submission_id=?", InternalError, sid)
+				db.Update("update submission_details set result=\"\", pretest_result=\"\", extra_result=\"\" where submission_id=?", sid)
 				sub, _ := SubmGetBaseInfo(sid)
 				SubmUpdate(sid, sub.ProblemId, subm.mode, []byte{})
 			}
@@ -97,14 +97,14 @@ func judgerStart(judger *Judger) {
 	}
 }
 
-//return true or false indicates whether judging succeeds
+// return true or false indicates whether judging succeeds
 func judgeSubmission(sid int, uuid int64, mode string, judger *Judger) bool {
 	type TempInfo struct {
 		Prob int   `db:"problem_id"`
 		Uuid int64 `db:"uuid"`
 	}
 	var tinfo TempInfo
-	err := db.DBSelectSingle(&tinfo, "select problem_id, uuid from submissions where submission_id=?", sid)
+	err := db.SelectSingle(&tinfo, "select problem_id, uuid from submissions where submission_id=?", sid)
 	if err != nil {
 		fmt.Println(err)
 		return false
@@ -113,17 +113,17 @@ func judgeSubmission(sid int, uuid int64, mode string, judger *Judger) bool {
 		//this judge entry isn't the recent entry in the judging queue
 		return true
 	}
-	
+
 	pro := ProbLoad(tinfo.Prob)
 	if !ProbHasData(pro, mode) {
 		go SubmUpdate(sid, tinfo.Prob, mode, []byte{})
 		return true
 	}
 	var content []byte
-	err = db.DBSelectSingleColumn(&content, "select content from submission_details where submission_id=?", sid)
-	go db.DBUpdate("update submissions set status=status|? where submission_id=?", Waiting, sid)
+	err = db.SelectSingleColumn(&content, "select content from submission_details where submission_id=?", sid)
+	go db.Update("update submissions set status=status|? where submission_id=?", Waiting, sid)
 	var check_sum string
-	err1 := db.DBSelectSingleColumn(&check_sum, "select check_sum from problems where problem_id=?", tinfo.Prob)
+	err1 := db.SelectSingleColumn(&check_sum, "select check_sum from problems where problem_id=?", tinfo.Prob)
 	if err != nil || err1 != nil {
 		fmt.Println(err, err1)
 		return false
@@ -134,8 +134,8 @@ func judgeSubmission(sid int, uuid int64, mode string, judger *Judger) bool {
 		judger.jid = utils.RandomString(64)
 		res, err := http.Post(judger.url+"/judge?"+getQuery(map[string]string{
 			"mode": mode,
-			"sum": check_sum,
-			"cb": fmt.Sprintf(config.Global.BackDomain+"/FinishJudging?jid=%s", judger.jid),
+			"sum":  check_sum,
+			"cb":   fmt.Sprintf(config.Global.BackDomain+"/FinishJudging?jid=%s", judger.jid),
 		}), "binary", bytes.NewBuffer(content))
 		if err != nil {
 			fmt.Printf("%v\n", err)
@@ -169,7 +169,7 @@ func judgeSubmission(sid int, uuid int64, mode string, judger *Judger) bool {
 	}
 	//Waiting judger finishes
 	ret := <-judger.callback
-	err = db.DBSelectSingleColumn(&tinfo.Uuid, "select uuid from submissions where submission_id=?", sid)
+	err = db.SelectSingleColumn(&tinfo.Uuid, "select uuid from submissions where submission_id=?", sid)
 	if err != nil {
 		fmt.Println(err)
 		return false
@@ -188,7 +188,7 @@ func judgeSubmission(sid int, uuid int64, mode string, judger *Judger) bool {
 
 func judgeCustomTest(sid int, callback *chan []byte, judger *Judger) {
 	var content []byte
-	err := db.DBSelectSingleColumn(&content, "select content from custom_tests where id=?", sid)
+	err := db.SelectSingleColumn(&content, "select content from custom_tests where id=?", sid)
 	if err != nil {
 		fmt.Println(err)
 		*callback <- []byte{}
@@ -210,7 +210,7 @@ func judgeCustomTest(sid int, callback *chan []byte, judger *Judger) {
 		*callback <- []byte{}
 		return
 	}
-	*callback <- <- judger.callback
+	*callback <- <-judger.callback
 }
 
 func InsertSubmission(sid int, uuid int64, priority int, mode string) {

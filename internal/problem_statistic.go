@@ -28,17 +28,17 @@ type problemStatistic struct {
 }
 
 type statisticSubm struct {
-	Id        	int `db:"submission_id"`
-	Submitter 	int `db:"submitter"`
-	Problem   	int `db:"problem_id"`
-	Time        int `db:"time"`
-	Memory      int `db:"memory"`
-	Length      int `db:"length"`
+	Id        int `db:"submission_id"`
+	Submitter int `db:"submitter"`
+	Problem   int `db:"problem_id"`
+	Time      int `db:"time"`
+	Memory    int `db:"memory"`
+	Length    int `db:"length"`
 }
 
 var (
-	allStatistic = cache.NewMemoryCache[*problemStatistic](time.Hour, 100)
-	prsMultiLock = locks.NewMappedMultiRWMutex()
+	allStatistic  = cache.NewMemoryCache[*problemStatistic](time.Hour, 100)
+	prsMultiLock  = locks.NewMappedMultiRWMutex()
 	statisticCols = "submission_id, submitter, problem_id, time, memory, length"
 )
 
@@ -52,7 +52,7 @@ func init() {
 	AfterSubmJudge(func(sb SubmissionBase) {
 		prsUpdateSubmission(sb.ProblemId, sb.Id)
 	})
-	OnSubmRejudge(func (sb SubmissionBase) {
+	OnSubmRejudge(func(sb SubmissionBase) {
 		prsDeleteSubmission(sb)
 	})
 	OnProbRejudge(func(i int) {
@@ -116,7 +116,7 @@ func prsRenew(problem_id int) {
 	prsMultiLock.Lock(problem_id)
 	defer prsMultiLock.Unlock(problem_id)
 	var subs []statisticSubm
-	err := db.DBSelectAll(&subs, "select " + statisticCols + " from submissions where problem_id=? and status=? and accepted=?", problem_id, Finished, Accepted)
+	err := db.SelectAll(&subs, "select "+statisticCols+" from submissions where problem_id=? and status=? and accepted=?", problem_id, Finished, Accepted)
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -125,7 +125,7 @@ func prsRenew(problem_id int) {
 	statistic := &problemStatistic{}
 	statistic.uidMap = make(map[int]int)
 	statistic.sids = make(map[int]struct{})
-	statistic.totSubs, err = db.DBSelectSingleInt("select count(*) from submissions where problem_id=?", problem_id)
+	statistic.totSubs, err = db.SelectSingleInt("select count(*) from submissions where problem_id=?", problem_id)
 	for i := range subs {
 		statistic.sids[subs[i].Id] = struct{}{}
 		statistic.updateEntry(&subs[i], false)
@@ -154,7 +154,7 @@ func prsUpdateSubmission(problem_id, sid int) {
 		return
 	}
 	var sub statisticSubm
-	err := db.DBSelectSingle(&sub, "select " + statisticCols + " from submissions where submission_id=? and status=? and accepted=?", sid, Finished, Accepted)
+	err := db.SelectSingle(&sub, "select "+statisticCols+" from submissions where submission_id=? and status=? and accepted=?", sid, Finished, Accepted)
 	if err != nil {
 		//this submission isn't ac
 		return
@@ -172,13 +172,13 @@ func prsDeleteSubmission(sub SubmissionBase) {
 	}
 	_, ok = statistic.sids[sub.Id]
 	statistic.totSubs--
-	if !ok {//no such ac submission
+	if !ok { //no such ac submission
 		return
 	}
 	delete(statistic.sids, sub.Id)
 	uid, ok := statistic.uidMap[sub.Submitter]
 	var subs []statisticSubm
-	err := db.DBSelectAll(&subs, "select " + statisticCols + " from submissions where problem_id=? and submitter=? and status=? and accepted=?", sub.ProblemId, sub.Submitter, Finished, Accepted)
+	err := db.SelectAll(&subs, "select "+statisticCols+" from submissions where problem_id=? and submitter=? and status=? and accepted=?", sub.ProblemId, sub.Submitter, Finished, Accepted)
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -229,19 +229,19 @@ func ProbSGetSubmissions(problem_id, bound, bound_id, pagesize int, isleft bool,
 	} else if mode == "length" {
 		val = &statistic.length
 	}
-	
+
 	start := sort.Search(n, func(i int) bool {
 		uid := val.sorted[i]
 		return val.value[uid] > bound || (val.value[uid] == bound && utils.If(isleft, val.sid[uid] >= bound_id, val.sid[uid] > bound_id))
 	})
 	subs := []int{}
 	if isleft {
-		for i := start; i < n && i < start + pagesize; i++ {
+		for i := start; i < n && i < start+pagesize; i++ {
 			subs = append(subs, val.sid[val.sorted[i]])
 		}
-		return subs, start + pagesize + 1 <= n
+		return subs, start+pagesize+1 <= n
 	} else {
-		for i := utils.Max(0, start - pagesize); i < start; i++ {
+		for i := utils.Max(0, start-pagesize); i < start; i++ {
 			subs = append(subs, val.sid[val.sorted[i]])
 		}
 		return subs, start > pagesize

@@ -9,7 +9,7 @@ import (
 	utils "github.com/super-yaoj/yaoj-utils"
 )
 
-//钩子：数据库修改完成后，重新评测前
+// 钩子：数据库修改完成后，重新评测前
 func OnProbRejudge(f func(int)) {
 	Listen("OnProbRejudge", f)
 }
@@ -49,9 +49,9 @@ func ProbList(bound, pagesize, user_id int, isleft, isadmin bool) ([]Problem, bo
 	if isadmin {
 		var err error
 		if isleft {
-			err = db.DBSelectAll(&problems, "select problem_id, title, `like` from problems where problem_id>=? order by problem_id limit ?", bound, pagesize)
+			err = db.SelectAll(&problems, "select problem_id, title, `like` from problems where problem_id>=? order by problem_id limit ?", bound, pagesize)
 		} else {
-			err = db.DBSelectAll(&problems, "select problem_id, title, `like` from problems where problem_id<=? order by problem_id desc limit ?", bound, pagesize)
+			err = db.SelectAll(&problems, "select problem_id, title, `like` from problems where problem_id<=? order by problem_id desc limit ?", bound, pagesize)
 		}
 		if err != nil {
 			return nil, false, err
@@ -74,9 +74,9 @@ func ProbList(bound, pagesize, user_id int, isleft, isadmin bool) ([]Problem, bo
 		var ids []int
 		perm_str := utils.JoinArray(perms)
 		if isleft {
-			ids, err = db.DBSelectInts(fmt.Sprintf("select distinct problem_id from problem_permissions where problem_id>=%d and permission_id in (%s) order by problem_id limit %d", bound, perm_str, pagesize))
+			ids, err = db.SelectInts(fmt.Sprintf("select distinct problem_id from problem_permissions where problem_id>=%d and permission_id in (%s) order by problem_id limit %d", bound, perm_str, pagesize))
 		} else {
-			ids, err = db.DBSelectInts(fmt.Sprintf("select distinct problem_id from problem_permissions where problem_id<=%d and permission_id in (%s) order by problem_id desc limit %d", bound, perm_str, pagesize))
+			ids, err = db.SelectInts(fmt.Sprintf("select distinct problem_id from problem_permissions where problem_id<=%d and permission_id in (%s) order by problem_id desc limit %d", bound, perm_str, pagesize))
 		}
 		if err != nil {
 			return nil, false, err
@@ -87,7 +87,7 @@ func ProbList(bound, pagesize, user_id int, isleft, isadmin bool) ([]Problem, bo
 			ids = ids[:pagesize-1]
 		}
 		if len(ids) != 0 {
-			err = db.DBSelectAll(&problems, "select problem_id, title, `like` from problems where problem_id in (" + utils.JoinArray(ids) + ")")
+			err = db.SelectAll(&problems, "select problem_id, title, `like` from problems where problem_id in ("+utils.JoinArray(ids)+")")
 			if err != nil {
 				return nil, false, err
 			}
@@ -114,7 +114,7 @@ func ProbGetLikes(problems []Problem, user_id int) {
 
 func ProbQuery(problem_id, user_id int) (*Problem, error) {
 	p := ProbLoad(problem_id)
-	err := db.DBSelectSingle(&p, "select problem_id, title, `like`, allow_down from problems where problem_id=?", problem_id)
+	err := db.SelectSingle(&p, "select problem_id, title, `like`, allow_down from problems where problem_id=?", problem_id)
 	if err != nil {
 		return p, err
 	}
@@ -124,41 +124,41 @@ func ProbQuery(problem_id, user_id int) (*Problem, error) {
 
 func ProbGetPermissions(problem_id int) ([]Permission, error) {
 	var p []Permission
-	err := db.DBSelectAll(&p, "select a.permission_id, permission_name from ((select permission_id from problem_permissions where problem_id=? and permission_id>0) as a join permissions on a.permission_id=permissions.permission_id)", problem_id)
+	err := db.SelectAll(&p, "select a.permission_id, permission_name from ((select permission_id from problem_permissions where problem_id=? and permission_id>0) as a join permissions on a.permission_id=permissions.permission_id)", problem_id)
 	return p, err
 }
 
 func ProbGetManagers(problem_id int) ([]User, error) {
 	var u []User
-	err := db.DBSelectAll(&u, "select user_id, user_name from ((select permission_id from problem_permissions where problem_id=? and permission_id<0) as a join user_info on -permission_id=user_id)", problem_id)
+	err := db.SelectAll(&u, "select user_id, user_name from ((select permission_id from problem_permissions where problem_id=? and permission_id<0) as a join user_info on -permission_id=user_id)", problem_id)
 	return u, err
 }
 
 func ProbAddPermission(problem_id, permission_id int) error {
-	_, err := db.DBUpdate("insert ignore into problem_permissions values (?, ?)", problem_id, permission_id)
+	_, err := db.Update("insert ignore into problem_permissions values (?, ?)", problem_id, permission_id)
 	return err
 }
 
 func ProbDeletePermission(problem_id, permission_id int) error {
-	_, err := db.DBUpdate("delete from problem_permissions where problem_id=? and permission_id=?", problem_id, permission_id)
+	_, err := db.Update("delete from problem_permissions where problem_id=? and permission_id=?", problem_id, permission_id)
 	return err
 }
 
 // 数据库查询是否存在该题目
 func ProbExists(problem_id int) bool {
-	count, _ := db.DBSelectSingleInt("select count(*) from problems where problem_id=?", problem_id)
+	count, _ := db.SelectSingleInt("select count(*) from problems where problem_id=?", problem_id)
 	return count > 0
 }
 
 func ProbRejudge(problem_id int) error {
 	current := utils.TimeStamp()
 	var sub []SubmissionBase
-	err := db.DBSelectAll(&sub, "select submission_id, contest_id from submissions where problem_id=?", problem_id)
+	err := db.SelectAll(&sub, "select submission_id, contest_id from submissions where problem_id=?", problem_id)
 	if err != nil {
 		return err
 	}
 	//update uuid to current time-stamp
-	_, err = db.DBUpdate("update submissions set uuid=?, status=0 where problem_id=?", current, problem_id)
+	_, err = db.Update("update submissions set uuid=?, status=0 where problem_id=?", current, problem_id)
 	if err != nil {
 		return err
 	}

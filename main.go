@@ -47,11 +47,12 @@ func main() {
 
 	// init
 	os.MkdirAll(config.Global.DataDir, os.ModePerm)
-	err := db.DBInit()
+	dsn := config.Global.DataSource
+	err := db.Init(dsn)
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer db.DBClose()
+	defer db.Close()
 	go internal.JudgersInit()
 
 	// server init

@@ -332,7 +332,7 @@ func CtstFinish(ctx Context, param CtstFinishParam) {
 			ctx.JSONRPC(http.StatusBadRequest, -32600, "Contest hasn't finished.", nil)
 			return
 		}
-		count, _ := db.DBSelectSingleInt("select count(*) from submissions where contest_id=? and status>=0 and status<? limit 1", param.CtstID, internal.Finished)
+		count, _ := db.SelectSingleInt("select count(*) from submissions where contest_id=? and status>=0 and status<? limit 1", param.CtstID, internal.Finished)
 		if count > 0 {
 			ctx.JSONRPC(http.StatusBadRequest, -32600, "There are still some contest submissions judging, please wait.", nil)
 			return

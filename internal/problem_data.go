@@ -34,7 +34,6 @@ func ProbGetSampleZip(problem_id int) string {
 	return config.Global.DataDir + fmt.Sprint(problem_id) + "_sample.zip"
 }
 
-
 /*
 Put problem data in tmp dir first. You should put data zip in tmpdir/1.zip
 
@@ -61,11 +60,11 @@ func ProbPutData(problem_id int, tmpdir string) error {
 	os.Rename(path.Join(tmpdir, "1"), data_dir)
 
 	ProblemCache.Delete(problem_id)
-	db.DBUpdate("update problems set check_sum=?, allow_down=\"\" where problem_id=?", utils.FileChecksum(data_zip).String(), problem_id)
+	db.Update("update problems set check_sum=?, allow_down=\"\" where problem_id=?", utils.FileChecksum(data_zip).String(), problem_id)
 	return err
 }
 
-//Load a problem into memory by problem_id. This function will get the reading lock.
+// Load a problem into memory by problem_id. This function will get the reading lock.
 func ProbLoad(problem_id int) *Problem {
 	val, ok := ProblemCache.Get(problem_id)
 	if !ok {
@@ -84,7 +83,7 @@ func ProbLoad(problem_id int) *Problem {
 	}
 }
 
-//Format and set a loaded problem into memory. You should ensure that you have the reading lock before calling this function.
+// Format and set a loaded problem into memory. You should ensure that you have the reading lock before calling this function.
 func ProbSetCache(problem_id int, pro problem.Problem) {
 	stmts := []Statement{}
 	for key, val := range pro.Data().Statement {
@@ -107,7 +106,7 @@ func ProbSetCache(problem_id int, pro problem.Problem) {
 	})
 }
 
-//You should ensure that you have the writing lock before calling this function.
+// You should ensure that you have the writing lock before calling this function.
 func ProbModifySample(problem_id int, allow_down string) error {
 	ProblemRWLock.Lock(problem_id)
 	defer ProblemRWLock.Unlock(problem_id)

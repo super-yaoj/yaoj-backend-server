@@ -3,7 +3,6 @@ package db
 import (
 	"database/sql"
 	"errors"
-	"yao/config"
 
 	"github.com/jmoiron/sqlx"
 
@@ -12,8 +11,7 @@ import (
 
 var db *sqlx.DB
 
-func DBInit() error {
-	dsn := config.Global.DataSource
+func Init(dsn string) error {
 	var err error
 	db, err = sqlx.Connect("mysql", dsn)
 	if err != nil {
@@ -24,11 +22,11 @@ func DBInit() error {
 	return nil
 }
 
-func DBQuery(query string, args ...any) (*sqlx.Rows, error) {
+func Query(query string, args ...any) (*sqlx.Rows, error) {
 	return db.Queryx(query, args...)
 }
 
-func DBSelectInts(query string, args ...any) ([]int, error) {
+func SelectInts(query string, args ...any) ([]int, error) {
 	var ret []int
 	row, err := db.Queryx(query, args...)
 	if err != nil {
@@ -43,11 +41,11 @@ func DBSelectInts(query string, args ...any) ([]int, error) {
 	return ret, nil
 }
 
-func DBSelectAll(arr any, query string, args ...any) error {
+func SelectAll(arr any, query string, args ...any) error {
 	return db.Select(arr, query, args...)
 }
 
-func DBSelectSingleInt(query string, args ...any) (int, error) {
+func SelectSingleInt(query string, args ...any) (int, error) {
 	var a int
 	rows, err := db.Queryx(query, args...)
 	if err != nil {
@@ -57,12 +55,12 @@ func DBSelectSingleInt(query string, args ...any) (int, error) {
 	if rows.Next() {
 		err = rows.Scan(&a)
 	} else {
-		err = errors.New("no rows read in DBSelectSingleInt()")
+		err = errors.New("no rows read in SelectSingleInt()")
 	}
 	return a, err
 }
 
-func DBSelectSingle(arr any, query string, args ...any) error {
+func SelectSingle(arr any, query string, args ...any) error {
 	rows, err := db.Queryx(query, args...)
 	if err != nil {
 		return err
@@ -73,10 +71,10 @@ func DBSelectSingle(arr any, query string, args ...any) error {
 		rows.Close()
 		return err
 	}
-	return errors.New("no rows read by DBSelectSingle()")
+	return errors.New("no rows read by SelectSingle()")
 }
 
-func DBSelectSingleColumn(arr any, query string, args ...any) error {
+func SelectSingleColumn(arr any, query string, args ...any) error {
 	rows, err := db.Queryx(query, args...)
 	if err != nil {
 		return err
@@ -87,14 +85,14 @@ func DBSelectSingleColumn(arr any, query string, args ...any) error {
 		rows.Close()
 		return err
 	}
-	return errors.New("no rows read by DBSelectSingleColumn()")
+	return errors.New("no rows read by SelectSingleColumn()")
 }
 
-func DBUpdate(query string, args ...any) (sql.Result, error) {
+func Update(query string, args ...any) (sql.Result, error) {
 	return db.Exec(query, args...)
 }
 
-func DBUpdateGetAffected(query string, args ...any) (int64, error) {
+func UpdateGetAffected(query string, args ...any) (int64, error) {
 	res, err := db.Exec(query, args...)
 	if err != nil {
 		return 0, err
@@ -102,7 +100,7 @@ func DBUpdateGetAffected(query string, args ...any) (int64, error) {
 	return res.RowsAffected()
 }
 
-func DBInsertGetId(query string, args ...any) (int64, error) {
+func InsertGetId(query string, args ...any) (int64, error) {
 	res, err := db.Exec(query, args...)
 	if err != nil {
 		return 0, err
@@ -110,6 +108,6 @@ func DBInsertGetId(query string, args ...any) (int64, error) {
 	return res.LastInsertId()
 }
 
-func DBClose() error {
+func Close() error {
 	return db.Close()
 }

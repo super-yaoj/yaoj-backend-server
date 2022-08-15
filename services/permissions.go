@@ -46,7 +46,7 @@ func PermRename(ctx Context, param PermRenameParam) {
 
 type PermDelParam struct {
 	Auth
-	PermID  int `query:"permission_id" validate:"required,prmsid"`
+	PermID int `query:"permission_id" validate:"required,prmsid"`
 }
 
 func PermDel(ctx Context, param PermDelParam) {
@@ -80,7 +80,7 @@ func PermGet(ctx Context, param PermGetParam) {
 
 type PermGetUserParam struct {
 	Auth
-	PermID     int `query:"permission_id" validate:"required,prmsid"`
+	PermID int `query:"permission_id" validate:"required,prmsid"`
 }
 
 func PermGetUser(ctx Context, param PermGetUserParam) {
@@ -125,7 +125,7 @@ func PermAddUser(ctx Context, param PermAddUserParam) {
 				return
 			}
 		}
-		real_ids, err := db.DBSelectInts(fmt.Sprintf("select user_id from user_info where user_id in (%s) order by user_id", param.UserIDs))
+		real_ids, err := db.SelectInts(fmt.Sprintf("select user_id from user_info where user_id in (%s) order by user_id", param.UserIDs))
 		if err != nil {
 			ctx.ErrorAPI(err)
 			return
@@ -152,8 +152,8 @@ func PermAddUser(ctx Context, param PermAddUserParam) {
 
 type PermDelUserParam struct {
 	Auth
-	PermID  int `query:"permission_id" validate:"required,prmsid"`
-	UserID  int `query:"user_id" validate:"required,userid"`
+	PermID int `query:"permission_id" validate:"required,prmsid"`
+	UserID int `query:"user_id" validate:"required,userid"`
 }
 
 func PermDelUser(ctx Context, param PermDelUserParam) {

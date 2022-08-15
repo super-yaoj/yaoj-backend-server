@@ -38,7 +38,7 @@ type ProbAddParam struct {
 
 func ProbAdd(ctx Context, param ProbAddParam) {
 	param.NewPermit().AsAdmin().Success(func(any) {
-		id, err := db.DBInsertGetId(`insert into problems values (null, "New Problem", 0, "", "")`)
+		id, err := db.InsertGetId(`insert into problems values (null, "New Problem", 0, "", "")`)
 		if err != nil {
 			ctx.ErrorAPI(err)
 		} else {
@@ -256,7 +256,7 @@ func ProbEdit(ctx Context, param ProbEditParam) {
 		}
 
 		var allow_down string
-		err := db.DBSelectSingleColumn(&allow_down, "select allow_down from problems where problem_id=?", param.ProbID)
+		err := db.SelectSingleColumn(&allow_down, "select allow_down from problems where problem_id=?", param.ProbID)
 		if err != nil {
 			ctx.JSONAPI(http.StatusNotFound, "", nil)
 			return
@@ -264,24 +264,24 @@ func ProbEdit(ctx Context, param ProbEditParam) {
 		allow_down = fix(allow_down)
 		new_allow := fix(param.AllowDown)
 		if allow_down != new_allow {
-			db.DBUpdate("update problems set title=?, allow_down=? where problem_id=?", param.Title, new_allow, param.ProbID)
+			db.Update("update problems set title=?, allow_down=? where problem_id=?", param.Title, new_allow, param.ProbID)
 			err := internal.ProbModifySample(param.ProbID, new_allow)
 			if err != nil {
 				ctx.ErrorAPI(err)
 			}
 		} else {
-			db.DBUpdate("update problems set title=? where problem_id=?", param.Title, param.ProbID)
+			db.Update("update problems set title=? where problem_id=?", param.Title, param.ProbID)
 		}
 	}).FailAPIStatusForbidden(ctx)
 }
 
 type ProbStatisticParam struct {
 	Auth
-	Page             `validate:"pagecanbound"`
-	ProbID    int    `query:"problem_id" validate:"required,probid"`
-	Mode      string `query:"mode" validate:"required"`//one of {"time", "memory"}
-	LeftId   *int    `query:"left_id"`
-	RightId  *int    `query:"right_id"`
+	Page    `validate:"pagecanbound"`
+	ProbID  int    `query:"problem_id" validate:"required,probid"`
+	Mode    string `query:"mode" validate:"required"` //one of {"time", "memory"}
+	LeftId  *int   `query:"left_id"`
+	RightId *int   `query:"right_id"`
 }
 
 func ProbStatistic(ctx Context, param ProbStatisticParam) {

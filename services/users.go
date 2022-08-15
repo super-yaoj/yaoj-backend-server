@@ -47,7 +47,7 @@ func UserSignUp(ctx Context, param UserSignUpParam) {
 	if param.Memo == "true" {
 		remember_token = utils.RandomString(32)
 	}
-	user_id, err := db.DBInsertGetId(
+	user_id, err := db.InsertGetId(
 		"insert into user_info values (null, ?, ?, \"\", 0, ?, ?, ?, 0, \"\", \"\")",
 		param.UserName, password, time.Now(), remember_token, internal.UserNormal,
 	)
@@ -59,8 +59,8 @@ func UserSignUp(ctx Context, param UserSignUpParam) {
 	sess.Set("user_id", int(user_id))
 	sess.Set("user_name", param.UserName)
 	sess.Set("user_group", internal.UserNormal)
-	db.DBUpdate("insert into user_permissions values (?, ?)", user_id, config.Global.DefaultGroup)
-	db.DBUpdate("update permissions set count = count + 1 where permission_id=1")
+	db.Update("insert into user_permissions values (?, ?)", user_id, config.Global.DefaultGroup)
+	db.Update("update permissions set count = count + 1 where permission_id=1")
 	sess.Save()
 	if param.Memo == "true" {
 		ctx.SetCookie("user_id", fmt.Sprint(user_id), true)
@@ -82,7 +82,7 @@ func UserLogin(ctx Context, param UserLoginParam) {
 	}
 	password := internal.SaltPassword(param.Passwd)
 	user := internal.UserBase{Name: param.UserName}
-	err := db.DBSelectSingle(
+	err := db.SelectSingle(
 		&user, "select user_id, user_group from user_info where user_name=? and password=?",
 		param.UserName, password,
 	)
@@ -103,7 +103,7 @@ func UserLogin(ctx Context, param UserLoginParam) {
 		remember_token := utils.RandomString(32)
 		ctx.SetCookie("user_id", fmt.Sprint(user.Id), true)
 		ctx.SetCookie("remember_token", remember_token, true)
-		db.DBUpdate("update user_info set remember_token=? where user_id=?", remember_token, user.Id)
+		db.Update("update user_info set remember_token=? where user_id=?", remember_token, user.Id)
 	}
 	ctx.JSONRPC(http.StatusOK, 0, "", nil)
 }
@@ -149,7 +149,7 @@ func UserInit(ctx Context, param UserInitParam) {
 		id, err := strconv.Atoi(tmp)
 		remember_token, err1 := ctx.Cookie("remember_token")
 		if err == nil && err1 == nil {
-			err = db.DBSelectSingle(&user, "select user_id, user_name, user_group from user_info where user_id=? and remember_token=?", id, remember_token)
+			err = db.SelectSingle(&user, "select user_id, user_name, user_group from user_info where user_id=? and remember_token=?", id, remember_token)
 			if err == nil {
 				sess.Set("user_id", id)
 				sess.Set("user_name", user.Name)
@@ -179,7 +179,7 @@ func UserGet(ctx Context, param UserGetParam) {
 	if err != nil {
 		ctx.ErrorAPI(err)
 	} else {
-		ctx.JSONAPI(http.StatusOK, "", map[string]any{ "user": user })
+		ctx.JSONAPI(http.StatusOK, "", map[string]any{"user": user})
 	}
 }
 
@@ -286,7 +286,7 @@ func UserRating(ctx Context, param UserRatingParam) {
 		Time      time.Time `db:"time" json:"time"`
 		Title     string    `db:"title" json:"title"`
 	}
-	err := db.DBSelectAll(&ratings, "select rating, a.contest_id, title, time from ((select rating, contest_id, time from ratings where user_id=?) as a inner join contests on a.contest_id=contests.contest_id)", param.UserId)
+	err := db.SelectAll(&ratings, "select rating, a.contest_id, title, time from ((select rating, contest_id, time from ratings where user_id=?) as a inner join contests on a.contest_id=contests.contest_id)", param.UserId)
 	if err != nil {
 		ctx.ErrorAPI(err)
 	} else {
