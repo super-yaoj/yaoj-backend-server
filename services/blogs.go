@@ -14,7 +14,7 @@ type BlogCreateParam struct {
 
 func BlogCreate(ctx Context, param BlogCreateParam) {
 	param.NewPermit().AsNormalUser().Success(func(any) {
-		id, err := internal.BLCreate(param.UserID, param.Private, param.Title, param.Content)
+		id, err := internal.BlogCreate(param.UserID, param.Private, param.Title, param.Content)
 		if err != nil {
 			ctx.ErrorAPI(err)
 		} else {
@@ -33,7 +33,7 @@ type BlogEditParam struct {
 
 func BlogEdit(ctx Context, param BlogEditParam) {
 	param.NewPermit().TryEditBlog(param.BlogID).Success(func(any) {
-		err := internal.BLEdit(param.BlogID, param.Private, param.Title, param.Content)
+		err := internal.BlogEdit(param.BlogID, param.Private, param.Title, param.Content)
 		if err != nil {
 			ctx.ErrorAPI(err)
 		}
@@ -47,7 +47,7 @@ type BlogDelParam struct {
 
 func BlogDel(ctx Context, param BlogDelParam) {
 	param.NewPermit().TryEditBlog(param.BlogID).Success(func(any) {
-		err := internal.BLDelete(param.BlogID)
+		err := internal.BlogDelete(param.BlogID)
 		if err != nil {
 			ctx.ErrorAPI(err)
 		}
@@ -61,7 +61,7 @@ type BlogGetParam struct {
 
 func BlogGet(ctx Context, param BlogGetParam) {
 	param.NewPermit().TrySeeBlog(param.BlogID).Success(func(any) {
-		blog, err := internal.BLQuery(param.BlogID, param.UserID)
+		blog, err := internal.BlogQuery(param.BlogID, param.UserID)
 		if err != nil {
 			ctx.ErrorAPI(err)
 		} else {
@@ -78,7 +78,7 @@ type BlogListParam struct {
 
 func BlogList(ctx Context, param BlogListParam) {
 	if param.BlogUserID != nil {
-		blogs, err := internal.BLListUser(*param.BlogUserID, param.UserID)
+		blogs, err := internal.BlogListUser(*param.BlogUserID, param.UserID)
 		if err != nil {
 			ctx.ErrorAPI(err)
 		} else {
@@ -89,7 +89,7 @@ func BlogList(ctx Context, param BlogListParam) {
 			ctx.JSONAPI(http.StatusBadRequest, "", nil)
 			return
 		}
-		blogs, isfull, err := internal.BLListAll(
+		blogs, isfull, err := internal.BlogListAll(
 			param.Bound(), *param.PageSize, param.UserID, param.IsLeft(), internal.IsAdmin(param.UserGrp),
 		)
 		if err != nil {

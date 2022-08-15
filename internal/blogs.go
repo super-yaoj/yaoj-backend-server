@@ -20,16 +20,16 @@ type Blog struct {
 	Liked      bool      `json:"liked"`
 }
 
-func BLCreate(user_id, private int, title, content string) (int64, error) {
+func BlogCreate(user_id, private int, title, content string) (int64, error) {
 	return db.DBInsertGetId("insert into blogs values (null, ?, ?, ?, ?, ?, 0, 0)", user_id, title, content, private, time.Now())
 }
 
-func BLEdit(id, private int, title, content string) error {
+func BlogEdit(id, private int, title, content string) error {
 	_, err := db.DBUpdate("update blogs set title=?, content=?, private=? where blog_id=?", title, content, private, id)
 	return err
 }
 
-func BLDelete(id int) error {
+func BlogDelete(id int) error {
 	_, err := db.DBUpdate("delete from blogs where blog_id=?", id)
 	if err != nil {
 		return err
@@ -41,7 +41,7 @@ func BLDelete(id int) error {
 	}
 }
 
-func BLQuery(id, user_id int) (Blog, error) {
+func BlogQuery(id, user_id int) (Blog, error) {
 	var blog Blog
 	err := db.DBSelectSingle(&blog, "select * from blogs where blog_id=?", id)
 	if err != nil {
@@ -53,14 +53,14 @@ func BLQuery(id, user_id int) (Blog, error) {
 	}
 }
 
-func BLListUser(id, user_id int) ([]Blog, error) {
+func BlogListUser(id, user_id int) ([]Blog, error) {
 	var blogs []Blog
 	err := db.DBSelectAll(&blogs, "select blog_id, title, private, create_time, comments, `like` from blogs where author=?", id)
-	BLGetLikes(blogs, user_id)
+	BlogGetLikes(blogs, user_id)
 	return blogs, err
 }
 
-func BLListAll(bound, pagesize, user_id int, isleft, isadmin bool) ([]Blog, bool, error) {
+func BlogListAll(bound, pagesize, user_id int, isleft, isadmin bool) ([]Blog, bool, error) {
 	pagesize += 1
 	var err error
 	var blogs []Blog
@@ -87,11 +87,11 @@ func BLListAll(bound, pagesize, user_id int, isleft, isadmin bool) ([]Blog, bool
 	if !isleft {
 		utils.Reverse(blogs)
 	}
-	BLGetLikes(blogs, user_id)
+	BlogGetLikes(blogs, user_id)
 	return blogs, isfull, nil
 }
 
-func BLGetLikes(blogs []Blog, user_id int) {
+func BlogGetLikes(blogs []Blog, user_id int) {
 	if user_id < 0 {
 		return
 	}
@@ -105,7 +105,7 @@ func BLGetLikes(blogs []Blog, user_id int) {
 	}
 }
 
-func BLExists(blog_id int) bool {
+func BlogExists(blog_id int) bool {
 	count, err := db.DBSelectSingleInt("select count(*) from blogs where blog_id=?", blog_id)
 	return err == nil && count > 0
 }

@@ -16,19 +16,19 @@ func ClickLike(ctx Context, param ClickLikeParam) {
 		var err error
 		switch param.Target {
 		case "blog":
-			if !internal.BLExists(param.BlogID) {
+			if !internal.BlogExists(param.BlogID) {
 				ctx.JSONAPI(http.StatusNotFound, "", nil)
 				return
 			}
 			err = internal.ClickLike(internal.BLOG, param.BlogID, param.UserID)
 		case "comment":
-			if !internal.BLCommentExists(param.BlogID) {
+			if !internal.BlogCommentExists(param.BlogID) {
 				ctx.JSONAPI(http.StatusNotFound, "", nil)
 				return
 			}
 			err = internal.ClickLike(internal.COMMENT, param.BlogID, param.UserID)
 		case "problem":
-			if !internal.PRExists(param.BlogID) {
+			if !internal.ProbExists(param.BlogID) {
 				ctx.JSONAPI(http.StatusNotFound, "", nil)
 				return
 			}

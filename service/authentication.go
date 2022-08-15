@@ -249,7 +249,7 @@ type PermitSubm struct {
 }
 
 func (p *Permit) TrySeeSubm(submid int) *Permit {
-	ret, _ := internal.SMQuery(submid)
+	ret, _ := internal.SubmQuery(submid)
 	return p.TrySeeProb(ret.ProblemId, ret.ContestId).Then(func(a any) (any, bool) {
 		by_problem := a.(int) > 0
 		can_edit := p.CanEditSubm(ret.SubmissionBase)
@@ -262,7 +262,7 @@ func (p *Permit) TrySeeSubm(submid int) *Permit {
 
 func (p *Permit) TryEditSubm(submid int) *Permit {
 	return p.Try(func() (any, bool) {
-		ret, _ := internal.SMGetBaseInfo(submid)
+		ret, _ := internal.SubmGetBaseInfo(submid)
 		return ret, p.CanEditSubm(ret)
 	})
 }

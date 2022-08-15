@@ -24,7 +24,7 @@ type SubmListParam struct {
 }
 
 func SubmList(ctx Context, param SubmListParam) {
-	submissions, isfull, err := internal.SMList(
+	submissions, isfull, err := internal.SubmList(
 		param.Bound(), *param.PageSize, param.UserID, param.Submtter, param.ProbID, param.CtstID,
 		param.IsLeft(), param.IsAdmin(),
 	)
@@ -36,7 +36,7 @@ func SubmList(ctx Context, param SubmListParam) {
 	contest_pretest, _ := db.DBSelectInts("select a.contest_id from ((select contest_id from contests where start_time<=? and end_time>=? and pretest=1) as a join (select contest_id from contest_participants where user_id=?) as b on a.contest_id=b.contest_id)", time.Now(), time.Now(), param.UserID)
 	for key := range submissions {
 		if utils.HasElement(contest_pretest, submissions[key].ContestId) {
-			internal.SMPretestOnly(&submissions[key])
+			internal.SubmPretestOnly(&submissions[key])
 		}
 	}
 	ctx.JSONAPI(http.StatusOK, "", map[string]any{"data": submissions, "isfull": isfull})
@@ -54,8 +54,8 @@ type SubmAddParam struct {
 func SubmAdd(ctx Context, param SubmAddParam) {
 	param.NewPermit().AsNormalUser().TrySeeProb(param.ProbID, param.CtstID).Success(func(a any) {
 		ctstid := a.(int)
-		pro := internal.PRLoad(param.ProbID)
-		if !internal.PRHasData(pro, "tests") {
+		pro := internal.ProbLoad(param.ProbID)
+		if !internal.ProbHasData(pro, "tests") {
 			ctx.JSONAPI(http.StatusBadRequest, "problem has no data", nil)
 			return
 		}
@@ -74,7 +74,7 @@ func SubmAdd(ctx Context, param SubmAddParam) {
 
 		w := bytes.NewBuffer(nil)
 		sub.DumpTo(w)
-		err := internal.SMCreate(param.UserID, param.ProbID, ctstid, language, w.Bytes(), preview, length)
+		err := internal.SubmCreate(param.UserID, param.ProbID, ctstid, language, w.Bytes(), preview, length)
 		if err != nil {
 			ctx.ErrorAPI(err)
 		}
@@ -224,10 +224,10 @@ func SubmGet(ctx Context, param SubmGetParam) {
 		//user cannot see submission details inside contests
 		if !psubm.CanEdit && !psubm.ByProb {
 			if internal.CTPretestOnly(psubm.ContestId) {
-				internal.SMPretestOnly(&psubm.Submission)
+				internal.SubmPretestOnly(&psubm.Submission)
 			} else {
-				psubm.Details.Result = internal.SMRemoveTestDetails(psubm.Details.Result)
-				psubm.Details.ExtraResult = internal.SMRemoveTestDetails(psubm.Details.ExtraResult)
+				psubm.Details.Result = internal.SubmRemoveTestDetails(psubm.Details.Result)
+				psubm.Details.ExtraResult = internal.SubmRemoveTestDetails(psubm.Details.ExtraResult)
 			}
 		}
 		ctx.JSONAPI(http.StatusOK, "", map[string]any{"submission": psubm.Submission, "can_edit": psubm.CanEdit})
@@ -250,7 +250,7 @@ func SubmCustom(ctx Context, param SubmCustomParam) {
 		}
 		w := bytes.NewBuffer(nil)
 		subm.DumpTo(w)
-		result := internal.SMJudgeCustomTest(w.Bytes())
+		result := internal.SubmJudgeCustomTest(w.Bytes())
 		if len(result) == 0 {
 			result, _ = json.Marshal(map[string]any{
 				"Memory": -1,
@@ -270,7 +270,7 @@ type SubmDelParam struct {
 func SubmDel(ctx Context, param SubmDelParam) {
 	param.NewPermit().TryEditSubm(param.SubmID).Success(func(a any) {
 		sub := a.(internal.SubmissionBase)
-		err := internal.SMDelete(sub)
+		err := internal.SubmDelete(sub)
 		if err != nil {
 			ctx.ErrorAPI(err)
 		}
@@ -286,14 +286,14 @@ type RejudgeParam struct {
 func Rejudge(ctx Context, param RejudgeParam) {
 	if param.ProbID != nil {
 		param.NewPermit().TryEditProb(*param.ProbID).Success(func(a any) {
-			err := internal.PRRejudge(*param.ProbID)
+			err := internal.ProbRejudge(*param.ProbID)
 			if err != nil {
 				ctx.ErrorRPC(err)
 			}
 		}).FailRPCStatusForbidden(ctx)
 	} else {
 		param.NewPermit().TryEditSubm(*param.SubmID).Success(func(any) {
-			err := internal.SMRejudge(*param.SubmID)
+			err := internal.SubmRejudge(*param.SubmID)
 			if err != nil {
 				ctx.ErrorRPC(err)
 			}

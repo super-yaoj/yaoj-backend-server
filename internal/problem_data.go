@@ -22,15 +22,15 @@ var (
 	ProblemCache  = cache.NewMemoryCache[*Problem](time.Hour, 100)
 )
 
-func PRGetDir(problem_id int) string {
+func ProbGetDir(problem_id int) string {
 	return config.Global.DataDir + fmt.Sprint(problem_id)
 }
 
-func PRGetDataZip(problem_id int) string {
+func ProbGetDataZip(problem_id int) string {
 	return config.Global.DataDir + fmt.Sprint(problem_id) + ".zip"
 }
 
-func PRGetSampleZip(problem_id int) string {
+func ProbGetSampleZip(problem_id int) string {
 	return config.Global.DataDir + fmt.Sprint(problem_id) + "_sample.zip"
 }
 
@@ -40,7 +40,7 @@ Put problem data in tmp dir first. You should put data zip in tmpdir/1.zip
 
 If the data format is correct, then copy it to the data dir.
 */
-func PRPutData(problem_id int, tmpdir string) error {
+func ProbPutData(problem_id int, tmpdir string) error {
 	os.Mkdir(path.Join(tmpdir, "1"), os.ModePerm)
 	_, err := problem.LoadDump(path.Join(tmpdir, "1.zip"), path.Join(tmpdir, "1"))
 	if err != nil {
@@ -49,9 +49,9 @@ func PRPutData(problem_id int, tmpdir string) error {
 	//Success now
 	ProblemRWLock.Lock(problem_id)
 	defer ProblemRWLock.Unlock(problem_id)
-	data_zip := PRGetDataZip(problem_id)
-	data_dir := PRGetDir(problem_id)
-	sample_zip := PRGetSampleZip(problem_id)
+	data_zip := ProbGetDataZip(problem_id)
+	data_dir := ProbGetDir(problem_id)
+	sample_zip := ProbGetSampleZip(problem_id)
 
 	os.RemoveAll(data_zip)
 	os.RemoveAll(data_dir)
@@ -66,17 +66,17 @@ func PRPutData(problem_id int, tmpdir string) error {
 }
 
 //Load a problem into memory by problem_id. This function will get the reading lock.
-func PRLoad(problem_id int) *Problem {
+func ProbLoad(problem_id int) *Problem {
 	val, ok := ProblemCache.Get(problem_id)
 	if !ok {
 		ProblemRWLock.RLock(problem_id)
 		defer ProblemRWLock.RUnlock(problem_id)
-		pro, err := problem.LoadDir(PRGetDir(problem_id))
+		pro, err := problem.LoadDir(ProbGetDir(problem_id))
 		if err != nil {
 			log.Print("prload", err)
 			return &Problem{}
 		}
-		PRSetCache(problem_id, pro)
+		ProbSetCache(problem_id, pro)
 		ret, _ := ProblemCache.Get(problem_id)
 		return ret
 	} else {
@@ -85,7 +85,7 @@ func PRLoad(problem_id int) *Problem {
 }
 
 //Format and set a loaded problem into memory. You should ensure that you have the reading lock before calling this function.
-func PRSetCache(problem_id int, pro problem.Problem) {
+func ProbSetCache(problem_id int, pro problem.Problem) {
 	stmts := []Statement{}
 	for key, val := range pro.Data().Statement {
 		if key[0] != '_' {
@@ -101,20 +101,20 @@ func PRSetCache(problem_id int, pro problem.Problem) {
 		DataInfo:     pro.DataInfo(),
 		Statements:   stmts,
 		SubmConfig:   pro.Data().Submission,
-		HasSample:    utils.FileExists(PRGetSampleZip(problem_id)),
+		HasSample:    utils.FileExists(ProbGetSampleZip(problem_id)),
 		TimeLimit:    utils.AtoiDefault(pro.Data().Statement["_tl"], -1),
 		MemoryLimit:  utils.AtoiDefault(pro.Data().Statement["_ml"], -1),
 	})
 }
 
 //You should ensure that you have the writing lock before calling this function.
-func PRModifySample(problem_id int, allow_down string) error {
+func ProbModifySample(problem_id int, allow_down string) error {
 	ProblemRWLock.Lock(problem_id)
 	defer ProblemRWLock.Unlock(problem_id)
-	sample_dir := PRGetSampleZip(problem_id)
-	data_dir := PRGetDir(problem_id)
+	sample_dir := ProbGetSampleZip(problem_id)
+	data_dir := ProbGetDir(problem_id)
 	os.RemoveAll(sample_dir)
-	pro := PRLoad(problem_id)
+	pro := ProbLoad(problem_id)
 	zipfile, _ := os.Create(sample_dir)
 	writer := zip.NewWriter(zipfile)
 
@@ -160,7 +160,7 @@ func totalTests(test *problem.TestdataInfo) int {
 	return ret
 }
 
-func PRHasData(pro *Problem, mode string) bool {
+func ProbHasData(pro *Problem, mode string) bool {
 	switch mode {
 	case "pretest":
 		return totalTests(&pro.DataInfo.Pretest) > 0
@@ -172,8 +172,8 @@ func PRHasData(pro *Problem, mode string) bool {
 	return false
 }
 
-func PRFullScore(problem_id int) float64 {
-	pro := PRLoad(problem_id)
+func ProbFullScore(problem_id int) float64 {
+	pro := ProbLoad(problem_id)
 	if pro == nil {
 		return 0
 	}

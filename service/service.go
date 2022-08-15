@@ -139,7 +139,7 @@ func init() {
 		if !fv.Value.CanInt() {
 			return HttpStatErr(http.StatusBadRequest)
 		}
-		if !internal.PRExists(int(fv.Value.Int())) {
+		if !internal.ProbExists(int(fv.Value.Int())) {
 			return HttpStatErr(http.StatusNotFound)
 		}
 		return nil
@@ -148,7 +148,7 @@ func init() {
 		if !fv.Value.CanInt() {
 			return HttpStatErr(http.StatusBadRequest)
 		}
-		if !internal.SMExists(int(fv.Value.Int())) {
+		if !internal.SubmExists(int(fv.Value.Int())) {
 			return HttpStatErr(http.StatusNotFound)
 		}
 		return nil
@@ -166,7 +166,7 @@ func init() {
 		if !fv.Value.CanInt() {
 			return HttpStatErr(http.StatusBadRequest)
 		}
-		if !internal.PMExists(int(fv.Value.Int())) {
+		if !internal.PermExists(int(fv.Value.Int())) {
 			return HttpStatErr(http.StatusNotFound)
 		}
 		return nil
@@ -175,7 +175,7 @@ func init() {
 		if !fv.Value.CanInt() {
 			return HttpStatErr(http.StatusBadRequest)
 		}
-		if !internal.USExists(int(fv.Value.Int())) {
+		if !internal.UserExists(int(fv.Value.Int())) {
 			return HttpStatErr(http.StatusNotFound)
 		}
 		return nil
@@ -184,7 +184,7 @@ func init() {
 		if !fv.Value.CanInt() {
 			return HttpStatErr(http.StatusBadRequest)
 		}
-		if !internal.BLExists(int(fv.Value.Int())) {
+		if !internal.BlogExists(int(fv.Value.Int())) {
 			return HttpStatErr(http.StatusNotFound)
 		}
 		return nil
@@ -193,7 +193,7 @@ func init() {
 		if !fv.Value.CanInt() {
 			return HttpStatErr(http.StatusBadRequest)
 		}
-		if !internal.BLCommentExists(int(fv.Value.Int())) {
+		if !internal.BlogCommentExists(int(fv.Value.Int())) {
 			return HttpStatErr(http.StatusNotFound)
 		}
 		return nil

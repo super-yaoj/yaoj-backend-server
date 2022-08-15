@@ -18,7 +18,7 @@ type Comment struct {
 	Liked      bool      `json:"liked"`
 }
 
-func BLCreateComment(blog_id, user_id int, content string) (int64, error) {
+func BlogCreateComment(blog_id, user_id int, content string) (int64, error) {
 	id, err := db.DBInsertGetId("insert into blog_comments values (?, now(), ?, ?, 0, null)", blog_id, user_id, content)
 	if err != nil {
 		return 0, err
@@ -28,17 +28,17 @@ func BLCreateComment(blog_id, user_id int, content string) (int64, error) {
 	}
 }
 
-func BLGetComments(blog_id, user_id int) ([]Comment, error) {
+func BlogGetComments(blog_id, user_id int) ([]Comment, error) {
 	var comments []Comment
 	err := db.DBSelectAll(&comments, "select comment_id, author, content, `like`, create_time, user_name from ((select * from blog_comments where blog_id=?) as a join user_info on author=user_id)", blog_id)
 	if err != nil {
 		return nil, err
 	}
-	BLCommentsGetLike(comments, user_id)
+	BlogCommentsGetLike(comments, user_id)
 	return comments, nil
 }
 
-func BLCommentsGetLike(comments []Comment, user_id int) {
+func BlogCommentsGetLike(comments []Comment, user_id int) {
 	if user_id > 0 {
 		var ids []int
 		for _, i := range comments {
@@ -51,7 +51,7 @@ func BLCommentsGetLike(comments []Comment, user_id int) {
 	}
 }
 
-func BLDeleteComment(id int) error {
+func BlogDeleteComment(id int) error {
 	blog_id, err := db.DBSelectSingleInt("select blog_id from blog_comments where comment_id=?", id)
 	if err != nil {
 		return err
@@ -68,7 +68,7 @@ func BLDeleteComment(id int) error {
 	return err
 }
 
-func BLCommentExists(comment_id int) bool {
+func BlogCommentExists(comment_id int) bool {
 	count, err := db.DBSelectSingleInt("select count(*) from blog_comments where comment_id=?", comment_id)
 	return err == nil && count > 0
 }

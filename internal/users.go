@@ -28,18 +28,18 @@ type User struct {
 }
 
 const (
-	USBanned = 0
-	USNormal = 1
-	USAdmin  = 2
-	USRoot   = 3
+	UserBanned = 0
+	UserNormal = 1
+	UserAdmin  = 2
+	UserRoot   = 3
 )
 
 func IsAdmin(user_group int) bool {
-	return (user_group == USAdmin || user_group == USRoot)
+	return (user_group == UserAdmin || user_group == UserRoot)
 }
 
 func IsBanned(user_group int) bool {
-	return user_group == USBanned
+	return user_group == UserBanned
 }
 
 func SaltPassword(password string) string {
@@ -70,7 +70,7 @@ func CheckPassword(user_id int, password string) (bool, error) {
 	return count == 1, err
 }
 
-func USQuery(user_id int) (User, error) {
+func UserQuery(user_id int) (User, error) {
 	var user User
 	err := db.DBSelectSingle(&user, "select * from user_info where user_id=?", user_id)
 	return user, err
@@ -82,17 +82,17 @@ func UserQueryBase(user_id int) (UserBase, error) {
 	return user, err
 }
 
-func USModify(password string, gender int, motto, email, organization string, user_id int) error {
+func Userubmodify(password string, gender int, motto, email, organization string, user_id int) error {
 	_, err := db.DBUpdate("update user_info set password=?, gender=?, motto=?, email=?, organization=? where user_id=?", password, gender, motto, email, organization, user_id)
 	return err
 }
 
-func USGroupEdit(user_id, user_group int) error {
+func UserGroupEdit(user_id, user_group int) error {
 	_, err := db.DBUpdateGetAffected("update user_info set user_group=? where user_id=?", user_group, user_id)
 	return err
 }
 
-func USList(bound_user_id, bound_rating, pagesize int, isleft bool) ([]User, bool, error) {
+func UserList(bound_user_id, bound_rating, pagesize int, isleft bool) ([]User, bool, error) {
 	pagesize += 1
 	var users []User
 	var err error
@@ -114,13 +114,13 @@ func USList(bound_user_id, bound_rating, pagesize int, isleft bool) ([]User, boo
 	return users, isfull, nil
 }
 
-func USQueryPermission(user_id int) ([]Permission, error) {
+func UserQueryPermission(user_id int) ([]Permission, error) {
 	var p []Permission
 	err := db.DBSelectAll(&p, "select permissions.permission_id, permission_name, count from (permissions join user_permissions on permissions.permission_id=user_permissions.permission_id) where user_id=?", user_id)
 	return p, err
 }
 
-func USPermissions(user_id int) ([]int, error) {
+func UserPermissions(user_id int) ([]int, error) {
 	if user_id < 0 {
 		return []int{config.Global.DefaultGroup}, nil
 	}
@@ -131,12 +131,12 @@ func USPermissions(user_id int) ([]int, error) {
 	return append(p, -user_id), err
 }
 
-func USExists(user_id int) bool {
+func UserExists(user_id int) bool {
 	count, _ := db.DBSelectSingleInt("select count(*) from user_info where user_id=?", user_id)
 	return count > 0
 }
 
-func USListByName(user_name string, bound, pagesize int, isleft bool) ([]UserBase, bool, error) {
+func UserListByName(user_name string, bound, pagesize int, isleft bool) ([]UserBase, bool, error) {
 	var users []UserBase
 	pagesize += 1
 	var err error

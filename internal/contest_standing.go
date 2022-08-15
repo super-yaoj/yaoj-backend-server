@@ -53,6 +53,22 @@ var (
 	standingCols = "submission_id, submitter, problem_id, score, sample_score, accepted, submit_time"
 )
 
+func init() {
+	AfterSubmJudge(func(sb SubmissionBase) {
+		if sb.ContestId > 0 {
+			ctsUpdateSubmission(sb.ContestId, sb.Id)
+		}
+	})
+	AfterSubmDelete(func(sb SubmissionBase) {
+		if sb.ContestId > 0 {
+			ctsDeleteSubmission(sb)
+		}
+	})
+	AfterCTModify(func(i int) {
+		ctsRenew(i)
+	})
+}
+
 func newStandingEntry(user_id, rating int, user_name string, probs int) CTStandingEntry {
 	return CTStandingEntry{
 		user_id, user_name,
@@ -92,7 +108,7 @@ func updateCTSEntry(standing *CTStanding, sub *standingSubm, getRating bool) {
 	entry.Hacked[pid] = (sub.Accepted & ExtraAccepted) == 0
 }
 
-func CTSRenew(contest_id int) {
+func ctsRenew(contest_id int) {
 	ctsMultiLock.Lock(contest_id)
 	defer ctsMultiLock.Unlock(contest_id)
 	contest, err := CTQuery(contest_id, -1)
@@ -152,7 +168,7 @@ func CTSRenew(contest_id int) {
 	allStandings.Set(contest_id, standing)
 }
 
-func CTSUpdateSubmission(contest_id, sid int) {
+func ctsUpdateSubmission(contest_id, sid int) {
 	if CTHasFinished(contest_id) {
 		return
 	}
@@ -171,7 +187,7 @@ func CTSUpdateSubmission(contest_id, sid int) {
 	updateCTSEntry(standing, &sub, true)
 }
 
-func CTSDeleteSubmission(sub SubmissionBase) {
+func ctsDeleteSubmission(sub SubmissionBase) {
 	if CTHasFinished(sub.ContestId) {
 		return
 	}
@@ -216,7 +232,7 @@ func CTSGet(contest_id int) []CTStandingEntry {
 			return entries
 		}
 		ctsMultiLock.RUnlock(contest_id)
-		CTSRenew(contest_id)
+		ctsRenew(contest_id)
 		ctsMultiLock.RLock(contest_id)
 		standing, ok = allStandings.Get(contest_id)
 		if !ok {
@@ -264,7 +280,7 @@ You must ensure that there's no more submissions judging in this contest.
 func CTFinish(contest_id int) error {
 	var err error
 	//For safety, recalculate standing
-	CTSRenew(contest_id)
+	ctsRenew(contest_id)
 	standing := CTSGet(contest_id)
 	if len(standing) > 0 {
 		err = getPastContests(standing)

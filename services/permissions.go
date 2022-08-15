@@ -20,7 +20,7 @@ type PermCreateParam struct {
 
 func PermCreate(ctx Context, param PermCreateParam) {
 	param.NewPermit().AsAdmin().Success(func(a any) {
-		id, err := internal.PMCreate(param.PermName)
+		id, err := internal.PermCreate(param.PermName)
 		if err != nil {
 			ctx.ErrorAPI(err)
 		} else {
@@ -37,7 +37,7 @@ type PermRenameParam struct {
 
 func PermRename(ctx Context, param PermRenameParam) {
 	param.NewPermit().AsAdmin().Success(func(a any) {
-		err := internal.PMChangeName(param.PermID, param.PermName)
+		err := internal.PermChangeName(param.PermID, param.PermName)
 		if err != nil {
 			ctx.ErrorAPI(err)
 		}
@@ -55,7 +55,7 @@ func PermDel(ctx Context, param PermDelParam) {
 			ctx.JSONAPI(http.StatusBadRequest, "you cannot modify the default group", nil)
 			return
 		}
-		_, err := internal.PMDelete(param.PermID)
+		_, err := internal.PermDelete(param.PermID)
 		if err != nil {
 			ctx.ErrorAPI(err)
 		}
@@ -69,7 +69,7 @@ type PermGetParam struct {
 
 func PermGet(ctx Context, param PermGetParam) {
 	param.NewPermit().AsAdmin().Success(func(a any) {
-		p, isfull, err := internal.PMQuery(param.Bound(), *param.PageSize, param.IsLeft())
+		p, isfull, err := internal.PermQuery(param.Bound(), *param.PageSize, param.IsLeft())
 		if err != nil {
 			ctx.ErrorAPI(err)
 		} else {
@@ -85,7 +85,7 @@ type PermGetUserParam struct {
 
 func PermGetUser(ctx Context, param PermGetUserParam) {
 	param.NewPermit().AsAdmin().Success(func(a any) {
-		users, err := internal.PMQueryUser(param.PermID)
+		users, err := internal.PermQueryUser(param.PermID)
 		if err != nil {
 			ctx.ErrorAPI(err)
 		} else {
@@ -111,7 +111,7 @@ func PermAddUser(ctx Context, param PermAddUserParam) {
 			ctx.JSONAPI(http.StatusBadRequest, "you cannot modify the default group", nil)
 			return
 		}
-		if !internal.PMExists(param.PermID) {
+		if !internal.PermExists(param.PermID) {
 			ctx.JSONAPI(http.StatusBadRequest, "invalid request: permission id is wrong", nil)
 			return
 		}
@@ -141,7 +141,7 @@ func PermAddUser(ctx Context, param PermAddUserParam) {
 			ctx.JSONAPI(http.StatusBadRequest, "invalid ids exist", gin.H{"invalid_ids": invalid_ids})
 			return
 		}
-		res, err := internal.PMAddUser(real_ids, param.PermID)
+		res, err := internal.PermAddUser(real_ids, param.PermID)
 		if err != nil {
 			ctx.ErrorAPI(err)
 		} else {
@@ -162,7 +162,7 @@ func PermDelUser(ctx Context, param PermDelUserParam) {
 			ctx.JSONAPI(http.StatusBadRequest, "you cannot modify the default group", nil)
 			return
 		}
-		_, err := internal.PMDeleteUser(param.PermID, param.UserID)
+		_, err := internal.PermDeleteUser(param.PermID, param.UserID)
 		if err != nil {
 			ctx.ErrorAPI(err)
 		}

@@ -191,7 +191,7 @@ type CtstMgrAddParam struct {
 
 func CtstMgrAdd(ctx Context, param CtstMgrAddParam) {
 	param.NewPermit().TryEditCtst(param.CtstID).Success(func(any) {
-		if !internal.USExists(param.MgrUserID) {
+		if !internal.UserExists(param.MgrUserID) {
 			ctx.JSONAPI(http.StatusBadRequest, "no such user id", nil)
 			return
 		}

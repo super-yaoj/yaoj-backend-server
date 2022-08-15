@@ -42,6 +42,24 @@ var (
 	statisticCols = "submission_id, submitter, problem_id, time, memory, length"
 )
 
+func init() {
+	AfterSubmCreate(func(sb SubmissionBase) {
+		prsAddSubmission(sb.ProblemId, sb.Id)
+	})
+	AfterSubmDelete(func(sb SubmissionBase) {
+		prsDeleteSubmission(sb)
+	})
+	AfterSubmJudge(func(sb SubmissionBase) {
+		prsUpdateSubmission(sb.ProblemId, sb.Id)
+	})
+	OnSubmRejudge(func (sb SubmissionBase) {
+		prsDeleteSubmission(sb)
+	})
+	OnProbRejudge(func(i int) {
+		prsRenew(i)
+	})
+}
+
 func (val *statisticValue) compare() func(int, int) bool {
 	return func(i, j int) bool {
 		a, b := val.sorted[i], val.sorted[j]
@@ -94,7 +112,7 @@ func (statistic *problemStatistic) updateEntry(sub *statisticSubm, sorts bool) {
 	statistic.length.updateEntry(sub.Length, sub.Id, uid, sorts)
 }
 
-func PRSRenew(problem_id int) {
+func prsRenew(problem_id int) {
 	prsMultiLock.Lock(problem_id)
 	defer prsMultiLock.Unlock(problem_id)
 	var subs []statisticSubm
@@ -118,7 +136,7 @@ func PRSRenew(problem_id int) {
 	allStatistic.Set(problem_id, statistic)
 }
 
-func PRSAddSubmission(problem_id, sid int) {
+func prsAddSubmission(problem_id, sid int) {
 	prsMultiLock.Lock(problem_id)
 	defer prsMultiLock.Unlock(problem_id)
 	statistic, ok := allStatistic.Get(problem_id)
@@ -128,7 +146,7 @@ func PRSAddSubmission(problem_id, sid int) {
 	statistic.totSubs++
 }
 
-func PRSUpdateSubmission(problem_id, sid int) {
+func prsUpdateSubmission(problem_id, sid int) {
 	prsMultiLock.Lock(problem_id)
 	defer prsMultiLock.Unlock(problem_id)
 	statistic, ok := allStatistic.Get(problem_id)
@@ -145,7 +163,7 @@ func PRSUpdateSubmission(problem_id, sid int) {
 	statistic.updateEntry(&sub, true)
 }
 
-func PRSDeleteSubmission(sub SubmissionBase) {
+func prsDeleteSubmission(sub SubmissionBase) {
 	prsMultiLock.Lock(sub.ProblemId)
 	defer prsMultiLock.Unlock(sub.ProblemId)
 	statistic, ok := allStatistic.Get(sub.ProblemId)
@@ -191,13 +209,13 @@ func PRSDeleteSubmission(sub SubmissionBase) {
 mode is one of {"time", "memory"}
 return (submission ids, is full)
 */
-func PRSGetSubmissions(problem_id, bound, bound_id, pagesize int, isleft bool, mode string) ([]int, bool) {
+func ProbSGetSubmissions(problem_id, bound, bound_id, pagesize int, isleft bool, mode string) ([]int, bool) {
 	prsMultiLock.RLock(problem_id)
 	defer prsMultiLock.RUnlock(problem_id)
 	statistic, ok := allStatistic.Get(problem_id)
 	if !ok {
 		prsMultiLock.RUnlock(problem_id)
-		PRSRenew(problem_id)
+		prsRenew(problem_id)
 		prsMultiLock.RLock(problem_id)
 		statistic, ok = allStatistic.Get(problem_id)
 		if !ok {
@@ -230,13 +248,13 @@ func PRSGetSubmissions(problem_id, bound, bound_id, pagesize int, isleft bool, m
 	}
 }
 
-func PRSGetACRatio(problem_id int) (int, int) {
+func ProbSGetACRatio(problem_id int) (int, int) {
 	prsMultiLock.RLock(problem_id)
 	defer prsMultiLock.RUnlock(problem_id)
 	statistic, ok := allStatistic.Get(problem_id)
 	if !ok {
 		prsMultiLock.RUnlock(problem_id)
-		PRSRenew(problem_id)
+		prsRenew(problem_id)
 		prsMultiLock.RLock(problem_id)
 		statistic, ok = allStatistic.Get(problem_id)
 		if !ok {

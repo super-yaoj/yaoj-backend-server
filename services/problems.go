@@ -22,7 +22,7 @@ type ProbListParam struct {
 }
 
 func ProbList(ctx Context, param ProbListParam) {
-	problems, isfull, err := internal.PRList(
+	problems, isfull, err := internal.ProbList(
 		param.Page.Bound(), *param.PageSize, param.UserID, param.IsLeft(), param.IsAdmin(),
 	)
 	if err != nil {
@@ -57,7 +57,7 @@ type ProbGetParam struct {
 func ProbGet(ctx Context, param ProbGetParam) {
 	param.NewPermit().TrySeeProb(param.ProbID, param.CtstID).Success(func(a any) {
 		ctstid := a.(int)
-		prob, err := internal.PRQuery(param.ProbID, param.UserID)
+		prob, err := internal.ProbQuery(param.ProbID, param.UserID)
 		if err != nil {
 			ctx.ErrorAPI(err)
 			return
@@ -83,7 +83,7 @@ type ProbGetPermParam struct {
 
 func ProbGetPerm(ctx Context, param ProbGetPermParam) {
 	param.NewPermit().TryEditProb(param.ProbID).Success(func(any) {
-		pers, err := internal.PRGetPermissions(param.ProbID)
+		pers, err := internal.ProbGetPermissions(param.ProbID)
 		if err != nil {
 			ctx.ErrorAPI(err)
 		} else {
@@ -100,7 +100,7 @@ type ProbAddPermParam struct {
 
 func ProbAddPerm(ctx Context, param ProbAddPermParam) {
 	param.NewPermit().TryEditProb(param.ProbID).Success(func(any) {
-		err := internal.PRAddPermission(param.ProbID, param.PermID)
+		err := internal.ProbAddPermission(param.ProbID, param.PermID)
 		if err != nil {
 			ctx.ErrorAPI(err)
 		}
@@ -115,7 +115,7 @@ type ProbDelPermParam struct {
 
 func ProbDelPerm(ctx Context, param ProbDelPermParam) {
 	param.NewPermit().TryEditProb(param.ProbID).Success(func(any) {
-		err := internal.PRDeletePermission(param.ProbID, param.PermID)
+		err := internal.ProbDeletePermission(param.ProbID, param.PermID)
 		if err != nil {
 			ctx.ErrorAPI(err)
 		}
@@ -129,7 +129,7 @@ type ProbGetMgrParam struct {
 
 func ProbGetMgr(ctx Context, param ProbGetMgrParam) {
 	param.NewPermit().TryEditProb(param.ProbID).Success(func(any) {
-		users, err := internal.PRGetManagers(param.ProbID)
+		users, err := internal.ProbGetManagers(param.ProbID)
 		if err != nil {
 			ctx.ErrorAPI(err)
 		} else {
@@ -146,7 +146,7 @@ type ProbAddMgrParam struct {
 
 func ProbAddMgr(ctx Context, param ProbAddMgrParam) {
 	param.NewPermit().TryEditProb(param.ProbID).Success(func(any) {
-		err := internal.PRAddPermission(param.ProbID, -param.MgrUserID)
+		err := internal.ProbAddPermission(param.ProbID, -param.MgrUserID)
 		if err != nil {
 			ctx.ErrorAPI(err)
 		}
@@ -161,7 +161,7 @@ type ProbDelMgrParam struct {
 
 func ProbDelMgr(ctx Context, param ProbDelMgrParam) {
 	param.NewPermit().TryEditProb(param.ProbID).Success(func(any) {
-		err := internal.PRDeletePermission(param.ProbID, -param.MgrUserID)
+		err := internal.ProbDeletePermission(param.ProbID, -param.MgrUserID)
 		if err != nil {
 			ctx.ErrorAPI(err)
 		}
@@ -189,7 +189,7 @@ func ProbPutData(ctx Context, param ProbPutDataParam) {
 			return
 		}
 		log.Printf("file uploaded saves at %s", path.Join(tmpdir, "1.zip"))
-		err = internal.PRPutData(param.ProbID, tmpdir)
+		err = internal.ProbPutData(param.ProbID, tmpdir)
 		if err != nil {
 			ctx.JSONAPI(http.StatusBadRequest, err.Error(), nil)
 		}
@@ -208,7 +208,7 @@ func ProbDownData(ctx Context, param ProbDownDataParam) {
 	defer internal.ProblemRWLock.RUnlock(param.ProbID)
 	if param.DataType == "data" {
 		param.NewPermit().TryEditProb(param.ProbID).Success(func(any) {
-			path := internal.PRGetDataZip(param.ProbID)
+			path := internal.ProbGetDataZip(param.ProbID)
 			_, err := os.Stat(path)
 			if err != nil {
 				ctx.JSONAPI(http.StatusBadRequest, "no data", nil)
@@ -218,7 +218,7 @@ func ProbDownData(ctx Context, param ProbDownDataParam) {
 		}).FailAPIStatusForbidden(ctx)
 	} else {
 		param.NewPermit().TrySeeProb(param.ProbID, param.CtstID).Success(func(any) {
-			path := internal.PRGetSampleZip(param.ProbID)
+			path := internal.ProbGetSampleZip(param.ProbID)
 			_, err := os.Stat(path)
 			if err != nil {
 				ctx.JSONAPI(http.StatusBadRequest, "no data", nil)
@@ -243,7 +243,7 @@ func ProbEdit(ctx Context, param ProbEditParam) {
 			return
 		}
 
-		pro := internal.PRLoad(param.ProbID)
+		pro := internal.ProbLoad(param.ProbID)
 		length := len(pro.Statements)
 		fix := func(str string) string {
 			if len(str) > length {
@@ -265,7 +265,7 @@ func ProbEdit(ctx Context, param ProbEditParam) {
 		new_allow := fix(param.AllowDown)
 		if allow_down != new_allow {
 			db.DBUpdate("update problems set title=?, allow_down=? where problem_id=?", param.Title, new_allow, param.ProbID)
-			err := internal.PRModifySample(param.ProbID, new_allow)
+			err := internal.ProbModifySample(param.ProbID, new_allow)
 			if err != nil {
 				ctx.ErrorAPI(err)
 			}
@@ -293,20 +293,20 @@ func ProbStatistic(ctx Context, param ProbStatisticParam) {
 				ctx.JSONAPI(http.StatusBadRequest, "left_id is null", nil)
 				return
 			}
-			subs, isfull = internal.PRSGetSubmissions(param.ProbID, *param.Left, *param.LeftId, *param.PageSize, true, param.Mode)
+			subs, isfull = internal.ProbSGetSubmissions(param.ProbID, *param.Left, *param.LeftId, *param.PageSize, true, param.Mode)
 		} else {
 			if param.RightId == nil {
 				ctx.JSONAPI(http.StatusBadRequest, "right_id is null", nil)
 				return
 			}
-			subs, isfull = internal.PRSGetSubmissions(param.ProbID, *param.Right, *param.RightId, *param.PageSize, false, param.Mode)
+			subs, isfull = internal.ProbSGetSubmissions(param.ProbID, *param.Right, *param.RightId, *param.PageSize, false, param.Mode)
 		}
 		if subs == nil {
 			ctx.JSONAPI(http.StatusBadRequest, "", nil)
 			return
 		}
-		ret := internal.SMListByIds(subs)
-		acnum, totnum := internal.PRSGetACRatio(param.ProbID)
+		ret := internal.SubmListByIds(subs)
+		acnum, totnum := internal.ProbSGetACRatio(param.ProbID)
 		ctx.JSONAPI(http.StatusOK, "", map[string]any{"data": ret, "isfull": isfull, "acnum": acnum, "totnum": totnum})
 	}).FailAPIStatusForbidden(ctx)
 }

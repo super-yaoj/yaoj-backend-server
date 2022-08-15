@@ -12,6 +12,23 @@ import (
 	utils "github.com/super-yaoj/yaoj-utils"
 )
 
+//钩子：数据库修改完成后
+func AfterSubmCreate(f func(SubmissionBase)) {
+	Listen("AfterSubmCreate", f)
+}
+//钩子：数据库修改完成后
+func AfterSubmJudge(f func(SubmissionBase)) {
+	Listen("AfterSubmJudge", f)
+}
+//钩子：数据库修改完成后
+func AfterSubmDelete(f func(SubmissionBase)) {
+	Listen("AfterSubmDelete", f)
+}
+//钩子：数据库修改完成后，重新评测前
+func OnSubmRejudge(f func(SubmissionBase)) {
+	Listen("OnSubmRejudge", f)
+}
+
 type ContentPreview struct {
 	Accepted utils.CtntType
 	Language utils.LangTag
@@ -65,7 +82,7 @@ Priority: in contest > not in contest, real-time judge > rejudge, pretest > test
 
 in contest, real-time, pretest judge > custom test > in contest, real-time data judge
 */
-func SMPriority(contest, rejudge bool, mode string) int {
+func SubmPriority(contest, rejudge bool, mode string) int {
 	switch mode {
 	case "custom_test":
 		return 165
@@ -82,14 +99,14 @@ func SMPriority(contest, rejudge bool, mode string) int {
 /*
 Process a whole judge on single problem submission
 */
-func SMJudge(sub SubmissionBase, rejudge bool, uuid int64) error {
+func SubmJudge(sub SubmissionBase, rejudge bool, uuid int64) error {
 	for _, val := range []string{"pretest", "tests", "extra"} {
-		InsertSubmission(int(sub.Id), uuid, SMPriority(sub.ContestId > 0, rejudge, val), val)
+		InsertSubmission(int(sub.Id), uuid, SubmPriority(sub.ContestId > 0, rejudge, val), val)
 	}
 	return nil
 }
 
-func SMCreate(user_id, problem_id, contest_id int, language utils.LangTag, zipfile []byte, preview map[string]ContentPreview, length int) error {
+func SubmCreate(user_id, problem_id, contest_id int, language utils.LangTag, zipfile []byte, preview map[string]ContentPreview, length int) error {
 	current := utils.TimeStamp()
 	id, err := db.DBInsertGetId("insert into submissions values (null, ?, ?, ?, ?, 0, -1, -1, ?, ?, 0, 0, ?, ?)", user_id, problem_id, contest_id, Waiting, language, time.Now(), current, length)
 	if err != nil {
@@ -103,11 +120,12 @@ func SMCreate(user_id, problem_id, contest_id int, language utils.LangTag, zipfi
 	if err != nil {
 		return err
 	}
-	PRSAddSubmission(problem_id, int(id))
-	return SMJudge(SubmissionBase{int(id), problem_id, contest_id, user_id}, false, current)
+	sb := SubmissionBase{int(id), problem_id, contest_id, user_id}
+	Register("AfterSubmCreate", sb)
+	return SubmJudge(sb, false, current)
 }
 
-func SMListByIds(subids []int) []Submission {
+func SubmListByIds(subids []int) []Submission {
 	if len(subids) == 0 {
 		return []Submission{}
 	}
@@ -127,14 +145,14 @@ func SMListByIds(subids []int) []Submission {
 		rows.StructScan(&cur)
 		subs[sidmap[cur.Id]] = cur
 	}
-	SMGetExtraInfo(subs)
+	SubmGetExtraInfo(subs)
 	return subs
 }
 
 /*
 Get problem title and user name by id avoiding querying in the database one by one
 */
-func SMGetExtraInfo(subs []Submission) {
+func SubmGetExtraInfo(subs []Submission) {
 	if len(subs) == 0 {
 		return
 	}
@@ -160,13 +178,13 @@ func SMGetExtraInfo(subs []Submission) {
 	}
 }
 
-func SMGetBaseInfo(submission_id int) (SubmissionBase, error) {
+func SubmGetBaseInfo(submission_id int) (SubmissionBase, error) {
 	ret := SubmissionBase{Id: submission_id}
 	err := db.DBSelectSingle(&ret, "select problem_id, contest_id, submitter from submissions where submission_id=?", submission_id)
 	return ret, err
 }
 
-func SMQuery(sid int) (Submission, error) {
+func SubmQuery(sid int) (Submission, error) {
 	var ret Submission
 	err := db.DBSelectSingle(&ret, "select * from submissions where submission_id=?", sid)
 	if err != nil {
@@ -189,13 +207,13 @@ func SMQuery(sid int) (Submission, error) {
 For params problem_id, contest_id, submitter, if you do not want to limit them then just leave them as 0.
 user_id is the current user's id
 */
-func SMList(bound, pagesize, user_id, submitter, problem_id, contest_id int, isleft, isadmin bool) ([]Submission, bool, error) {
+func SubmList(bound, pagesize, user_id, submitter, problem_id, contest_id int, isleft, isadmin bool) ([]Submission, bool, error) {
 	query := utils.If(problem_id == 0, "", fmt.Sprintf(" and problem_id=%d", problem_id)) +
 		utils.If(contest_id == 0, "", fmt.Sprintf(" and contest_id=%d", contest_id)) +
 		utils.If(submitter == 0, "", fmt.Sprintf(" and submitter=%d", submitter))
 	must := "1"
 	if !isadmin {
-		perms, err := USPermissions(user_id)
+		perms, err := UserPermissions(user_id)
 		if err != nil {
 			return nil, false, err
 		}
@@ -265,11 +283,11 @@ func SMList(bound, pagesize, user_id, submitter, problem_id, contest_id int, isl
 	if !isleft {
 		utils.Reverse(submissions)
 	}
-	SMGetExtraInfo(submissions)
+	SubmGetExtraInfo(submissions)
 	return submissions, isfull, nil
 }
 
-func SMPretestOnly(sub *Submission) {
+func SubmPretestOnly(sub *Submission) {
 	sub.Score = sub.SampleScore
 	sub.Details.ExtraResult, sub.Details.Result = "", ""
 	sub.Time, sub.Memory = -1, -1
@@ -280,10 +298,10 @@ func SMPretestOnly(sub *Submission) {
 
 var sm_update_mutex = sync.Mutex{}
 
-func SMUpdate(sid, pid int, mode string, result []byte) error {
+func SubmUpdate(sid, pid int, mode string, result []byte) error {
 	sm_update_mutex.Lock()
 	defer sm_update_mutex.Unlock()
-	prob := PRLoad(pid)
+	prob := ProbLoad(pid)
 	var testdata *problem.TestdataInfo
 	var column_name string
 	switch mode {
@@ -366,16 +384,12 @@ func SMUpdate(sid, pid int, mode string, result []byte) error {
 	}
 	//we should ensure that each submission will be exactly updated once
 	if subinfo.Status == Finished || (subinfo.Status < 0 && mode == "tests") {
-		//TODO: some corresponding updates
-		PRSUpdateSubmission(subinfo.ProblemId, subinfo.Id)
-		if subinfo.ContestId > 0 {
-			CTSUpdateSubmission(subinfo.ContestId, subinfo.Id)
-		}
+		Register("AfterSubmJudge", subinfo.SubmissionBase)
 	}
 	return nil
 }
 
-func SMJudgeCustomTest(content []byte) []byte {
+func SubmJudgeCustomTest(content []byte) []byte {
 	callback := make(chan []byte)
 	//find a free submission_id
 	sid, err := db.DBInsertGetId("insert into custom_tests values (null, ?)", content)
@@ -389,7 +403,7 @@ func SMJudgeCustomTest(content []byte) []byte {
 	return result
 }
 
-func SMDelete(sub SubmissionBase) error {
+func SubmDelete(sub SubmissionBase) error {
 	_, err := db.DBUpdate("delete from submissions where submission_id=?", sub.Id)
 	if err != nil {
 		return err
@@ -398,15 +412,12 @@ func SMDelete(sub SubmissionBase) error {
 	if err != nil {
 		return err
 	}
-	if sub.ContestId > 0 {
-		CTSDeleteSubmission(sub)
-	}
-	PRSDeleteSubmission(sub)
+	Register("AfterSubmDelete", sub)
 	return nil
 }
 
-func SMRejudge(submission_id int) error {
-	sub, err := SMGetBaseInfo(submission_id)
+func SubmRejudge(submission_id int) error {
+	sub, err := SubmGetBaseInfo(submission_id)
 	if err != nil {
 		return err
 	}
@@ -416,11 +427,11 @@ func SMRejudge(submission_id int) error {
 	if err != nil {
 		return err
 	}
-	PRSDeleteSubmission(sub)
-	return SMJudge(sub, true, current)
+	Register("OnSubmRejudge", sub)
+	return SubmJudge(sub, true, current)
 }
 
-func SMRemoveTestDetails(js string) string {
+func SubmRemoveTestDetails(js string) string {
 	if js == "" {
 		return ""
 	}
@@ -444,7 +455,7 @@ func SMRemoveTestDetails(js string) string {
 	return ret
 }
 
-func SMExists(subm_id int) bool {
+func SubmExists(subm_id int) bool {
 	cnt, _ := db.DBSelectSingleInt("select count(*) from submissions where submission_id=?", subm_id)
 	return cnt > 0
 }

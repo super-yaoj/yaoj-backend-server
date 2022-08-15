@@ -9,6 +9,11 @@ import (
 	utils "github.com/super-yaoj/yaoj-utils"
 )
 
+//钩子：数据库修改完成后
+func AfterCTModify(f func(int)) {
+	Listen("AfterCTModify", f)
+}
+
 type Contest struct {
 	Id             int       `db:"contest_id" json:"contest_id"`
 	Title          string    `db:"title" json:"title"`
@@ -46,7 +51,7 @@ func CTList(bound, pagesize, user_id int, isleft, isadmin bool) ([]Contest, bool
 		CTGetLikes(cts, user_id)
 		return cts, isfull, nil
 	} else {
-		perms, err := USPermissions(user_id)
+		perms, err := UserPermissions(user_id)
 		if err != nil {
 			return nil, false, err
 		}
@@ -148,7 +153,7 @@ func CTCreate() (int64, error) {
 
 func CTModify(contest_id int, title string, start time.Time, last int, pretest int, score_private int) error {
 	_, err := db.DBUpdate("update contests set title=?, start_time=?, end_time=?, pretest=?, score_private=? where contest_id=?", title, start, start.Add(time.Duration(last)*time.Minute), pretest, score_private, contest_id)
-	go CTSRenew(contest_id)
+	Register("AfterCTModify", contest_id)
 	return err
 }
 
@@ -182,13 +187,13 @@ func CTDeletePermission(contest_id, permission_id int) error {
 
 func CTAddProblem(contest_id, problem_id int) error {
 	_, err := db.DBUpdate("insert ignore into contest_problems values (?, ?)", contest_id, problem_id)
-	go CTSRenew(contest_id)
+	Register("AfterCTModify", contest_id)
 	return err
 }
 
 func CTDeleteProblem(contest_id, problem_id int) error {
 	_, err := db.DBUpdate("delete from contest_problems where contest_id=? and problem_id=?", contest_id, problem_id)
-	go CTSRenew(contest_id)
+	Register("AfterCTModify", contest_id)
 	return err
 }
 

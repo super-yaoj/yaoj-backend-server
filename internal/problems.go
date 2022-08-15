@@ -9,6 +9,11 @@ import (
 	utils "github.com/super-yaoj/yaoj-utils"
 )
 
+//钩子：数据库修改完成后，重新评测前
+func OnProbRejudge(f func(int)) {
+	Listen("OnProbRejudge", f)
+}
+
 type Statement struct {
 	Name string `json:"name"`
 	Path string `json:"path"`
@@ -38,7 +43,7 @@ type Problem struct {
 	DataInfo problem.DataInfo `json:"data"`
 }
 
-func PRList(bound, pagesize, user_id int, isleft, isadmin bool) ([]Problem, bool, error) {
+func ProbList(bound, pagesize, user_id int, isleft, isadmin bool) ([]Problem, bool, error) {
 	pagesize += 1
 	var problems []Problem
 	if isadmin {
@@ -58,10 +63,10 @@ func PRList(bound, pagesize, user_id int, isleft, isadmin bool) ([]Problem, bool
 		if !isleft {
 			utils.Reverse(problems)
 		}
-		PRGetLikes(problems, user_id)
+		ProbGetLikes(problems, user_id)
 		return problems, isfull, nil
 	} else {
-		perms, err := USPermissions(user_id)
+		perms, err := UserPermissions(user_id)
 		if err != nil {
 			return nil, false, err
 		}
@@ -88,12 +93,12 @@ func PRList(bound, pagesize, user_id int, isleft, isadmin bool) ([]Problem, bool
 			}
 		}
 		sort.Slice(problems, func(i, j int) bool { return problems[i].Id < problems[j].Id })
-		PRGetLikes(problems, user_id)
+		ProbGetLikes(problems, user_id)
 		return problems, isfull, nil
 	}
 }
 
-func PRGetLikes(problems []Problem, user_id int) {
+func ProbGetLikes(problems []Problem, user_id int) {
 	if user_id < 0 {
 		return
 	}
@@ -107,8 +112,8 @@ func PRGetLikes(problems []Problem, user_id int) {
 	}
 }
 
-func PRQuery(problem_id, user_id int) (*Problem, error) {
-	p := PRLoad(problem_id)
+func ProbQuery(problem_id, user_id int) (*Problem, error) {
+	p := ProbLoad(problem_id)
 	err := db.DBSelectSingle(&p, "select problem_id, title, `like`, allow_down from problems where problem_id=?", problem_id)
 	if err != nil {
 		return p, err
@@ -117,35 +122,35 @@ func PRQuery(problem_id, user_id int) (*Problem, error) {
 	return p, nil
 }
 
-func PRGetPermissions(problem_id int) ([]Permission, error) {
+func ProbGetPermissions(problem_id int) ([]Permission, error) {
 	var p []Permission
 	err := db.DBSelectAll(&p, "select a.permission_id, permission_name from ((select permission_id from problem_permissions where problem_id=? and permission_id>0) as a join permissions on a.permission_id=permissions.permission_id)", problem_id)
 	return p, err
 }
 
-func PRGetManagers(problem_id int) ([]User, error) {
+func ProbGetManagers(problem_id int) ([]User, error) {
 	var u []User
 	err := db.DBSelectAll(&u, "select user_id, user_name from ((select permission_id from problem_permissions where problem_id=? and permission_id<0) as a join user_info on -permission_id=user_id)", problem_id)
 	return u, err
 }
 
-func PRAddPermission(problem_id, permission_id int) error {
+func ProbAddPermission(problem_id, permission_id int) error {
 	_, err := db.DBUpdate("insert ignore into problem_permissions values (?, ?)", problem_id, permission_id)
 	return err
 }
 
-func PRDeletePermission(problem_id, permission_id int) error {
+func ProbDeletePermission(problem_id, permission_id int) error {
 	_, err := db.DBUpdate("delete from problem_permissions where problem_id=? and permission_id=?", problem_id, permission_id)
 	return err
 }
 
 // 数据库查询是否存在该题目
-func PRExists(problem_id int) bool {
+func ProbExists(problem_id int) bool {
 	count, _ := db.DBSelectSingleInt("select count(*) from problems where problem_id=?", problem_id)
 	return count > 0
 }
 
-func PRRejudge(problem_id int) error {
+func ProbRejudge(problem_id int) error {
 	current := utils.TimeStamp()
 	var sub []SubmissionBase
 	err := db.DBSelectAll(&sub, "select submission_id, contest_id from submissions where problem_id=?", problem_id)
@@ -157,9 +162,9 @@ func PRRejudge(problem_id int) error {
 	if err != nil {
 		return err
 	}
-	PRSRenew(problem_id)
+	Register("OnProbRejudge", problem_id)
 	for _, i := range sub {
-		SMJudge(i, true, current)
+		SubmJudge(i, true, current)
 	}
 	return nil
 }

@@ -18,19 +18,19 @@ type Announcement struct {
 	Liked       bool      `json:"liked"`
 }
 
-func ANCreate(blog_id, priority int) error {
+func AnceCreate(blog_id, priority int) error {
 	_, err := db.DBUpdate("insert into announcements values (?, ?, ?, null)", blog_id, time.Now(), priority)
 	return err
 }
 
-func ANQuery(user_id int) []Announcement {
+func AnceQuery(user_id int) []Announcement {
 	var ans []Announcement
 	db.DBSelectAll(&ans, "select id, blogs.blog_id, title, priority, comments, `like`, release_time from (announcements join blogs on announcements.blog_id = blogs.blog_id)")
-	ANGetLikes(ans, user_id)
+	AnceGetLikes(ans, user_id)
 	return ans
 }
 
-func ANGetLikes(blogs []Announcement, user_id int) {
+func AnceGetLikes(blogs []Announcement, user_id int) {
 	if user_id < 0 {
 		return
 	}
@@ -44,6 +44,6 @@ func ANGetLikes(blogs []Announcement, user_id int) {
 	}
 }
 
-func ANDelete(id int) {
+func AnceDelete(id int) {
 	db.DBUpdate("delete from announcements where id=?", id)
 }

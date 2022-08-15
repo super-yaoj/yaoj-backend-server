@@ -13,7 +13,7 @@ type AnceCreateParam struct {
 
 func AnceCreate(ctx Context, param AnceCreateParam) {
 	param.NewPermit().AsAdmin().Success(func(a any) {
-		err := internal.ANCreate(param.BlogID, param.Priority)
+		err := internal.AnceCreate(param.BlogID, param.Priority)
 		if err != nil {
 			ctx.ErrorAPI(err)
 			return
@@ -26,7 +26,7 @@ type AnceGetParam struct {
 }
 
 func AnceGet(ctx Context, param AnceGetParam) {
-	ctx.JSONAPI(http.StatusOK, "", map[string]any{"data": internal.ANQuery(param.UserID)})
+	ctx.JSONAPI(http.StatusOK, "", map[string]any{"data": internal.AnceQuery(param.UserID)})
 }
 
 type AnceDelParam struct {
@@ -36,6 +36,6 @@ type AnceDelParam struct {
 
 func AnceDel(ctx Context, param AnceDelParam) {
 	param.NewPermit().AsAdmin().Success(func(a any) {
-		internal.ANDelete(param.ID)
+		internal.AnceDelete(param.ID)
 	}).FailAPIStatusForbidden(ctx)
 }

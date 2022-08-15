@@ -13,7 +13,7 @@ type BlogCmntCreateParam struct {
 func BlogCmntCreate(ctx Context, param BlogCmntCreateParam) {
 	param.NewPermit().TrySeeBlog(param.BlogID).Success(func(any) {
 		content := ctx.PostForm("content")
-		id, err := internal.BLCreateComment(param.BlogID, param.UserID, content)
+		id, err := internal.BlogCreateComment(param.BlogID, param.UserID, content)
 		if err != nil {
 			ctx.ErrorAPI(err)
 		} else {
@@ -29,7 +29,7 @@ type BlogCmntGetParam struct {
 
 func BlogCmntGet(ctx Context, param BlogCmntGetParam) {
 	param.NewPermit().TrySeeBlog(param.BlogID).Success(func(any) {
-		comments, err := internal.BLGetComments(param.BlogID, param.UserID)
+		comments, err := internal.BlogGetComments(param.BlogID, param.UserID)
 		if err != nil {
 			ctx.ErrorAPI(err)
 		} else {
@@ -45,7 +45,7 @@ type BlogCmntDelParam struct {
 
 func BlogCmntDel(ctx Context, param BlogCmntDelParam) {
 	param.NewPermit().TryEditBlogCmnt(param.CmntID).Success(func(any) {
-		err := internal.BLDeleteComment(param.CmntID)
+		err := internal.BlogDeleteComment(param.CmntID)
 		if err != nil {
 			ctx.ErrorAPI(err)
 		}

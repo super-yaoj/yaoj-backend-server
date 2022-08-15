@@ -14,16 +14,16 @@ type Permission struct {
 	Count int    `db:"count" json:"count"`
 }
 
-func PMCreate(name string) (int64, error) {
+func PermCreate(name string) (int64, error) {
 	return db.DBInsertGetId("insert into permissions values (null, ?, 0)", name)
 }
 
-func PMChangeName(id int, name string) error {
+func PermChangeName(id int, name string) error {
 	_, err := db.DBUpdateGetAffected("update permissions set permission_name=? where permission_id=?", name, id)
 	return err
 }
 
-func PMDelete(id int) (int64, error) {
+func PermDelete(id int) (int64, error) {
 	res, err := db.DBUpdateGetAffected("delete from permissions where permission_id=?", id)
 	if err != nil {
 		return res, err
@@ -42,7 +42,7 @@ func PMDelete(id int) (int64, error) {
 	return res, err
 }
 
-func PMQuery(bound, pagesize int, isleft bool) ([]Permission, bool, error) {
+func PermQuery(bound, pagesize int, isleft bool) ([]Permission, bool, error) {
 	pagesize += 1
 	var p []Permission
 	var err error
@@ -65,13 +65,13 @@ func PMQuery(bound, pagesize int, isleft bool) ([]Permission, bool, error) {
 	}
 }
 
-func PMQueryUser(id int) ([]User, error) {
+func PermQueryUser(id int) ([]User, error) {
 	var users []User
 	err := db.DBSelectAll(&users, "select user_info.user_id, user_name, motto, rating from (user_info join user_permissions on user_info.user_id=user_permissions.user_id) where permission_id=?", id)
 	return users, err
 }
 
-func PMAddUser(ids []int, id int) (int64, error) {
+func PermAddUser(ids []int, id int) (int64, error) {
 	query := strings.Builder{}
 	for i, j := range ids {
 		query.WriteString(fmt.Sprintf("(%d,%d)", j, id))
@@ -88,7 +88,7 @@ func PMAddUser(ids []int, id int) (int64, error) {
 	}
 }
 
-func PMDeleteUser(pid, uid int) (int64, error) {
+func PermDeleteUser(pid, uid int) (int64, error) {
 	res, err := db.DBUpdateGetAffected("delete from user_permissions where user_id=? and permission_id=?", uid, pid)
 	if err != nil {
 		return 0, err
@@ -99,7 +99,7 @@ func PMDeleteUser(pid, uid int) (int64, error) {
 	return res, err
 }
 
-func PMExists(permission_id int) bool {
+func PermExists(permission_id int) bool {
 	count, _ := db.DBSelectSingleInt("select count(*) from permissions where permission_id=?", permission_id)
 	return count > 0
 }

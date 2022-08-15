@@ -49,7 +49,7 @@ func UserSignUp(ctx Context, param UserSignUpParam) {
 	}
 	user_id, err := db.DBInsertGetId(
 		"insert into user_info values (null, ?, ?, \"\", 0, ?, ?, ?, 0, \"\", \"\")",
-		param.UserName, password, time.Now(), remember_token, internal.USNormal,
+		param.UserName, password, time.Now(), remember_token, internal.UserNormal,
 	)
 	if err != nil {
 		ctx.JSONAPI(http.StatusBadRequest, "username has been used by others", nil)
@@ -58,7 +58,7 @@ func UserSignUp(ctx Context, param UserSignUpParam) {
 	sess := sessions.Default(ctx.Context)
 	sess.Set("user_id", int(user_id))
 	sess.Set("user_name", param.UserName)
-	sess.Set("user_group", internal.USNormal)
+	sess.Set("user_group", internal.UserNormal)
 	db.DBUpdate("insert into user_permissions values (?, ?)", user_id, config.Global.DefaultGroup)
 	db.DBUpdate("update permissions set count = count + 1 where permission_id=1")
 	sess.Save()
@@ -90,7 +90,7 @@ func UserLogin(ctx Context, param UserLoginParam) {
 		ctx.JSONRPC(http.StatusBadRequest, -32600, "username or password is wrong", nil)
 		return
 	}
-	if user.Usergroup == internal.USBanned {
+	if user.Usergroup == internal.UserBanned {
 		ctx.JSONRPC(http.StatusBadRequest, -32600, "user is banned", nil)
 		return
 	}
@@ -129,7 +129,7 @@ func UserInit(ctx Context, param UserInitParam) {
 	sess := sessions.Default(ctx.Context)
 	ret := func(user internal.UserBase) {
 		fmt.Println(user)
-		if user.Usergroup == internal.USBanned {
+		if user.Usergroup == internal.UserBanned {
 			UserLogout(ctx, UserLogoutParam{})
 			ctx.JSONRPC(http.StatusBadRequest, -32600, "user is banned", nil)
 			return
@@ -144,7 +144,7 @@ func UserInit(ctx Context, param UserInitParam) {
 	}
 
 	tmp, err := ctx.Cookie("user_id")
-	user := internal.UserBase{Id: -1, Name: "", Usergroup: internal.USNormal}
+	user := internal.UserBase{Id: -1, Name: "", Usergroup: internal.UserNormal}
 	if err == nil {
 		id, err := strconv.Atoi(tmp)
 		remember_token, err1 := ctx.Cookie("remember_token")
@@ -174,7 +174,7 @@ type UserGetParam struct {
 }
 
 func UserGet(ctx Context, param UserGetParam) {
-	user, err := internal.USQuery(param.UserID)
+	user, err := internal.UserQuery(param.UserID)
 	user.Password, user.RememberToken = "", ""
 	if err != nil {
 		ctx.ErrorAPI(err)
@@ -215,7 +215,7 @@ func UserEdit(ctx Context, param UserEditParam) {
 		}
 		password = internal.SaltPassword(password)
 		motto, email, organization := param.Motto, param.Email, param.Org
-		err = internal.USModify(password, param.Gender, motto, email, organization, param.UserID)
+		err = internal.Userubmodify(password, param.Gender, motto, email, organization, param.UserID)
 		if err != nil {
 			ctx.ErrorAPI(err)
 			return
@@ -238,7 +238,7 @@ func UserGrpEdit(ctx Context, param UserGrpEditParam) {
 		//users cannot modify others which have permissions higher or equal than himself
 		return target, param.UserGrp > target.Usergroup
 	}).Success(func(a any) {
-		err := internal.USGroupEdit(param.UserID, param.TargetGrp)
+		err := internal.UserGroupEdit(param.UserID, param.TargetGrp)
 		if err != nil {
 			ctx.ErrorAPI(err)
 		}
@@ -254,7 +254,7 @@ type UserListParam struct {
 
 func UserList(ctx Context, param UserListParam) {
 	if param.UserName != nil {
-		users, isfull, err := internal.USListByName(*param.UserName+"%", param.Bound(), *param.PageSize, param.IsLeft())
+		users, isfull, err := internal.UserListByName(*param.UserName+"%", param.Bound(), *param.PageSize, param.IsLeft())
 		if err != nil {
 			ctx.ErrorAPI(err)
 		} else {
@@ -266,7 +266,7 @@ func UserList(ctx Context, param UserListParam) {
 			ctx.JSONAPI(http.StatusBadRequest, "", nil)
 			return
 		}
-		users, isfull, err := internal.USList(*bound_user_id, param.Bound(), *param.PageSize, param.LeftID != nil)
+		users, isfull, err := internal.UserList(*bound_user_id, param.Bound(), *param.PageSize, param.LeftID != nil)
 		if err != nil {
 			ctx.ErrorAPI(err)
 		} else {
@@ -303,7 +303,7 @@ func UserGetPerm(ctx Context, param UserGetPermParam) {
 	param.NewPermit().Try(func() (any, bool) {
 		return nil, param.IsAdmin() || param.PermUserID == param.UserID
 	}).Success(func(a any) {
-		permissions, err := internal.USQueryPermission(param.PermUserID)
+		permissions, err := internal.UserQueryPermission(param.PermUserID)
 		if err != nil {
 			ctx.ErrorAPI(err)
 		} else {

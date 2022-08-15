@@ -61,7 +61,7 @@ func JudgersInit() {
 		log.Fatal(err)
 	}
 	for _, val := range sub {
-		err := SMJudge(val.SubmissionBase, true, val.Uuid)
+		err := SubmJudge(val.SubmissionBase, true, val.Uuid)
 		if err != nil {
 			fmt.Println(err)
 		}
@@ -86,8 +86,8 @@ func judgerStart(judger *Judger) {
 			if !judgeSubmission(sid, uuid, mode, judger) {
 				db.DBUpdate("update submissions set status=? where submission_id=?", InternalError, sid)
 				db.DBUpdate("update submission_details set result=\"\", pretest_result=\"\", extra_result=\"\" where submission_id=?", sid)
-				sub, _ := SMGetBaseInfo(sid)
-				SMUpdate(sid, sub.ProblemId, subm.mode, []byte{})
+				sub, _ := SubmGetBaseInfo(sid)
+				SubmUpdate(sid, sub.ProblemId, subm.mode, []byte{})
 			}
 		} else {
 			judgeCustomTest(sid, subm.callback, judger)
@@ -114,9 +114,9 @@ func judgeSubmission(sid int, uuid int64, mode string, judger *Judger) bool {
 		return true
 	}
 	
-	pro := PRLoad(tinfo.Prob)
-	if !PRHasData(pro, mode) {
-		go SMUpdate(sid, tinfo.Prob, mode, []byte{})
+	pro := ProbLoad(tinfo.Prob)
+	if !ProbHasData(pro, mode) {
+		go SubmUpdate(sid, tinfo.Prob, mode, []byte{})
 		return true
 	}
 	var content []byte
@@ -149,7 +149,7 @@ func judgeSubmission(sid int, uuid int64, mode string, judger *Judger) bool {
 			break
 		} else if jr.Err_code == 1 {
 			ProblemRWLock.RLock(tinfo.Prob)
-			file, err := os.Open(PRGetDataZip(tinfo.Prob))
+			file, err := os.Open(ProbGetDataZip(tinfo.Prob))
 			res, err1 = http.Post(judger.url+"/sync?"+getQuery(map[string]string{"sum": check_sum}), "binary", file)
 			ProblemRWLock.RUnlock(tinfo.Prob)
 			if err != nil || err1 != nil {
@@ -177,7 +177,7 @@ func judgeSubmission(sid int, uuid int64, mode string, judger *Judger) bool {
 	if tinfo.Uuid == uuid {
 		//Update status if and only if this is the recent submission
 		go func() {
-			err := SMUpdate(sid, tinfo.Prob, mode, ret)
+			err := SubmUpdate(sid, tinfo.Prob, mode, ret)
 			if err != nil {
 				fmt.Printf("%v\n", err)
 			}
