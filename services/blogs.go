@@ -12,7 +12,7 @@ type BlogCreateParam struct {
 	Content string `body:"content"`
 }
 
-func BlogCreate(ctx Context, param BlogCreateParam) {
+func BlogCreate(ctx *Context, param BlogCreateParam) {
 	param.NewPermit().AsNormalUser().Success(func(any) {
 		id, err := internal.BlogCreate(param.UserID, param.Private, param.Title, param.Content)
 		if err != nil {
@@ -31,7 +31,7 @@ type BlogEditParam struct {
 	Content string `body:"content"`
 }
 
-func BlogEdit(ctx Context, param BlogEditParam) {
+func BlogEdit(ctx *Context, param BlogEditParam) {
 	param.NewPermit().TryEditBlog(param.BlogID).Success(func(any) {
 		err := internal.BlogEdit(param.BlogID, param.Private, param.Title, param.Content)
 		if err != nil {
@@ -45,7 +45,7 @@ type BlogDelParam struct {
 	BlogID int `query:"blog_id" validate:"required,blogid"`
 }
 
-func BlogDel(ctx Context, param BlogDelParam) {
+func BlogDel(ctx *Context, param BlogDelParam) {
 	param.NewPermit().TryEditBlog(param.BlogID).Success(func(any) {
 		err := internal.BlogDelete(param.BlogID)
 		if err != nil {
@@ -59,7 +59,7 @@ type BlogGetParam struct {
 	BlogID int `query:"blog_id" validate:"required,blogid"`
 }
 
-func BlogGet(ctx Context, param BlogGetParam) {
+func BlogGet(ctx *Context, param BlogGetParam) {
 	param.NewPermit().TrySeeBlog(param.BlogID).Success(func(any) {
 		blog, err := internal.BlogQuery(param.BlogID, param.UserID)
 		if err != nil {
@@ -76,7 +76,7 @@ type BlogListParam struct {
 	BlogUserID *int `query:"user_id" validate:"userid"`
 }
 
-func BlogList(ctx Context, param BlogListParam) {
+func BlogList(ctx *Context, param BlogListParam) {
 	if param.BlogUserID != nil {
 		blogs, err := internal.BlogListUser(*param.BlogUserID, param.UserID)
 		if err != nil {

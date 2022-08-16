@@ -23,7 +23,7 @@ type SubmListParam struct {
 	Submtter int `query:"submitter"`
 }
 
-func SubmList(ctx Context, param SubmListParam) {
+func SubmList(ctx *Context, param SubmListParam) {
 	submissions, isfull, err := internal.SubmList(
 		param.Bound(), *param.PageSize, param.UserID, param.Submtter, param.ProbID, param.CtstID,
 		param.IsLeft(), param.IsAdmin(),
@@ -51,7 +51,7 @@ type SubmAddParam struct {
 
 // users can submit from a contest if and only if the contest is running and
 // he takes part in the contest (only these submissions are contest submissions)
-func SubmAdd(ctx Context, param SubmAddParam) {
+func SubmAdd(ctx *Context, param SubmAddParam) {
 	param.NewPermit().AsNormalUser().TrySeeProb(param.ProbID, param.CtstID).Success(func(a any) {
 		ctstid := a.(int)
 		pro := internal.ProbLoad(param.ProbID)
@@ -82,7 +82,7 @@ func SubmAdd(ctx Context, param SubmAddParam) {
 }
 
 // When the submitted file is a zip file
-func parseZipFile(ctx Context, field string, config internal.SubmConfig) (problem.Submission, map[string]internal.ContentPreview, utils.LangTag, int) {
+func parseZipFile(ctx *Context, field string, config internal.SubmConfig) (problem.Submission, map[string]internal.ContentPreview, utils.LangTag, int) {
 	file, header, err := ctx.Request.FormFile(field)
 	if err != nil {
 		return nil, nil, 0, 0
@@ -136,7 +136,7 @@ func parseZipFile(ctx Context, field string, config internal.SubmConfig) (proble
 /*
 When user submits files one by one
 */
-func parseMultiFiles(ctx Context, config internal.SubmConfig) (problem.Submission, map[string]internal.ContentPreview, utils.LangTag, int) {
+func parseMultiFiles(ctx *Context, config internal.SubmConfig) (problem.Submission, map[string]internal.ContentPreview, utils.LangTag, int) {
 	sub := make(problem.Submission)
 	preview := make(map[string]internal.ContentPreview)
 	language := -1
@@ -218,7 +218,7 @@ type SubmGetParam struct {
 
 // Query single submission, when user is in contests which score_private=true
 // (i.e. cannot see full result), this function will delete extra information.
-func SubmGet(ctx Context, param SubmGetParam) {
+func SubmGet(ctx *Context, param SubmGetParam) {
 	param.NewPermit().TrySeeSubm(param.SubmID).Success(func(a any) {
 		psubm := a.(PermitSubm)
 		//user cannot see submission details inside contests
@@ -238,7 +238,7 @@ type SubmCustomParam struct {
 	Auth
 }
 
-func SubmCustom(ctx Context, param SubmCustomParam) {
+func SubmCustom(ctx *Context, param SubmCustomParam) {
 	param.NewPermit().AsNormalUser().Success(func(any) {
 		config := internal.SubmConfig{
 			"source": {Langs: nil, Accepted: utils.Csource, Length: 64 * 1024},
@@ -267,7 +267,7 @@ type SubmDelParam struct {
 	SubmID int `query:"submission_id" validate:"required,submid"`
 }
 
-func SubmDel(ctx Context, param SubmDelParam) {
+func SubmDel(ctx *Context, param SubmDelParam) {
 	param.NewPermit().TryEditSubm(param.SubmID).Success(func(a any) {
 		sub := a.(internal.SubmissionBase)
 		err := internal.SubmDelete(sub)
@@ -283,7 +283,7 @@ type RejudgeParam struct {
 	Auth
 }
 
-func Rejudge(ctx Context, param RejudgeParam) {
+func Rejudge(ctx *Context, param RejudgeParam) {
 	if param.ProbID != nil {
 		param.NewPermit().TryEditProb(*param.ProbID).Success(func(a any) {
 			err := internal.ProbRejudge(*param.ProbID)

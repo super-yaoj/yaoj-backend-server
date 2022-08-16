@@ -139,12 +139,12 @@ func (p *Permit) Fail(callback func()) {
 	})
 }
 
-func (p *Permit) FailAPIStatusForbidden(ctx Context) {
+func (p *Permit) FailAPIStatusForbidden(ctx *Context) {
 	p.Fail(func() {
 		ctx.JSONAPI(http.StatusForbidden, "", nil)
 	})
 }
-func (p *Permit) FailRPCStatusForbidden(ctx Context) {
+func (p *Permit) FailRPCStatusForbidden(ctx *Context) {
 	p.Fail(func() {
 		ctx.JSONRPC(http.StatusForbidden, -32600, "", nil)
 	})

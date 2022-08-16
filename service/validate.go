@@ -72,8 +72,8 @@ func (r *validatorx) Struct(o any) error {
 	})
 }
 
-func NewValidator() validatorx {
-	val := validatorx{vals: map[string]CheckerFunc{}}
+func NewValidator() *validatorx {
+	val := &validatorx{vals: map[string]CheckerFunc{}}
 	// 自带的 checker
 	val.RegisterValidation("gte", func(fv FieldValue) error {
 		limit, err := strconv.Atoi(fv.Param)
@@ -134,4 +134,10 @@ func NewValidator() validatorx {
 		return nil
 	})
 	return val
+}
+
+type ValFailedErr string
+
+func (r ValFailedErr) Error() string {
+	return fmt.Sprint("validation failed: ", string(r))
 }

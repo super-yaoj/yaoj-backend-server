@@ -33,7 +33,7 @@ type UserSignUpParam struct {
 	VerifyCode string `body:"verify_code"`
 }
 
-func UserSignUp(ctx Context, param UserSignUpParam) {
+func UserSignUp(ctx *Context, param UserSignUpParam) {
 	if err := validSign(param.UserName, param.Passwd); err != nil {
 		ctx.JSONRPC(http.StatusBadRequest, -32600, err.Error(), nil)
 		return
@@ -75,7 +75,7 @@ type UserLoginParam struct {
 	Memo     string `body:"remember"`
 }
 
-func UserLogin(ctx Context, param UserLoginParam) {
+func UserLogin(ctx *Context, param UserLoginParam) {
 	if err := validSign(param.UserName, param.Passwd); err != nil {
 		ctx.JSONRPC(http.StatusBadRequest, -32600, err.Error(), nil)
 		return
@@ -111,7 +111,7 @@ func UserLogin(ctx Context, param UserLoginParam) {
 type UserLogoutParam struct {
 }
 
-func UserLogout(ctx Context, param UserLogoutParam) {
+func UserLogout(ctx *Context, param UserLogoutParam) {
 	ctx.DeleteCookie("user_id")
 	ctx.DeleteCookie("remember_token")
 	sess := sessions.Default(ctx.Context)
@@ -125,7 +125,7 @@ func UserLogout(ctx Context, param UserLogoutParam) {
 type UserInitParam struct {
 }
 
-func UserInit(ctx Context, param UserInitParam) {
+func UserInit(ctx *Context, param UserInitParam) {
 	sess := sessions.Default(ctx.Context)
 	ret := func(user internal.UserMeta) {
 		fmt.Println(user)
@@ -173,7 +173,7 @@ type UserGetParam struct {
 	UserID int `query:"user_id" validate:"required,userid"`
 }
 
-func UserGet(ctx Context, param UserGetParam) {
+func UserGet(ctx *Context, param UserGetParam) {
 	user, err := internal.UserQuery(param.UserID)
 	user.Password, user.RememberToken = "", ""
 	if err != nil {
@@ -194,7 +194,7 @@ type UserEditParam struct {
 	Org       string `body:"organization" validate:"lte=350"`
 }
 
-func UserEdit(ctx Context, param UserEditParam) {
+func UserEdit(ctx *Context, param UserEditParam) {
 	param.NewPermit().Try(func() (any, bool) {
 		//only user himself can modify profiles
 		return nil, param.TargetID == param.UserID
@@ -229,7 +229,7 @@ type UserGrpEditParam struct {
 	TargetGrp int `body:"user_group" validate:"required"`
 }
 
-func UserGrpEdit(ctx Context, param UserGrpEditParam) {
+func UserGrpEdit(ctx *Context, param UserGrpEditParam) {
 	param.NewPermit().AsAdmin().Try(func() (any, bool) {
 		//user cannot modify others' permissions which are higher or equal than himself
 		return nil, param.UserGrp > param.TargetGrp
@@ -252,7 +252,7 @@ type UserListParam struct {
 	RightID  *int `query:"right_user_id"`
 }
 
-func UserList(ctx Context, param UserListParam) {
+func UserList(ctx *Context, param UserListParam) {
 	if param.UserName != nil {
 		users, isfull, err := internal.UserListByName(*param.UserName+"%", param.Bound(), *param.PageSize, param.IsLeft())
 		if err != nil {
@@ -279,7 +279,7 @@ type UserRatingParam struct {
 	UserId int `query:"user_id" validate:"required,userid"`
 }
 
-func UserRating(ctx Context, param UserRatingParam) {
+func UserRating(ctx *Context, param UserRatingParam) {
 	var ratings []struct {
 		Rating    int       `db:"rating" json:"rating"`
 		ContestId int       `db:"contest_id" json:"contest_id"`
@@ -299,7 +299,7 @@ type UserGetPermParam struct {
 	PermUserID int `query:"user_id" validate:"required,userid"`
 }
 
-func UserGetPerm(ctx Context, param UserGetPermParam) {
+func UserGetPerm(ctx *Context, param UserGetPermParam) {
 	param.NewPermit().Try(func() (any, bool) {
 		return nil, param.IsAdmin() || param.PermUserID == param.UserID
 	}).Success(func(a any) {

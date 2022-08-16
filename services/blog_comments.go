@@ -10,7 +10,7 @@ type BlogCmntCreateParam struct {
 	BlogID int `body:"blog_id" validate:"required,blogid"`
 }
 
-func BlogCmntCreate(ctx Context, param BlogCmntCreateParam) {
+func BlogCmntCreate(ctx *Context, param BlogCmntCreateParam) {
 	param.NewPermit().TrySeeBlog(param.BlogID).Success(func(any) {
 		content := ctx.PostForm("content")
 		id, err := internal.BlogCreateComment(param.BlogID, param.UserID, content)
@@ -27,7 +27,7 @@ type BlogCmntGetParam struct {
 	BlogID int `query:"blog_id" validate:"required,blogid"`
 }
 
-func BlogCmntGet(ctx Context, param BlogCmntGetParam) {
+func BlogCmntGet(ctx *Context, param BlogCmntGetParam) {
 	param.NewPermit().TrySeeBlog(param.BlogID).Success(func(any) {
 		comments, err := internal.BlogGetComments(param.BlogID, param.UserID)
 		if err != nil {
@@ -43,7 +43,7 @@ type BlogCmntDelParam struct {
 	CmntID int `query:"comment_id" validate:"required,cmntid"`
 }
 
-func BlogCmntDel(ctx Context, param BlogCmntDelParam) {
+func BlogCmntDel(ctx *Context, param BlogCmntDelParam) {
 	param.NewPermit().TryEditBlogCmnt(param.CmntID).Success(func(any) {
 		err := internal.BlogDeleteComment(param.CmntID)
 		if err != nil {

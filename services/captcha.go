@@ -11,7 +11,7 @@ type CaptchaPostParam struct {
 	Length int `body:"length"`
 }
 
-func CaptchaPost(ctx Context, param CaptchaPostParam) {
+func CaptchaPost(ctx *Context, param CaptchaPostParam) {
 	// default value
 	if param.Length == 0 {
 		param.Length = 4
@@ -31,7 +31,7 @@ type CaptchaGetParam struct {
 	Height int    `query:"height"`
 }
 
-func CaptchaGet(ctx Context, param CaptchaGetParam) {
+func CaptchaGet(ctx *Context, param CaptchaGetParam) {
 	if param.Width == 0 {
 		param.Width = 95
 	}
@@ -53,7 +53,7 @@ type CaptchaReloadParam struct {
 	ID string `body:"id"`
 }
 
-func CaptchaReload(ctx Context, param CaptchaReloadParam) {
+func CaptchaReload(ctx *Context, param CaptchaReloadParam) {
 	if captcha.Reload(param.ID) {
 		ctx.JSONAPI(http.StatusOK, "", nil)
 	} else {

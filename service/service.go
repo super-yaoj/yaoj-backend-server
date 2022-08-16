@@ -6,18 +6,65 @@ import (
 	"net/http"
 
 	"yao/config"
-	"yao/internal"
 	"yao/service/bind"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gocraft/dbr/v2"
 )
+
+type Server struct {
+	*gin.Engine
+	db *dbr.Connection
+}
+
+// map[method]handlerfunc
+type RestApi map[string]GenHandlerFunc
+
+// register rest api
+func (r *Server) RestApi(name string, api RestApi) {
+	r.OPTIONS(name, func(ctx *gin.Context) {
+		ctx.Header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,PATCH,OPTIONS")
+		ctx.Header("Access-Control-Allow-Headers", "Content-Type, Accept, Authorization")
+		ctx.Status(204)
+	})
+
+	for method, handler := range api {
+		switch method {
+		case "GET":
+			r.GET(name, r.GinHandler(handler))
+		case "POST":
+			r.POST(name, r.GinHandler(handler))
+		case "PATCH":
+			r.PATCH(name, r.GinHandler(handler))
+		case "PUT":
+			r.PUT(name, r.GinHandler(handler))
+		case "DELETE":
+			r.DELETE(name, r.GinHandler(handler))
+		default:
+			panic("unknown method: " + method)
+		}
+	}
+}
+
+func NewServer(db *dbr.Connection) *Server {
+	return &Server{
+		Engine: gin.Default(),
+		db:     db,
+	}
+}
 
 type Context struct {
 	*gin.Context
+	// create a session for each business unit of execution (e.g. a web request or goworkers job)
+	sess *dbr.Session
+}
+
+func (ctx *Context) DB() *dbr.Session {
+	return ctx.sess
 }
 
 // APIWriteBack
-func (ctx Context) JSONAPI(statusCode int, errorMessage string, data map[string]any) {
+func (ctx *Context) JSONAPI(statusCode int, errorMessage string, data map[string]any) {
 	// log.Printf("[api] code=%d, msg=%q", statusCode, errorMessage)
 	if data == nil {
 		data = map[string]any{}
@@ -27,7 +74,7 @@ func (ctx Context) JSONAPI(statusCode int, errorMessage string, data map[string]
 }
 
 // RPCWriteBack
-func (ctx Context) JSONRPC(statusCode int, errorCode int, errorMessage string, data map[string]any) {
+func (ctx *Context) JSONRPC(statusCode int, errorCode int, errorMessage string, data map[string]any) {
 	if data == nil {
 		data = map[string]any{}
 	}
@@ -36,20 +83,20 @@ func (ctx Context) JSONRPC(statusCode int, errorCode int, errorMessage string, d
 }
 
 // APIInternalError
-func (ctx Context) ErrorAPI(err error) {
+func (ctx *Context) ErrorAPI(err error) {
 	ctx.JSON(500, map[string]any{"_error": err.Error()})
 }
 
 // RPCInternalError
-func (ctx Context) ErrorRPC(err error) {
+func (ctx *Context) ErrorRPC(err error) {
 	ctx.JSON(500, map[string]any{"_error": map[string]any{"code": -32603, "message": err.Error()}})
 }
 
-func (ctx Context) SetCookie(key, value string, security bool) {
+func (ctx *Context) SetCookie(key, value string, security bool) {
 	ctx.Context.SetCookie(key, value, 86400*365, "/", config.Global.FrontDomain, security, false)
 }
 
-func (ctx Context) DeleteCookie(key string) {
+func (ctx *Context) DeleteCookie(key string) {
 	ctx.Context.SetCookie(key, "", -1, "/", config.Global.FrontDomain, false, false)
 }
 
@@ -78,16 +125,15 @@ func (ctx Context) DeleteCookie(key string) {
 // 对于引用类型，要求不能是 nil。
 // 对于其他值，要求不能是零值。
 // 对于指针要求既不是 nil 也不是零值。
-type StdHandlerFunc[T any] func(ctx Context, param T)
+type HandlerFunc[T any] func(ctx *Context, param T)
 
-var defaultValidator = NewValidator()
+type GenHandlerFunc func(ctx *Context)
 
-// 将标准化的 API handler 转化为 gin handler
-// route string, method string,
-func GinHandler[T any](handler StdHandlerFunc[T]) gin.HandlerFunc {
-	return func(ctx *gin.Context) {
+// 将泛型的 API handler 转化为不带泛型的 service handler
+func GeneralHandler[T any](handler HandlerFunc[T]) GenHandlerFunc {
+	return func(ctx *Context) {
 		var data T
-		err := bind.Bind(ctx, &data)
+		err := bind.Bind(ctx.Context, &data)
 		if err != nil {
 			ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			log.Printf("[bind]: %s", err)
@@ -106,7 +152,20 @@ func GinHandler[T any](handler StdHandlerFunc[T]) gin.HandlerFunc {
 			log.Printf("[validate]: %s", err)
 			return
 		}
-		handler(Context{Context: ctx}, data)
+		handler(ctx, data)
+	}
+}
+
+var defaultValidator = NewServiceValidator()
+
+// 将不带泛型的 API handler 转化为 gin handler
+// route string, method string,
+func (r *Server) GinHandler(handler GenHandlerFunc) gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		handler(&Context{
+			Context: ctx,
+			sess:    r.db.NewSession(nil),
+		})
 	}
 }
 
@@ -115,99 +174,4 @@ type HttpStatErr int
 
 func (r HttpStatErr) Error() string {
 	return fmt.Sprint("http status code: ", int(r))
-}
-
-type ValFailedErr string
-
-func (r ValFailedErr) Error() string {
-	return fmt.Sprint("validation failed: ", string(r))
-}
-
-func init() {
-	// check whether the user_group belongs to admin
-	defaultValidator.RegisterValidation("admin", func(fv FieldValue) error {
-		if !fv.Value.CanInt() {
-			return HttpStatErr(http.StatusBadRequest)
-		}
-		if !internal.IsAdmin(int(fv.Value.Int())) {
-			return HttpStatErr(http.StatusForbidden)
-		}
-		return nil // ok
-	})
-	// check whether the problem id exist in database
-	defaultValidator.RegisterValidation("probid", func(fv FieldValue) error {
-		if !fv.Value.CanInt() {
-			return HttpStatErr(http.StatusBadRequest)
-		}
-		if !internal.ProbExists(int(fv.Value.Int())) {
-			return HttpStatErr(http.StatusNotFound)
-		}
-		return nil
-	})
-	defaultValidator.RegisterValidation("submid", func(fv FieldValue) error {
-		if !fv.Value.CanInt() {
-			return HttpStatErr(http.StatusBadRequest)
-		}
-		if !internal.SubmExists(int(fv.Value.Int())) {
-			return HttpStatErr(http.StatusNotFound)
-		}
-		return nil
-	})
-	defaultValidator.RegisterValidation("ctstid", func(fv FieldValue) error {
-		if !fv.Value.CanInt() {
-			return HttpStatErr(http.StatusBadRequest)
-		}
-		if !internal.CTExists(int(fv.Value.Int())) {
-			return HttpStatErr(http.StatusNotFound)
-		}
-		return nil
-	})
-	defaultValidator.RegisterValidation("prmsid", func(fv FieldValue) error {
-		if !fv.Value.CanInt() {
-			return HttpStatErr(http.StatusBadRequest)
-		}
-		if !internal.PermExists(int(fv.Value.Int())) {
-			return HttpStatErr(http.StatusNotFound)
-		}
-		return nil
-	})
-	defaultValidator.RegisterValidation("userid", func(fv FieldValue) error {
-		if !fv.Value.CanInt() {
-			return HttpStatErr(http.StatusBadRequest)
-		}
-		if !internal.UserExists(int(fv.Value.Int())) {
-			return HttpStatErr(http.StatusNotFound)
-		}
-		return nil
-	})
-	defaultValidator.RegisterValidation("blogid", func(fv FieldValue) error {
-		if !fv.Value.CanInt() {
-			return HttpStatErr(http.StatusBadRequest)
-		}
-		if !internal.BlogExists(int(fv.Value.Int())) {
-			return HttpStatErr(http.StatusNotFound)
-		}
-		return nil
-	})
-	defaultValidator.RegisterValidation("cmntid", func(fv FieldValue) error {
-		if !fv.Value.CanInt() {
-			return HttpStatErr(http.StatusBadRequest)
-		}
-		if !internal.BlogCommentExists(int(fv.Value.Int())) {
-			return HttpStatErr(http.StatusNotFound)
-		}
-		return nil
-	})
-	// authentication
-	defaultValidator.RegisterValidation("pagecanbound", func(fv FieldValue) error {
-		page, ok := fv.Value.Interface().(Page)
-		if !ok {
-			return ValFailedErr("invalid Page struct")
-		}
-		// pp.Print(page, page.CanBound())
-		if !page.CanBound() {
-			return HttpStatErr(http.StatusBadRequest)
-		}
-		return nil
-	})
 }

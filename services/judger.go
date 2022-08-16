@@ -1,7 +1,7 @@
 package services
 
 import (
-	"io/ioutil"
+	"io"
 	"net/http"
 	"yao/internal"
 
@@ -12,13 +12,13 @@ import (
 func FinishJudging(ctx *gin.Context) {
 	var result []byte
 	var err error
-	promise.NewErrorPromise(func () error {
-		result, err = ioutil.ReadAll(ctx.Request.Body)
+	promise.NewErrorPromise(func() error {
+		result, err = io.ReadAll(ctx.Request.Body)
 		return err
 	}).Then(func() error {
 		return internal.FinishJudging(ctx.Query("jid"), result)
 	}).Catch(func(err error) {
-		Context{Context: ctx}.ErrorRPC(err)
+		(&Context{Context: ctx}).ErrorRPC(err)
 	})
 }
 
@@ -26,7 +26,7 @@ type JudgerLogParam struct {
 	Id int `query:"id"`
 }
 
-func JudgerLog(ctx Context, param JudgerLogParam) {
+func JudgerLog(ctx *Context, param JudgerLogParam) {
 	log := internal.JudgerLog(param.Id)
 	ctx.JSONAPI(http.StatusOK, "", map[string]any{"log": log})
 }

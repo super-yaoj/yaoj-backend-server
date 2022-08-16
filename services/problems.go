@@ -21,7 +21,7 @@ type ProbListParam struct {
 	Page `validate:"pagecanbound"`
 }
 
-func ProbList(ctx Context, param ProbListParam) {
+func ProbList(ctx *Context, param ProbListParam) {
 	problems, isfull, err := internal.ProbList(
 		param.Page.Bound(), *param.PageSize, param.UserID, param.IsLeft(), param.IsAdmin(),
 	)
@@ -36,7 +36,7 @@ type ProbAddParam struct {
 	Auth
 }
 
-func ProbAdd(ctx Context, param ProbAddParam) {
+func ProbAdd(ctx *Context, param ProbAddParam) {
 	param.NewPermit().AsAdmin().Success(func(any) {
 		id, err := db.InsertGetId(`insert into problems values (null, "New Problem", 0, "", "")`)
 		if err != nil {
@@ -54,7 +54,7 @@ type ProbGetParam struct {
 	CtstID int `query:"contest_id"`
 }
 
-func ProbGet(ctx Context, param ProbGetParam) {
+func ProbGet(ctx *Context, param ProbGetParam) {
 	param.NewPermit().TrySeeProb(param.ProbID, param.CtstID).Success(func(a any) {
 		ctstid := a.(int)
 		prob, err := internal.ProbQuery(param.ProbID, param.UserID)
@@ -81,7 +81,7 @@ type ProbGetPermParam struct {
 	ProbID int `query:"problem_id" validate:"required,probid"`
 }
 
-func ProbGetPerm(ctx Context, param ProbGetPermParam) {
+func ProbGetPerm(ctx *Context, param ProbGetPermParam) {
 	param.NewPermit().TryEditProb(param.ProbID).Success(func(any) {
 		pers, err := internal.ProbGetPermissions(param.ProbID)
 		if err != nil {
@@ -98,7 +98,7 @@ type ProbAddPermParam struct {
 	PermID int `body:"permission_id" validate:"required,prmsid"`
 }
 
-func ProbAddPerm(ctx Context, param ProbAddPermParam) {
+func ProbAddPerm(ctx *Context, param ProbAddPermParam) {
 	param.NewPermit().TryEditProb(param.ProbID).Success(func(any) {
 		err := internal.ProbAddPermission(param.ProbID, param.PermID)
 		if err != nil {
@@ -113,7 +113,7 @@ type ProbDelPermParam struct {
 	PermID int `query:"permission_id" validate:"required,prmsid"`
 }
 
-func ProbDelPerm(ctx Context, param ProbDelPermParam) {
+func ProbDelPerm(ctx *Context, param ProbDelPermParam) {
 	param.NewPermit().TryEditProb(param.ProbID).Success(func(any) {
 		err := internal.ProbDeletePermission(param.ProbID, param.PermID)
 		if err != nil {
@@ -127,7 +127,7 @@ type ProbGetMgrParam struct {
 	ProbID int `query:"problem_id" validate:"required,probid"`
 }
 
-func ProbGetMgr(ctx Context, param ProbGetMgrParam) {
+func ProbGetMgr(ctx *Context, param ProbGetMgrParam) {
 	param.NewPermit().TryEditProb(param.ProbID).Success(func(any) {
 		users, err := internal.ProbGetManagers(param.ProbID)
 		if err != nil {
@@ -144,7 +144,7 @@ type ProbAddMgrParam struct {
 	MgrUserID int `body:"user_id" validate:"required,userid"`
 }
 
-func ProbAddMgr(ctx Context, param ProbAddMgrParam) {
+func ProbAddMgr(ctx *Context, param ProbAddMgrParam) {
 	param.NewPermit().TryEditProb(param.ProbID).Success(func(any) {
 		err := internal.ProbAddPermission(param.ProbID, -param.MgrUserID)
 		if err != nil {
@@ -159,7 +159,7 @@ type ProbDelMgrParam struct {
 	MgrUserID int `query:"user_id" validate:"required,userid"`
 }
 
-func ProbDelMgr(ctx Context, param ProbDelMgrParam) {
+func ProbDelMgr(ctx *Context, param ProbDelMgrParam) {
 	param.NewPermit().TryEditProb(param.ProbID).Success(func(any) {
 		err := internal.ProbDeletePermission(param.ProbID, -param.MgrUserID)
 		if err != nil {
@@ -174,7 +174,7 @@ type ProbPutDataParam struct {
 	Data   *multipart.FileHeader `body:"data" validate:"required"`
 }
 
-func ProbPutData(ctx Context, param ProbPutDataParam) {
+func ProbPutData(ctx *Context, param ProbPutDataParam) {
 	param.NewPermit().TryEditProb(param.ProbID).Success(func(any) {
 		ext := path.Ext(param.Data.Filename)
 		if ext != ".zip" {
@@ -203,7 +203,7 @@ type ProbDownDataParam struct {
 	DataType string `query:"type" validate:"required"`
 }
 
-func ProbDownData(ctx Context, param ProbDownDataParam) {
+func ProbDownData(ctx *Context, param ProbDownDataParam) {
 	internal.ProblemRWLock.RLock(param.ProbID)
 	defer internal.ProblemRWLock.RUnlock(param.ProbID)
 	if param.DataType == "data" {
@@ -236,7 +236,7 @@ type ProbEditParam struct {
 	AllowDown string `body:"allow_down"`
 }
 
-func ProbEdit(ctx Context, param ProbEditParam) {
+func ProbEdit(ctx *Context, param ProbEditParam) {
 	param.NewPermit().TryEditProb(param.ProbID).Success(func(any) {
 		if strings.TrimSpace(param.Title) == "" {
 			ctx.JSONAPI(http.StatusBadRequest, "title cannot be blank", nil)
@@ -284,7 +284,7 @@ type ProbStatisticParam struct {
 	RightId *int   `query:"right_id"`
 }
 
-func ProbStatistic(ctx Context, param ProbStatisticParam) {
+func ProbStatistic(ctx *Context, param ProbStatisticParam) {
 	//Users can see statistics if and only if they are out of contest
 	param.NewPermit().TrySeeProb(param.ProbID, 0).Success(func(any) {
 		subs, isfull := []int{}, false

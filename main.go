@@ -8,6 +8,7 @@ import (
 	config "yao/config"
 	"yao/db"
 	"yao/internal"
+	"yao/service"
 	"yao/services"
 
 	"github.com/dchest/captcha"
@@ -17,20 +18,20 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func process(f func(*gin.Context)) func(*gin.Context) {
-	return func(ctx *gin.Context) {
-		ctx.Header("Access-Control-Allow-Origin", config.Global.FrontDomain)
-		ctx.Header("Access-Control-Allow-Credentials", "true")
-		if ctx.Request.Method == "OPTIONS" {
-			ctx.Header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,PATCH,OPTIONS")
-			ctx.Header("Access-Control-Allow-Headers", "Content-Type, Accept, Authorization")
-			ctx.Status(204)
-			return
-		}
-		sessions.Default(ctx).Options(sessions.Options{MaxAge: 0})
-		f(ctx)
-	}
-}
+// func process(f func(*gin.Context)) func(*gin.Context) {
+// 	return func(ctx *gin.Context) {
+// 		ctx.Header("Access-Control-Allow-Origin", config.Global.FrontDomain)
+// 		ctx.Header("Access-Control-Allow-Credentials", "true")
+// 		if ctx.Request.Method == "OPTIONS" {
+// 			ctx.Header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,PATCH,OPTIONS")
+// 			ctx.Header("Access-Control-Allow-Headers", "Content-Type, Accept, Authorization")
+// 			ctx.Status(204)
+// 			return
+// 		}
+// 		sessions.Default(ctx).Options(sessions.Options{MaxAge: 0})
+// 		f(ctx)
+// 	}
+// }
 
 func main() {
 	// parse config
@@ -54,29 +55,31 @@ func main() {
 	}
 	defer db.Close()
 	go internal.JudgersInit()
+	captcha.SetCustomStore(captcha.NewMemoryStore(1024, 10*time.Minute))
 
 	// server init
-	app := gin.Default()
+	db, err := db.NewDBR("mysql", config.Global.DataSource)
+	if err != nil {
+		log.Fatal(err)
+	}
+	app := service.NewServer(db)
 	app.Use(sessions.Sessions("sessionId", cookie.NewStore([]byte("3.1y4a1o5j9"))))
-	//FinishJuding rpc dooesn't need process function
+	// FinishJuding rpc dooesn't need process function
 	app.POST("/FinishJudging", services.FinishJudging)
-	captcha.SetCustomStore(captcha.NewMemoryStore(1024, 10*time.Minute))
-	for url, value := range services.Router {
-		app.OPTIONS(url, process(func(ctx *gin.Context) {}))
-		for _, req := range value {
-			switch req.Method {
-			case "GET":
-				app.GET(url, process(req.Function))
-			case "POST":
-				app.POST(url, process(req.Function))
-			case "PATCH":
-				app.PATCH(url, process(req.Function))
-			case "PUT":
-				app.PUT(url, process(req.Function))
-			case "DELETE":
-				app.DELETE(url, process(req.Function))
-			}
+
+	app.Use(func(ctx *gin.Context) {
+		ctx.Header("Access-Control-Allow-Origin", config.Global.FrontDomain)
+		ctx.Header("Access-Control-Allow-Credentials", "true")
+
+		if ctx.Request.Method != "OPTIONS" {
+			sessions.Default(ctx).Options(sessions.Options{MaxAge: 0})
 		}
+
+		ctx.Next()
+	})
+
+	for url, value := range services.Router {
+		app.RestApi(url, value)
 	}
 	app.Run(config.Global.Listen)
 }

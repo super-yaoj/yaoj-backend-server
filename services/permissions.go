@@ -18,7 +18,7 @@ type PermCreateParam struct {
 	PermName string `body:"permission_name" validate:"lte=190"`
 }
 
-func PermCreate(ctx Context, param PermCreateParam) {
+func PermCreate(ctx *Context, param PermCreateParam) {
 	param.NewPermit().AsAdmin().Success(func(a any) {
 		id, err := internal.PermCreate(param.PermName)
 		if err != nil {
@@ -35,7 +35,7 @@ type PermRenameParam struct {
 	PermName string `body:"permission_name" validate:"lte=190"`
 }
 
-func PermRename(ctx Context, param PermRenameParam) {
+func PermRename(ctx *Context, param PermRenameParam) {
 	param.NewPermit().AsAdmin().Success(func(a any) {
 		err := internal.PermChangeName(param.PermID, param.PermName)
 		if err != nil {
@@ -49,7 +49,7 @@ type PermDelParam struct {
 	PermID int `query:"permission_id" validate:"required,prmsid"`
 }
 
-func PermDel(ctx Context, param PermDelParam) {
+func PermDel(ctx *Context, param PermDelParam) {
 	param.NewPermit().AsAdmin().Success(func(a any) {
 		if param.PermID == config.Global.DefaultGroup {
 			ctx.JSONAPI(http.StatusBadRequest, "you cannot modify the default group", nil)
@@ -67,7 +67,7 @@ type PermGetParam struct {
 	Page `validate:"pagecanbound"`
 }
 
-func PermGet(ctx Context, param PermGetParam) {
+func PermGet(ctx *Context, param PermGetParam) {
 	param.NewPermit().AsAdmin().Success(func(a any) {
 		p, isfull, err := internal.PermQuery(param.Bound(), *param.PageSize, param.IsLeft())
 		if err != nil {
@@ -83,7 +83,7 @@ type PermGetUserParam struct {
 	PermID int `query:"permission_id" validate:"required,prmsid"`
 }
 
-func PermGetUser(ctx Context, param PermGetUserParam) {
+func PermGetUser(ctx *Context, param PermGetUserParam) {
 	param.NewPermit().AsAdmin().Success(func(a any) {
 		users, err := internal.PermQueryUser(param.PermID)
 		if err != nil {
@@ -100,7 +100,7 @@ type PermAddUserParam struct {
 	UserIDs string `body:"user_ids"`
 }
 
-func PermAddUser(ctx Context, param PermAddUserParam) {
+func PermAddUser(ctx *Context, param PermAddUserParam) {
 	param.NewPermit().AsAdmin().Success(func(a any) {
 		user_ids := strings.Split(param.UserIDs, ",")
 		if len(user_ids) == 0 {
@@ -156,7 +156,7 @@ type PermDelUserParam struct {
 	UserID int `query:"user_id" validate:"required,userid"`
 }
 
-func PermDelUser(ctx Context, param PermDelUserParam) {
+func PermDelUser(ctx *Context, param PermDelUserParam) {
 	param.NewPermit().AsAdmin().Success(func(a any) {
 		if param.PermID == config.Global.DefaultGroup {
 			ctx.JSONAPI(http.StatusBadRequest, "you cannot modify the default group", nil)
