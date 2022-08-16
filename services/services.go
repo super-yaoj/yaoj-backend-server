@@ -1,13 +1,13 @@
 package services
 
-import "yao/service"
+import "yao/server"
 
 type (
-	Context = service.Context
-	
-	Auth = service.Auth
-	PermitCtst = service.PermitCtst
-	PermitSubm = service.PermitSubm
-	
-	Page = service.Page
+	Context = server.Context
+
+	Auth       = server.Auth
+	PermitCtst = server.PermitCtst
+	PermitSubm = server.PermitSubm
+
+	Page = server.Page
 )

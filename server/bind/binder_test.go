@@ -3,7 +3,7 @@ package bind_test
 import (
 	"reflect"
 	"testing"
-	"yao/service/bind"
+	"yao/server/bind"
 )
 
 func TestFormBinder(t *testing.T) {

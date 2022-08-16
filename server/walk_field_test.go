@@ -1,9 +1,9 @@
-package service_test
+package server_test
 
 import (
 	"reflect"
 	"testing"
-	"yao/service"
+	"yao/server"
 )
 
 func TestWalkStructField(t *testing.T) {
@@ -14,7 +14,7 @@ func TestWalkStructField(t *testing.T) {
 		}
 	}
 
-	err := service.WalkStructField(Obj{}, func(val reflect.Value, field reflect.StructField) error {
+	err := server.WalkStructField(Obj{}, func(val reflect.Value, field reflect.StructField) error {
 		t.Logf("field: %s", field.Name)
 		return nil
 	})

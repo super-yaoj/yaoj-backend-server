@@ -1,4 +1,4 @@
-package service
+package server
 
 import (
 	"fmt"
@@ -6,7 +6,7 @@ import (
 	"net/http"
 
 	"yao/config"
-	"yao/service/bind"
+	"yao/server/bind"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gocraft/dbr/v2"
@@ -106,6 +106,7 @@ func (ctx *Context) DeleteCookie(key string) {
 //
 // 对于 body，会自动根据 ContentType 来解析字段，目前已支持：
 //
+//	application/json
 //	application/x-www-form-urlencoded
 //	multipart/form-data
 //

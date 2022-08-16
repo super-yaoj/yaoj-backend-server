@@ -3,10 +3,10 @@ package services
 import (
 	"net/http"
 	"time"
-	"yao/service"
+	"yao/server"
 )
 
-type RestApi = service.RestApi
+type RestApi = server.RestApi
 
 /*
 The router table for yaoj back-end server
@@ -14,126 +14,126 @@ The router table for yaoj back-end server
 urls with first letter upper are rpcs, others are apis.
 */
 var Router = map[string]RestApi{
-	"/GetTime":       {"POST": service.GeneralHandler(GetTime)},
-	"/Init":          {"POST": service.GeneralHandler(UserInit)},
-	"/UserLogin":     {"POST": service.GeneralHandler(UserLogin)},
-	"/UserLogout":    {"POST": service.GeneralHandler(UserLogout)},
-	"/Rejudge":       {"POST": service.GeneralHandler(Rejudge)},
-	"/FinishContest": {"POST": service.GeneralHandler(CtstFinish)},
-	"/judgerlog":     {"GET": service.GeneralHandler(JudgerLog)},
+	"/GetTime":       {"POST": server.GeneralHandler(GetTime)},
+	"/Init":          {"POST": server.GeneralHandler(UserInit)},
+	"/UserLogin":     {"POST": server.GeneralHandler(UserLogin)},
+	"/UserLogout":    {"POST": server.GeneralHandler(UserLogout)},
+	"/Rejudge":       {"POST": server.GeneralHandler(Rejudge)},
+	"/FinishContest": {"POST": server.GeneralHandler(CtstFinish)},
+	"/judgerlog":     {"GET": server.GeneralHandler(JudgerLog)},
 
 	"/user": {
-		"GET":   service.GeneralHandler(UserGet),
-		"POST":  service.GeneralHandler(UserSignUp),
-		"PUT":   service.GeneralHandler(UserEdit),
-		"PATCH": service.GeneralHandler(UserGrpEdit),
+		"GET":   server.GeneralHandler(UserGet),
+		"POST":  server.GeneralHandler(UserSignUp),
+		"PUT":   server.GeneralHandler(UserEdit),
+		"PATCH": server.GeneralHandler(UserGrpEdit),
 	},
 	"/captcha": {
-		"GET":   service.GeneralHandler(CaptchaGet),
-		"POST":  service.GeneralHandler(CaptchaPost),
-		"PATCH": service.GeneralHandler(CaptchaReload),
+		"GET":   server.GeneralHandler(CaptchaGet),
+		"POST":  server.GeneralHandler(CaptchaPost),
+		"PATCH": server.GeneralHandler(CaptchaReload),
 	},
 	"/permissions": {
-		"GET":    service.GeneralHandler(PermGet),
-		"POST":   service.GeneralHandler(PermCreate),
-		"PATCH":  service.GeneralHandler(PermRename),
-		"DELETE": service.GeneralHandler(PermDel),
+		"GET":    server.GeneralHandler(PermGet),
+		"POST":   server.GeneralHandler(PermCreate),
+		"PATCH":  server.GeneralHandler(PermRename),
+		"DELETE": server.GeneralHandler(PermDel),
 	},
 	"/permission_users": {
-		"GET":    service.GeneralHandler(PermGetUser),
-		"POST":   service.GeneralHandler(PermAddUser),
-		"DELETE": service.GeneralHandler(PermDelUser),
+		"GET":    server.GeneralHandler(PermGetUser),
+		"POST":   server.GeneralHandler(PermAddUser),
+		"DELETE": server.GeneralHandler(PermDelUser),
 	},
 	"/user_permissions": {
-		"GET": service.GeneralHandler(UserGetPerm),
+		"GET": server.GeneralHandler(UserGetPerm),
 	},
-	"/users":   {"GET": service.GeneralHandler(UserList)},
-	"/ratings": {"GET": service.GeneralHandler(UserRating)},
+	"/users":   {"GET": server.GeneralHandler(UserList)},
+	"/ratings": {"GET": server.GeneralHandler(UserRating)},
 
 	"/blog": {
-		"GET":    service.GeneralHandler(BlogGet),
-		"POST":   service.GeneralHandler(BlogCreate),
-		"PUT":    service.GeneralHandler(BlogEdit),
-		"DELETE": service.GeneralHandler(BlogDel),
+		"GET":    server.GeneralHandler(BlogGet),
+		"POST":   server.GeneralHandler(BlogCreate),
+		"PUT":    server.GeneralHandler(BlogEdit),
+		"DELETE": server.GeneralHandler(BlogDel),
 	},
-	"/blogs": {"GET": service.GeneralHandler(BlogList)},
-	"/likes": {"POST": service.GeneralHandler(ClickLike)},
+	"/blogs": {"GET": server.GeneralHandler(BlogList)},
+	"/likes": {"POST": server.GeneralHandler(ClickLike)},
 	"/blog_comments": {
-		"GET":    service.GeneralHandler(BlogCmntGet),
-		"POST":   service.GeneralHandler(BlogCmntCreate),
-		"DELETE": service.GeneralHandler(BlogCmntDel),
+		"GET":    server.GeneralHandler(BlogCmntGet),
+		"POST":   server.GeneralHandler(BlogCmntCreate),
+		"DELETE": server.GeneralHandler(BlogCmntDel),
 	},
 	"/announcements": {
-		"GET":    service.GeneralHandler(AnceGet),
-		"POST":   service.GeneralHandler(AnceCreate),
-		"DELETE": service.GeneralHandler(AnceDel),
+		"GET":    server.GeneralHandler(AnceGet),
+		"POST":   server.GeneralHandler(AnceCreate),
+		"DELETE": server.GeneralHandler(AnceDel),
 	},
 
-	"/problems": {"GET": service.GeneralHandler(ProbList)},
+	"/problems": {"GET": server.GeneralHandler(ProbList)},
 	"/problem": {
-		"GET":   service.GeneralHandler(ProbGet),
-		"POST":  service.GeneralHandler(ProbAdd),
-		"PATCH": service.GeneralHandler(ProbEdit),
+		"GET":   server.GeneralHandler(ProbGet),
+		"POST":  server.GeneralHandler(ProbAdd),
+		"PATCH": server.GeneralHandler(ProbEdit),
 	},
 	"/problem_permissions": {
-		"GET":    service.GeneralHandler(ProbGetPerm),
-		"POST":   service.GeneralHandler(ProbAddPerm),
-		"DELETE": service.GeneralHandler(ProbDelPerm),
+		"GET":    server.GeneralHandler(ProbGetPerm),
+		"POST":   server.GeneralHandler(ProbAddPerm),
+		"DELETE": server.GeneralHandler(ProbDelPerm),
 	},
 	"/problem_managers": {
-		"GET":    service.GeneralHandler(ProbGetMgr),
-		"POST":   service.GeneralHandler(ProbAddMgr),
-		"DELETE": service.GeneralHandler(ProbDelMgr),
+		"GET":    server.GeneralHandler(ProbGetMgr),
+		"POST":   server.GeneralHandler(ProbAddMgr),
+		"DELETE": server.GeneralHandler(ProbDelMgr),
 	},
 	"/problem_data": {
-		"GET": service.GeneralHandler(ProbDownData),
-		"PUT": service.GeneralHandler(ProbPutData),
+		"GET": server.GeneralHandler(ProbDownData),
+		"PUT": server.GeneralHandler(ProbPutData),
 	},
 	"/problem_statistic": {
-		"GET": service.GeneralHandler(ProbStatistic),
+		"GET": server.GeneralHandler(ProbStatistic),
 	},
 
-	"/contests": {"GET": service.GeneralHandler(CtstList)},
+	"/contests": {"GET": server.GeneralHandler(CtstList)},
 	"/contest": {
-		"GET":   service.GeneralHandler(CtstGet),
-		"POST":  service.GeneralHandler(CtstCreate),
-		"PATCH": service.GeneralHandler(CtstEdit),
+		"GET":   server.GeneralHandler(CtstGet),
+		"POST":  server.GeneralHandler(CtstCreate),
+		"PATCH": server.GeneralHandler(CtstEdit),
 	},
 	"/contest_permissions": {
-		"GET":    service.GeneralHandler(CtstPermGet),
-		"POST":   service.GeneralHandler(CtstPermAdd),
-		"DELETE": service.GeneralHandler(CtstPermDel),
+		"GET":    server.GeneralHandler(CtstPermGet),
+		"POST":   server.GeneralHandler(CtstPermAdd),
+		"DELETE": server.GeneralHandler(CtstPermDel),
 	},
 	"/contest_managers": {
-		"GET":    service.GeneralHandler(CtstMgrGet),
-		"POST":   service.GeneralHandler(CtstMgrAdd),
-		"DELETE": service.GeneralHandler(CtstMgrDel),
+		"GET":    server.GeneralHandler(CtstMgrGet),
+		"POST":   server.GeneralHandler(CtstMgrAdd),
+		"DELETE": server.GeneralHandler(CtstMgrDel),
 	},
 	"/contest_participants": {
-		"GET":    service.GeneralHandler(CtstPtcpGet),
-		"POST":   service.GeneralHandler(CtstSignup),
-		"DELETE": service.GeneralHandler(CtstSignout),
+		"GET":    server.GeneralHandler(CtstPtcpGet),
+		"POST":   server.GeneralHandler(CtstSignup),
+		"DELETE": server.GeneralHandler(CtstSignout),
 	},
 	"/contest_problems": {
-		"GET":    service.GeneralHandler(CtstProbGet),
-		"POST":   service.GeneralHandler(CtstProbAdd),
-		"DELETE": service.GeneralHandler(CtstProbDel),
+		"GET":    server.GeneralHandler(CtstProbGet),
+		"POST":   server.GeneralHandler(CtstProbAdd),
+		"DELETE": server.GeneralHandler(CtstProbDel),
 	},
 	"/contest_standing": {
-		"GET": service.GeneralHandler(CtstStanding),
+		"GET": server.GeneralHandler(CtstStanding),
 	},
 	"/contest_dashboard": {
-		"GET":  service.GeneralHandler(CtstGetDashboard),
-		"POST": service.GeneralHandler(CtstAddDashboard),
+		"GET":  server.GeneralHandler(CtstGetDashboard),
+		"POST": server.GeneralHandler(CtstAddDashboard),
 	},
 
-	"/submissions": {"GET": service.GeneralHandler(SubmList)},
+	"/submissions": {"GET": server.GeneralHandler(SubmList)},
 	"/submission": {
-		"GET":    service.GeneralHandler(SubmGet),
-		"POST":   service.GeneralHandler(SubmAdd),
-		"DELETE": service.GeneralHandler(SubmDel),
+		"GET":    server.GeneralHandler(SubmGet),
+		"POST":   server.GeneralHandler(SubmAdd),
+		"DELETE": server.GeneralHandler(SubmDel),
 	},
-	"/custom_test": {"POST": service.GeneralHandler(SubmCustom)},
+	"/custom_test": {"POST": server.GeneralHandler(SubmCustom)},
 }
 
 type GetTimeParam struct {

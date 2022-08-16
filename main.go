@@ -8,7 +8,7 @@ import (
 	config "yao/config"
 	"yao/db"
 	"yao/internal"
-	"yao/service"
+	"yao/server"
 	"yao/services"
 
 	"github.com/dchest/captcha"
@@ -62,7 +62,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	app := service.NewServer(db)
+	app := server.NewServer(db)
 	app.Use(sessions.Sessions("sessionId", cookie.NewStore([]byte("3.1y4a1o5j9"))))
 	// FinishJuding rpc dooesn't need process function
 	app.POST("/FinishJudging", services.FinishJudging)
