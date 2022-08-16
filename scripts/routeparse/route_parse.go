@@ -201,9 +201,9 @@ var fset = token.NewFileSet()
 
 func main() {
 	// 这里取绝对路径，方便打印出来的语法树可以转跳到编辑器
-	path, _ := filepath.Abs("./services")
+	path, _ := filepath.Abs("./controllers")
 	pkgs, err := parser.ParseDir(fset, path, nil, parser.AllErrors|parser.ParseComments)
-	f := pkgs["services"]
+	f := pkgs["controllers"]
 	if err != nil {
 		log.Println(err)
 		return

@@ -6,10 +6,10 @@ import (
 	"os"
 	"time"
 	config "yao/config"
+	"yao/controllers"
 	"yao/db"
 	"yao/internal"
 	"yao/server"
-	"yao/services"
 
 	"github.com/dchest/captcha"
 	"github.com/gin-contrib/sessions"
@@ -65,7 +65,7 @@ func main() {
 	app := server.NewServer(db)
 	app.Use(sessions.Sessions("sessionId", cookie.NewStore([]byte("3.1y4a1o5j9"))))
 	// FinishJuding rpc dooesn't need process function
-	app.POST("/FinishJudging", services.FinishJudging)
+	app.POST("/FinishJudging", controllers.FinishJudging)
 
 	app.Use(func(ctx *gin.Context) {
 		ctx.Header("Access-Control-Allow-Origin", config.Global.FrontDomain)
@@ -78,7 +78,7 @@ func main() {
 		ctx.Next()
 	})
 
-	for url, value := range services.Router {
+	for url, value := range controllers.Router {
 		app.RestApi(url, value)
 	}
 	app.Run(config.Global.Listen)
