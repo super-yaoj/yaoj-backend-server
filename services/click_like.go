@@ -2,10 +2,7 @@ package services
 
 import (
 	"net/http"
-	"yao/db"
 	"yao/internal"
-
-	"github.com/k0kubun/pp"
 )
 
 type ClickLikeParam struct {
@@ -15,13 +12,10 @@ type ClickLikeParam struct {
 }
 
 func ClickLike(ctx *Context, param ClickLikeParam) {
-	mgr := db.NewBlogMgr(ctx.DB())
-
 	param.NewPermit().AsNormalUser().Success(func(a any) {
 		var err error
 		switch param.Target {
 		case "blog":
-			pp.Print(mgr.Exist(param.BlogID))
 			if !internal.BlogExists(param.BlogID) {
 				ctx.JSONAPI(http.StatusNotFound, "", nil)
 				return

@@ -53,6 +53,7 @@ func NewServer(db *dbr.Connection) *Server {
 	}
 }
 
+// 一个 Context 代表一次请求（事务）的上下文
 type Context struct {
 	*gin.Context
 	// create a session for each business unit of execution (e.g. a web request or goworkers job)

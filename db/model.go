@@ -2,7 +2,6 @@
 package db
 
 import (
-	"log"
 	"time"
 
 	"github.com/gocraft/dbr/v2"
@@ -32,11 +31,7 @@ type blogMgr struct {
 
 func (r *blogMgr) Exist(blogID int) bool {
 	var cnt int
-	err := r.sess.Select("count(*)").
-		From("blogs").
-		Where("blog_id=?", blogID).
-		LoadOne(&cnt)
-	log.Print("count blog: ", cnt)
+	err := r.sess.Select("count(*)").From("blogs").Where("blog_id=?", blogID).LoadOne(&cnt)
 	if err != nil {
 		panic(err)
 	}
