@@ -117,7 +117,7 @@ func NewValidator() validatorx {
 				return ValFailedErr("required non-zero")
 			}
 		case reflect.Bool:
-			if fv.Value.Bool() == false {
+			if !fv.Value.Bool() {
 				return ValFailedErr("required non-false")
 			}
 		}

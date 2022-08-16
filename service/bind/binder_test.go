@@ -1,9 +1,9 @@
-package service_test
+package bind_test
 
 import (
 	"reflect"
 	"testing"
-	"yao/service"
+	"yao/service/bind"
 )
 
 func TestFormBinder(t *testing.T) {
@@ -18,7 +18,7 @@ func TestFormBinder(t *testing.T) {
 		Ints  []int    `query:"aaa"`
 	}
 	data := Data{}
-	_, err := service.FormBinder(form).Bind(reflect.ValueOf(&data), reflect.StructField{})
+	_, err := bind.FormBinder(form).Bind(reflect.ValueOf(&data), reflect.StructField{})
 	if err != nil {
 		t.Error(err)
 		return
@@ -46,7 +46,7 @@ func TestSessionBinder(t *testing.T) {
 		// "sum":   123123,
 		"aaa": []int{1, 1, 4, 5, 1, 4},
 	}}
-	_, err := service.SessionBinder{Session: &getter}.Bind(reflect.ValueOf(&data), reflect.StructField{})
+	_, err := bind.SessionBinder{Session: &getter}.Bind(reflect.ValueOf(&data), reflect.StructField{})
 	if err != nil {
 		t.Error(err)
 		return

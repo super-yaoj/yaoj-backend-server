@@ -7,6 +7,7 @@ import (
 
 	"yao/config"
 	"yao/internal"
+	"yao/service/bind"
 
 	"github.com/gin-gonic/gin"
 )
@@ -45,13 +46,12 @@ func (ctx Context) ErrorRPC(err error) {
 }
 
 func (ctx Context) SetCookie(key, value string, security bool) {
-	ctx.Context.SetCookie(key, value, 86400 * 365, "/", config.Global.FrontDomain, security, false)
+	ctx.Context.SetCookie(key, value, 86400*365, "/", config.Global.FrontDomain, security, false)
 }
 
 func (ctx Context) DeleteCookie(key string) {
 	ctx.Context.SetCookie(key, "", -1, "/", config.Global.FrontDomain, false, false)
 }
-
 
 // Universal Web API Parameter Design
 //
@@ -59,8 +59,8 @@ func (ctx Context) DeleteCookie(key string) {
 //
 // 对于 body，会自动根据 ContentType 来解析字段，目前已支持：
 //
-//   application/x-www-form-urlencoded
-//   multipart/form-data
+//	application/x-www-form-urlencoded
+//	multipart/form-data
 //
 // session: github.com/gin-contrib/sessions
 //
@@ -87,7 +87,7 @@ var defaultValidator = NewValidator()
 func GinHandler[T any](handler StdHandlerFunc[T]) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		var data T
-		err := Bind(ctx, &data)
+		err := bind.Bind(ctx, &data)
 		if err != nil {
 			ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			log.Printf("[bind]: %s", err)
